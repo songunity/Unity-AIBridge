@@ -34,6 +34,24 @@ AIBridgeCache/CLI/AIBridgeCLI.exe
 
 > **Note**: The CLI is automatically copied to `AIBridgeCache/CLI/` when the package is installed. This provides a stable, fixed path regardless of how the package was installed (local, git, or registry).
 
+### Cross-Platform Support
+
+**Windows:**
+```bash
+AIBridgeCLI.exe <command> <action> [options]
+```
+
+**macOS / Linux:**
+```bash
+# Requires .NET Runtime installed
+dotnet AIBridgeCLI.dll <command> <action> [options]
+
+# Example
+dotnet AIBridgeCLI.dll get_logs --logType Error --raw
+```
+
+> **Note**: The CLI is built as a .NET assembly, so it can run on macOS/Linux via `dotnet` command. Install .NET Runtime from https://dotnet.microsoft.com/download if not already installed.
+
 ### Cache Directory
 
 Commands and results are stored in `AIBridgeCache/` under the Unity project root:

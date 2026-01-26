@@ -58,6 +58,14 @@ AIBridgeCLI.exe gameobject create --name "MyCube" --primitiveType Cube
 AIBridgeCLI.exe transform set_position --path "Player" --x 1 --y 2 --z 3
 ```
 
+### PowerShell Execution
+
+When the project path contains spaces, use the `&` call operator:
+
+```powershell
+& "{ProjectRoot}\AIBridgeCache\CLI\AIBridgeCLI.exe" <command> <action> [options] --raw
+```
+
 ### Global Options
 
 | Option | Description |
@@ -448,117 +456,6 @@ AIBridgeCLI.exe multi --cmd 'editor log --message Step1&gameobject create --name
 |--------|-------------|
 | `--cmd <commands>` | Commands separated by `&` |
 | `--stdin` | Read from stdin (one per line) |
-
----
-
-## Runtime Extension
-
-AIBridge provides a `AIBridgeRuntime` MonoBehaviour component for extending functionality during Play Mode.
-
-### Setup
-
-```csharp
-// Option 1: Add via code
-if (AIBridgeRuntime.Instance == null)
-{
-    var go = new GameObject("AIBridgeRuntime");
-    go.AddComponent<AIBridgeRuntime>();
-}
-
-// Option 2: Add via Inspector
-// Create empty GameObject and add AIBridgeRuntime component
-```
-
-### Implementing Custom Handlers
-
-```csharp
-using AIBridge.Runtime;
-
-public class MyCustomHandler : IAIBridgeHandler
-{
-    public string[] SupportedActions => new[] { "my_action", "another_action" };
-
-    public AIBridgeRuntimeCommandResult HandleCommand(AIBridgeRuntimeCommand command)
-    {
-        switch (command.Action)
-        {
-            case "my_action":
-                // Handle the command
-                return AIBridgeRuntimeCommandResult.FromSuccess(command.Id, new { result = "success" });
-
-            case "another_action":
-                // Handle another command
-                return AIBridgeRuntimeCommandResult.FromSuccess(command.Id);
-
-            default:
-                return null; // Not handled
-        }
-    }
-}
-
-// Register the handler
-AIBridgeRuntime.Instance.RegisterHandler(new MyCustomHandler());
-```
-
-### Async Handlers
-
-For long-running operations, implement `IAIBridgeAsyncHandler`:
-
-```csharp
-public class MyAsyncHandler : IAIBridgeAsyncHandler
-{
-    public string[] SupportedActions => new[] { "long_operation" };
-
-    public bool HandleCommandAsync(AIBridgeRuntimeCommand command, Action<AIBridgeRuntimeCommandResult> callback)
-    {
-        // Start async operation
-        StartCoroutine(DoLongOperation(command, callback));
-        return true; // Indicate we're handling it
-    }
-
-    private IEnumerator DoLongOperation(AIBridgeRuntimeCommand command, Action<AIBridgeRuntimeCommandResult> callback)
-    {
-        yield return new WaitForSeconds(5);
-        callback(AIBridgeRuntimeCommandResult.FromSuccess(command.Id, new { done = true }));
-    }
-}
-
-// Register async handler
-AIBridgeRuntime.Instance.RegisterAsyncHandler(new MyAsyncHandler());
-```
-
----
-
-## Command Protocol
-
-Commands are JSON files placed in `AIBridgeCache/commands/`:
-
-```json
-{
-    "id": "cmd_123456789",
-    "type": "gameobject",
-    "params": {
-        "action": "create",
-        "name": "MyCube",
-        "primitiveType": "Cube"
-    }
-}
-```
-
-Results are returned in `AIBridgeCache/results/`:
-
-```json
-{
-    "id": "cmd_123456789",
-    "success": true,
-    "data": {
-        "name": "MyCube",
-        "instanceId": 12345,
-        "path": "MyCube"
-    },
-    "executionTime": 15
-}
-```
 
 ---
 

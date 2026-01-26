@@ -21,7 +21,7 @@ AI Bridge 使 AI 编码助手（如 Claude、GPT 等）能够通过简单的基�
 
 1. 打开 Unity Package Manager（Window > Package Manager）
 2. 点击 "+" > "Add package from git URL"
-3. 输入：`https://github.com/YourRepo/AIBridge.git`
+3. 输入：`https://github.com/liyingsong99/AIBridge.git`
 
 ### 手动安装
 

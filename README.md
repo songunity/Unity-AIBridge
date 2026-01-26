@@ -1,7 +1,36 @@
 # AI Bridge
 
 English | [中文](./README_CN.md)
+
 File-based communication framework between AI Code assistants and Unity Editor.
+
+## Features
+
+- **GameObject** - Create, destroy, find, rename, duplicate, toggle active
+- **Transform** - Position, rotation, scale, parent hierarchy, look at
+- **Component/Inspector** - Get/set properties, add/remove components
+- **Scene** - Load, save, get hierarchy, create new
+- **Prefab** - Instantiate, save, unpack, apply overrides
+- **Asset** - Search, import, refresh, find by filter
+- **Editor Control** - Compile, undo/redo, play mode, focus window
+- **Screenshot & GIF** - Capture game view, record animated GIFs
+- **Batch Commands** - Execute multiple commands efficiently
+- **Runtime Extension** - Custom handlers for Play mode
+
+## Why AI Bridge? (vs Unity MCP)
+
+| Feature | AI Bridge | Unity MCP |
+|---------|-----------|-----------|
+| Communication | File-based | WebSocket |
+| During Unity Compile | **Works normally** | Connection lost |
+| Port Conflicts | None | May cause reconnection failure |
+| Stability | **High** | Affected by compile/restart |
+| Context Usage | **Low** | Higher |
+| Extensibility | Simple interface | Requires MCP protocol knowledge |
+
+**The Problem with MCP**: Unity MCP uses persistent WebSocket connections. When Unity recompiles (which happens frequently during development), the connection breaks. Port conflicts can also prevent reconnection, leading to a frustrating experience.
+
+**AI Bridge Solution**: By using file-based communication, AI Bridge completely avoids these issues. Commands are written as JSON files and results are read back - simple, stable, and reliable regardless of Unity's state.
 
 ## Overview
 

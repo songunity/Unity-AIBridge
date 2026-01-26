@@ -78,6 +78,48 @@ namespace AIBridge.Editor
         }
 
         /// <summary>
+        /// Get the actual CLI executable path relative to project root.
+        /// This handles both local packages and UPM cache packages.
+        /// </summary>
+        private static string GetActualCliPath()
+        {
+            var projectRoot = GetProjectRoot();
+
+            // Method 1: Direct package path (for local/embedded packages)
+            var directPath = Path.Combine("Packages", PACKAGE_NAME, "Tools~", "CLI", "AIBridgeCLI.exe");
+            if (File.Exists(Path.Combine(projectRoot, directPath)))
+            {
+                return directPath.Replace(Path.DirectorySeparatorChar, '/');
+            }
+
+            // Method 2: Use PackageInfo for resolved path (for git/registry packages in Library/PackageCache)
+            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath($"Packages/{PACKAGE_NAME}");
+            if (packageInfo != null)
+            {
+                var resolvedCliPath = Path.Combine(packageInfo.resolvedPath, "Tools~", "CLI", "AIBridgeCLI.exe");
+                if (File.Exists(resolvedCliPath))
+                {
+                    // Make it relative to project root
+                    return GetRelativePath(projectRoot, resolvedCliPath);
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Get relative path from base directory to target path.
+        /// Returns path with forward slashes for consistency in markdown files.
+        /// </summary>
+        private static string GetRelativePath(string basePath, string targetPath)
+        {
+            var baseUri = new Uri(basePath.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar);
+            var targetUri = new Uri(targetPath);
+            var relativeUri = baseUri.MakeRelativeUri(targetUri);
+            return Uri.UnescapeDataString(relativeUri.ToString());
+        }
+
+        /// <summary>
         /// Get the source skill file path from the package
         /// </summary>
         private static string GetSourceSkillPath()
@@ -107,7 +149,8 @@ namespace AIBridge.Editor
         }
 
         /// <summary>
-        /// Copy skill file to target location
+        /// Copy skill file to target location with CLI path replacement.
+        /// This ensures the CLI path in SKILL.md matches the actual package location.
         /// </summary>
         private static void CopySkillFile(string sourcePath, string targetDir, string targetFile)
         {
@@ -117,8 +160,23 @@ namespace AIBridge.Editor
                 Directory.CreateDirectory(targetDir);
             }
 
-            // Copy file
-            File.Copy(sourcePath, targetFile, true);
+            // Read source content
+            var content = File.ReadAllText(sourcePath, System.Text.Encoding.UTF8);
+
+            // Get actual CLI path and replace the hardcoded path if different
+            var actualCliPath = GetActualCliPath();
+            if (!string.IsNullOrEmpty(actualCliPath))
+            {
+                var hardcodedPath = $"Packages/{PACKAGE_NAME}/Tools~/CLI/AIBridgeCLI.exe";
+                if (actualCliPath != hardcodedPath)
+                {
+                    content = content.Replace(hardcodedPath, actualCliPath);
+                    AIBridgeLogger.LogInfo($"[SkillInstaller] Replaced CLI path: {hardcodedPath} -> {actualCliPath}");
+                }
+            }
+
+            // Write to target with UTF-8 encoding
+            File.WriteAllText(targetFile, content, System.Text.Encoding.UTF8);
         }
 
         /// <summary>

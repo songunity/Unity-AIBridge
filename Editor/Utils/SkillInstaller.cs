@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 
@@ -15,6 +16,8 @@ namespace AIBridge.Editor
         private const string SKILL_FOLDER_NAME = "aibridge";
         private const string SKILL_FILE_NAME = "SKILL.md";
         private const string PACKAGE_NAME = "cn.lys.aibridge";
+        private const string CLAUDE_MD_FILE = "CLAUDE.md";
+        private const string AIBRIDGE_SECTION_MARKER = "## AIBridge Unity Integration";
 
         static SkillInstaller()
         {
@@ -33,6 +36,8 @@ namespace AIBridge.Editor
                 var targetDir = Path.Combine(projectRoot, ".claude", "skills", SKILL_FOLDER_NAME);
                 var targetFile = Path.Combine(targetDir, SKILL_FILE_NAME);
 
+                bool skillInstalled = false;
+
                 // Check if skill file already exists
                 if (File.Exists(targetFile))
                 {
@@ -47,26 +52,111 @@ namespace AIBridge.Editor
                         {
                             CopySkillFile(sourceFile, targetDir, targetFile);
                             AIBridgeLogger.LogInfo($"[SkillInstaller] Updated skill documentation: {targetFile}");
+                            skillInstalled = true;
                         }
                     }
-                    return;
                 }
-
-                // Install skill documentation
-                var sourcePath = GetSourceSkillPath();
-                if (string.IsNullOrEmpty(sourcePath) || !File.Exists(sourcePath))
+                else
                 {
-                    AIBridgeLogger.LogWarning($"[SkillInstaller] Source skill file not found. Expected at: Packages/{PACKAGE_NAME}/Skill~/{SKILL_FILE_NAME}");
-                    return;
+                    // Install skill documentation
+                    var sourcePath = GetSourceSkillPath();
+                    if (string.IsNullOrEmpty(sourcePath) || !File.Exists(sourcePath))
+                    {
+                        AIBridgeLogger.LogWarning($"[SkillInstaller] Source skill file not found. Expected at: Packages/{PACKAGE_NAME}/Skill~/{SKILL_FILE_NAME}");
+                        return;
+                    }
+
+                    CopySkillFile(sourcePath, targetDir, targetFile);
+                    AIBridgeLogger.LogInfo($"[SkillInstaller] Installed skill documentation to: {targetFile}");
+                    skillInstalled = true;
                 }
 
-                CopySkillFile(sourcePath, targetDir, targetFile);
-                AIBridgeLogger.LogInfo($"[SkillInstaller] Installed skill documentation to: {targetFile}");
+                // Update CLAUDE.md with skill index
+                UpdateClaudeMdIfNeeded(projectRoot);
             }
             catch (Exception ex)
             {
                 AIBridgeLogger.LogError($"[SkillInstaller] Failed to install skill documentation: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Update CLAUDE.md with AIBridge skill index if not already present
+        /// </summary>
+        private static void UpdateClaudeMdIfNeeded(string projectRoot)
+        {
+            var claudeMdPath = Path.Combine(projectRoot, CLAUDE_MD_FILE);
+
+            // Check if CLAUDE.md exists
+            if (!File.Exists(claudeMdPath))
+            {
+                AIBridgeLogger.LogInfo($"[SkillInstaller] CLAUDE.md not found, skipping skill index update");
+                return;
+            }
+
+            try
+            {
+                var content = File.ReadAllText(claudeMdPath, Encoding.UTF8);
+
+                // Check if AIBridge section already exists
+                if (content.Contains(AIBRIDGE_SECTION_MARKER))
+                {
+                    return;
+                }
+
+                // Append AIBridge skill index
+                var skillIndex = GetAIBridgeSkillIndex();
+                content = content.TrimEnd() + "\n\n" + skillIndex;
+
+                File.WriteAllText(claudeMdPath, content, Encoding.UTF8);
+                AIBridgeLogger.LogInfo($"[SkillInstaller] Added AIBridge skill index to CLAUDE.md");
+            }
+            catch (Exception ex)
+            {
+                AIBridgeLogger.LogWarning($"[SkillInstaller] Failed to update CLAUDE.md: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get the AIBridge skill index content for CLAUDE.md
+        /// </summary>
+        private static string GetAIBridgeSkillIndex()
+        {
+            var cliPath = GetActualCliPath() ?? $"Packages/{PACKAGE_NAME}/Tools~/CLI/AIBridgeCLI.exe";
+            var q = "\""; // Quote character for bash commands
+
+            return $@"{AIBRIDGE_SECTION_MARKER}
+
+**Skill**: `aibridge`
+
+**Activation Keywords**: Unity log, compile Unity, modify asset, query asset, GameObject, Transform, Component, Scene, Prefab, screenshot, GIF
+
+**When to Activate**:
+- Get Unity console logs or compilation errors
+- Compile Unity project and check results
+- Create/modify/delete GameObjects in scene
+- Manipulate Transform (position/rotation/scale)
+- Add/remove/modify Components
+- Load/save scenes, query scene hierarchy
+- Instantiate or modify Prefabs
+- Search assets in AssetDatabase
+- Capture screenshots or record GIFs (Play Mode)
+
+**Quick Reference**:
+```bash
+# CLI Path
+{cliPath}
+
+# Common Commands
+AIBridgeCLI.exe compile unity --raw          # Compile and get errors
+AIBridgeCLI.exe get_logs --logType Error     # Get error logs
+AIBridgeCLI.exe asset search --mode script --keyword {q}Player{q}  # Search scripts
+AIBridgeCLI.exe gameobject create --name {q}Cube{q} --primitiveType Cube
+AIBridgeCLI.exe transform set_position --path {q}Player{q} --x 0 --y 1 --z 0
+```
+
+**Skill Documentation**: [AIBridge Skill](/.claude/skills/aibridge/SKILL.md)
+";
         }
 
         /// <summary>
@@ -199,7 +289,11 @@ namespace AIBridge.Editor
                 }
 
                 CopySkillFile(sourcePath, targetDir, targetFile);
-                EditorUtility.DisplayDialog("AIBridge", $"Skill documentation installed to:\n{targetFile}", "OK");
+
+                // Also update CLAUDE.md
+                UpdateClaudeMdIfNeeded(projectRoot);
+
+                EditorUtility.DisplayDialog("AIBridge", $"Skill documentation installed to:\n{targetFile}\n\nCLAUDE.md has been updated with skill index.", "OK");
             }
             catch (Exception ex)
             {

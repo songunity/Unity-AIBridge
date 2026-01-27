@@ -24,6 +24,7 @@ File-based communication framework between AI Code assistants and Unity Editor.
 | Communication | File-based | WebSocket |
 | During Unity Compile | **Works normally** | Connection lost |
 | Port Conflicts | None | May cause reconnection failure |
+| Multi-Project Support | **Yes** | No |
 | Stability | **High** | Affected by compile/restart |
 | Context Usage | **Low** | Higher |
 | Extensibility | Simple interface | Requires MCP protocol knowledge |

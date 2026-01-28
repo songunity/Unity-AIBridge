@@ -1,0 +1,100 @@
+name: Build CLI Multi-Platform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Tools~/AIBridgeCLI/**'
+      - '.github/workflows/build-cli.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Tools~/AIBridgeCLI/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            artifact: AIBridgeCLI.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact: AIBridgeCLI
+          - os: macos-latest
+            rid: osx-x64
+            artifact: AIBridgeCLI
+          - os: macos-latest
+            rid: osx-arm64
+            artifact: AIBridgeCLI
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Publish
+        run: |
+          dotnet publish Tools~/AIBridgeCLI/AIBridgeCLI.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained false \
+            -p:PublishSingleFile=true \
+            -o Tools~/CLI/${{ matrix.rid }}
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.rid }}
+          path: Tools~/CLI/${{ matrix.rid }}
+          retention-days: 30
+
+  commit-binaries:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: Tools~/CLI
+          pattern: cli-*
+          merge-multiple: false
+
+      - name: Reorganize artifacts
+        run: |
+          cd Tools~/CLI
+          for dir in cli-*; do
+            rid="${dir#cli-}"
+            if [ -d "$dir" ]; then
+              mkdir -p "$rid"
+              mv "$dir"/* "$rid"/ 2>/dev/null || true
+              rm -rf "$dir"
+            fi
+          done
+          ls -la */
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Tools~/CLI/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update CLI binaries for all platforms"
+            git push
+          fi

@@ -21,16 +21,37 @@ namespace AIBridge.Editor
         
         // Fixed CLI path in AIBridgeCache directory
         private const string CLI_CACHE_FOLDER = "AIBridgeCache/CLI";
-        private const string CLI_EXE_NAME = "AIBridgeCLI.exe";
         private static readonly string[] CLI_FILES = new[]
         {
-            "AIBridgeCLI.exe",
             "AIBridgeCLI.dll",
             "AIBridgeCLI.deps.json",
             "AIBridgeCLI.runtimeconfig.json",
             "AIBridgeCLI.pdb",
             "Newtonsoft.Json.dll"
         };
+        
+        private static string GetPlatformRID()
+        {
+#if UNITY_EDITOR_WIN
+            return "win-x64";
+#elif UNITY_EDITOR_OSX
+            return System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == 
+                   System.Runtime.InteropServices.Architecture.Arm64 ? "osx-arm64" : "osx-x64";
+#elif UNITY_EDITOR_LINUX
+            return "linux-x64";
+#else
+            return "win-x64";
+#endif
+        }
+        
+        private static string GetCliExecutableName()
+        {
+#if UNITY_EDITOR_WIN
+            return "AIBridgeCLI.exe";
+#else
+            return "AIBridgeCLI";
+#endif
+        }
 
         static SkillInstaller()
         {
@@ -99,18 +120,26 @@ namespace AIBridge.Editor
         /// </summary>
         private static void CopyCliToCacheIfNeeded(string projectRoot)
         {
+            var platformRID = GetPlatformRID();
+            var cliExeName = GetCliExecutableName();
             var targetCliDir = Path.Combine(projectRoot, CLI_CACHE_FOLDER);
-            var targetCliExe = Path.Combine(targetCliDir, CLI_EXE_NAME);
+            var targetCliExe = Path.Combine(targetCliDir, cliExeName);
             
-            // Find source CLI directory
-            var sourceCliDir = GetSourceCliDirectory();
+            // Find source CLI directory (platform-specific)
+            var sourceCliDir = GetSourceCliDirectory(platformRID);
+            if (string.IsNullOrEmpty(sourceCliDir))
+            {
+                // Fallback to legacy non-platform directory
+                sourceCliDir = GetSourceCliDirectory(null);
+            }
+            
             if (string.IsNullOrEmpty(sourceCliDir))
             {
                 AIBridgeLogger.LogWarning("[SkillInstaller] Source CLI directory not found");
                 return;
             }
             
-            var sourceCliExe = Path.Combine(sourceCliDir, CLI_EXE_NAME);
+            var sourceCliExe = Path.Combine(sourceCliDir, cliExeName);
             if (!File.Exists(sourceCliExe))
             {
                 AIBridgeLogger.LogWarning($"[SkillInstaller] Source CLI executable not found: {sourceCliExe}");
@@ -139,6 +168,33 @@ namespace AIBridge.Editor
             
             // Copy all CLI files
             int copiedCount = 0;
+            
+            // Copy executable first
+            try
+            {
+                File.Copy(sourceCliExe, targetCliExe, true);
+                copiedCount++;
+#if !UNITY_EDITOR_WIN
+                // Set executable permission on Unix platforms
+                try
+                {
+                    var process = new System.Diagnostics.Process();
+                    process.StartInfo.FileName = "chmod";
+                    process.StartInfo.Arguments = $"+x \"{targetCliExe}\"";
+                    process.StartInfo.UseShellExecute = false;
+                    process.StartInfo.CreateNoWindow = true;
+                    process.Start();
+                    process.WaitForExit();
+                }
+                catch { }
+#endif
+            }
+            catch (Exception ex)
+            {
+                AIBridgeLogger.LogWarning($"[SkillInstaller] Failed to copy {cliExeName}: {ex.Message}");
+            }
+            
+            // Copy other files
             foreach (var fileName in CLI_FILES)
             {
                 var sourceFile = Path.Combine(sourceCliDir, fileName);
@@ -167,12 +223,14 @@ namespace AIBridge.Editor
         /// <summary>
         /// Get the source CLI directory from the package.
         /// </summary>
-        private static string GetSourceCliDirectory()
+        /// <param name="platformRID">Platform RID (e.g., win-x64, osx-arm64) or null for legacy path</param>
+        private static string GetSourceCliDirectory(string platformRID)
         {
             var projectRoot = GetProjectRoot();
+            var subPath = string.IsNullOrEmpty(platformRID) ? "CLI" : $"CLI/{platformRID}";
             
             // Method 1: Direct package path (for local/embedded packages)
-            var directPath = Path.Combine(projectRoot, "Packages", PACKAGE_NAME, "Tools~", "CLI");
+            var directPath = Path.Combine(projectRoot, "Packages", PACKAGE_NAME, "Tools~", subPath);
             if (Directory.Exists(directPath))
             {
                 return directPath;
@@ -182,7 +240,7 @@ namespace AIBridge.Editor
             var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath($"Packages/{PACKAGE_NAME}");
             if (packageInfo != null)
             {
-                var resolvedPath = Path.Combine(packageInfo.resolvedPath, "Tools~", "CLI");
+                var resolvedPath = Path.Combine(packageInfo.resolvedPath, "Tools~", subPath);
                 if (Directory.Exists(resolvedPath))
                 {
                     return resolvedPath;
@@ -235,7 +293,8 @@ namespace AIBridge.Editor
         private static string GetAIBridgeSkillIndex()
         {
             // Use fixed CLI path in AIBridgeCache directory
-            var cliPath = CLI_CACHE_FOLDER + "/" + CLI_EXE_NAME;
+            var cliExeName = GetCliExecutableName();
+            var cliPath = CLI_CACHE_FOLDER + "/" + cliExeName;
             var q = "\""; // Quote character for bash commands
 
             return $@"{AIBRIDGE_SECTION_MARKER}
@@ -261,11 +320,11 @@ namespace AIBridge.Editor
 {cliPath}
 
 # Common Commands
-AIBridgeCLI.exe compile unity --raw          # Compile and get errors
-AIBridgeCLI.exe get_logs --logType Error     # Get error logs
-AIBridgeCLI.exe asset search --mode script --keyword {q}Player{q}  # Search scripts
-AIBridgeCLI.exe gameobject create --name {q}Cube{q} --primitiveType Cube
-AIBridgeCLI.exe transform set_position --path {q}Player{q} --x 0 --y 1 --z 0
+{cliExeName} compile unity --raw          # Compile and get errors
+{cliExeName} get_logs --logType Error     # Get error logs
+{cliExeName} asset search --mode script --keyword {q}Player{q}  # Search scripts
+{cliExeName} gameobject create --name {q}Cube{q} --primitiveType Cube
+{cliExeName} transform set_position --path {q}Player{q} --x 0 --y 1 --z 0
 ```
 
 **Skill Documentation**: [AIBridge Skill](/.claude/skills/aibridge/SKILL.md)
@@ -325,8 +384,9 @@ AIBridgeCLI.exe transform set_position --path {q}Player{q} --x 0 --y 1 --z 0
             var content = File.ReadAllText(sourcePath, System.Text.Encoding.UTF8);
 
             // Replace hardcoded path with fixed CLI cache path
+            var cliExeName = GetCliExecutableName();
             var hardcodedPath = $"Packages/{PACKAGE_NAME}/Tools~/CLI/AIBridgeCLI.exe";
-            var fixedCliPath = CLI_CACHE_FOLDER + "/" + CLI_EXE_NAME;
+            var fixedCliPath = CLI_CACHE_FOLDER + "/" + cliExeName;
             if (content.Contains(hardcodedPath))
             {
                 content = content.Replace(hardcodedPath, fixedCliPath);

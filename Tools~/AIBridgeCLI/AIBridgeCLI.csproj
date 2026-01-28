@@ -12,10 +12,12 @@
     <!-- 单文件发布配置 -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>false</SelfContained>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- RuntimeIdentifier 由 CI/CD 或命令行指定 -->
+    <!-- 本地开发默认使用 win-x64 -->
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
 
-    <!-- 输出到 CLI 目录 -->
-    <OutputPath>..\CLI\</OutputPath>
+    <!-- 输出到 CLI/{RID} 目录 -->
+    <OutputPath>..\CLI\$(RuntimeIdentifier)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>

@@ -27,7 +27,8 @@ namespace AIBridge.Editor
             "AIBridgeCLI.deps.json",
             "AIBridgeCLI.runtimeconfig.json",
             "AIBridgeCLI.pdb",
-            "Newtonsoft.Json.dll"
+            "Newtonsoft.Json.dll",
+            "AIBridgeCLI"  // macOS/Linux executable (no extension)
         };
         
         private static string GetPlatformRID()

@@ -241,7 +241,10 @@ namespace AIBridge.Editor
             for (int i = 0; i <= frames; i++)
             {
                 float t = i / (float)frames;
-                pointerData.position = Vector2.Lerp(startPos, endPos, t);
+                Vector2 newPos = Vector2.Lerp(startPos, endPos, t);
+                Vector2 delta = newPos - pointerData.position;
+                pointerData.position = newPos;
+                pointerData.delta = delta;
                 ExecuteEvents.Execute(go, pointerData, ExecuteEvents.dragHandler);
                 yield return null;
             }

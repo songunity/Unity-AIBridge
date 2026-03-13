@@ -16,7 +16,7 @@ namespace AIBridge.Editor
             [Description("Hierarchy path of the GameObject")] string path = null,
             [Description("Instance ID of the GameObject")] int instanceId = 0)
         {
-            var go = GetTargetGameObject(path, instanceId);
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
             {
                 yield return CommandResult.Failure("GameObject not found");
@@ -57,7 +57,7 @@ namespace AIBridge.Editor
             [Description("Component type name")] string componentName = null,
             [Description("Component index (alternative to componentName)")] int componentIndex = -1)
         {
-            var go = GetTargetGameObject(path, instanceId);
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
             {
                 yield return CommandResult.Failure("GameObject not found");
@@ -109,7 +109,7 @@ namespace AIBridge.Editor
             [Description("Serialized property name")] string propertyName = null,
             [Description("New value for the property")] string value = null)
         {
-            var go = GetTargetGameObject(path, instanceId);
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
             {
                 yield return CommandResult.Failure("GameObject not found");
@@ -160,7 +160,7 @@ namespace AIBridge.Editor
             [Description("Instance ID of the GameObject")] int instanceId = 0,
             [Description("Component type name (e.g. Rigidbody, BoxCollider)")] string typeName = null)
         {
-            var go = GetTargetGameObject(path, instanceId);
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
             {
                 yield return CommandResult.Failure("GameObject not found");
@@ -215,7 +215,7 @@ namespace AIBridge.Editor
             [Description("Component index")] int componentIndex = -1,
             [Description("Instance ID of the component")] int componentInstanceId = 0)
         {
-            var go = GetTargetGameObject(path, instanceId);
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
             {
                 yield return CommandResult.Failure("GameObject not found");
@@ -247,15 +247,6 @@ namespace AIBridge.Editor
                 gameObjectName = go.name,
                 removedComponent = removedTypeName
             });
-        }
-
-        private static GameObject GetTargetGameObject(string path, int instanceId)
-        {
-            if (instanceId != 0)
-                return EditorUtility.InstanceIDToObject(instanceId) as GameObject;
-            if (!string.IsNullOrEmpty(path))
-                return GameObject.Find(path);
-            return Selection.activeGameObject;
         }
 
         private static Component FindComponent(GameObject go, string componentName, int componentIndex)

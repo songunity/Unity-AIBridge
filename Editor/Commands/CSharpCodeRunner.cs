@@ -15,56 +15,6 @@ public sealed class CSharpCodeRunner
 {
     private readonly List<MetadataReference> references;
 
-    // List of excluded namespaces to avoid ambiguous references
-    private static readonly HashSet<string> ExcludedNamespaces = new()
-    {
-        // Namespaces that conflict with Unity types
-        "System.Drawing", // Conflicts with UnityEngine.Color
-        "System.Numerics", // Conflicts with UnityEngine.Vector3, UnityEngine.Quaternion
-        "System.Diagnostics", // Conflicts with UnityEngine.Debug
-        "UnityEngine.Experimental.GlobalIllumination", // Conflicts with UnityEngine.LightType
-
-        // Other namespaces to exclude
-        "FxResources",
-        "Internal",
-        "MS.Internal",
-        "Mono.Cecil",
-        "JetBrains",
-        "Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax",
-        "Microsoft.Cci",
-        "Microsoft.Win32",
-        "Unity.Android.Gradle",
-        "Unity.Android.Types",
-        "System.Web",
-        "System.Data.SqlClient",
-        "System.Data.Sql",
-        "System.Runtime.Remoting",
-        "System.Runtime.Serialization.Formatters",
-        "System.Runtime.InteropServices.ComTypes",
-        "System.Security.Cryptography.X509Certificates",
-        "System.Security.AccessControl",
-        "System.Web.UI.WebControls",
-        "System.Web.UI.HtmlControls",
-        "Microsoft.SqlServer",
-        "Microsoft.VisualBasic",
-        "Mono.Net",
-        "Mono.Util",
-        "Mono.Math",
-        "Microsoft.DiaSymReader",
-        "Microsoft.CSharp"
-    };
-
-    // Priority namespace prefixes
-    private static readonly string[] PriorityPrefixes = {
-        "UnityEngine.",
-        "UnityEditor.",
-        "System.",
-        "TMPro.",
-        "Unity.Collections.",
-        "Unity.Mathematics.",
-        "Unity.Jobs."
-    };
-
     /// <summary>
     /// Initializes a new instance of the <see cref="CSharpCodeRunner"/> class.
     /// </summary>

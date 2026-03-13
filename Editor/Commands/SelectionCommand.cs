@@ -23,7 +23,7 @@ namespace AIBridge.Editor
                 var info = new GameObjectInfo
                 {
                     name = go.name,
-                    path = GetGameObjectPath(go),
+                    path = GameObjectHelper.GetGameObjectPath(go),
                     tag = go.tag,
                     layer = LayerMask.LayerToName(go.layer),
                     activeSelf = go.activeSelf,
@@ -200,18 +200,6 @@ namespace AIBridge.Editor
                 removedObject = objectToRemove.name,
                 newCount = Selection.objects.Length
             });
-        }
-
-        private static string GetGameObjectPath(GameObject go)
-        {
-            var goPath = go.name;
-            var parent = go.transform.parent;
-            while (parent != null)
-            {
-                goPath = parent.name + "/" + goPath;
-                parent = parent.parent;
-            }
-            return goPath;
         }
 
         [Serializable]

@@ -13,7 +13,8 @@ namespace AIBridge.Editor
             [Description("Hierarchy path of the GameObject")] string path = null,
             [Description("Instance ID of the GameObject")] int instanceId = 0)
         {
-            var t = GetTargetTransform(path, instanceId);
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
+            var t = go?.transform ?? Selection.activeTransform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");
@@ -43,7 +44,7 @@ namespace AIBridge.Editor
             [Description("Z coordinate (omit to keep current)")] float z = float.NaN,
             [Description("Use local space")] bool local = false)
         {
-            var t = GetTargetTransform(path, instanceId);
+            var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");
@@ -84,7 +85,7 @@ namespace AIBridge.Editor
             [Description("Z euler angle (omit to keep current)")] float z = float.NaN,
             [Description("Use local space")] bool local = false)
         {
-            var t = GetTargetTransform(path, instanceId);
+            var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");
@@ -124,7 +125,7 @@ namespace AIBridge.Editor
             [Description("Z scale (omit to keep current)")] float z = float.NaN,
             [Description("Uniform scale for all axes")] float uniform = float.NaN)
         {
-            var t = GetTargetTransform(path, instanceId);
+            var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");
@@ -160,7 +161,7 @@ namespace AIBridge.Editor
             [Description("Instance ID of the new parent")] int parentInstanceId = 0,
             [Description("Keep world position after reparenting")] bool worldPositionStays = true)
         {
-            var t = GetTargetTransform(path, instanceId);
+            var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");
@@ -198,7 +199,7 @@ namespace AIBridge.Editor
             [Description("Target Y coordinate")] float targetY = float.NaN,
             [Description("Target Z coordinate")] float targetZ = float.NaN)
         {
-            var t = GetTargetTransform(path, instanceId);
+            var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");
@@ -229,7 +230,7 @@ namespace AIBridge.Editor
             [Description("Reset rotation")] bool rotation = true,
             [Description("Reset scale")] bool scale = true)
         {
-            var t = GetTargetTransform(path, instanceId);
+            var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");
@@ -248,21 +249,6 @@ namespace AIBridge.Editor
                 localRotation = new { x = t.localEulerAngles.x, y = t.localEulerAngles.y, z = t.localEulerAngles.z },
                 localScale = new { x = t.localScale.x, y = t.localScale.y, z = t.localScale.z }
             });
-        }
-
-        private static Transform GetTargetTransform(string path, int instanceId)
-        {
-            if (instanceId != 0)
-            {
-                var go = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
-                return go?.transform;
-            }
-            if (!string.IsNullOrEmpty(path))
-            {
-                var go = GameObject.Find(path);
-                return go?.transform;
-            }
-            return Selection.activeTransform;
         }
     }
 }

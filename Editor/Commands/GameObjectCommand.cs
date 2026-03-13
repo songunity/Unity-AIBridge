@@ -46,7 +46,7 @@ namespace AIBridge.Editor
             yield return CommandResult.Success(new
             {
                 name = go.name,
-                path = GetGameObjectPath(go),
+                path = GameObjectHelper.GetGameObjectPath(go),
                 instanceId = go.GetInstanceID()
             });
         }
@@ -57,7 +57,7 @@ namespace AIBridge.Editor
             [Description("Hierarchy path of the GameObject")] string path = null,
             [Description("Instance ID of the GameObject")] int instanceId = 0)
         {
-            var go = GetTargetGameObject(path, instanceId);
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
             {
                 yield return CommandResult.Failure("GameObject not found. Provide 'path' or 'instanceId', or select a GameObject");
@@ -65,7 +65,7 @@ namespace AIBridge.Editor
             }
 
             var goName = go.name;
-            var goPath = GetGameObjectPath(go);
+            var goPath = GameObjectHelper.GetGameObjectPath(go);
             Undo.DestroyObjectImmediate(go);
 
             yield return CommandResult.Success(new
@@ -93,7 +93,7 @@ namespace AIBridge.Editor
                 {
                     if (results.Count >= maxResults) break;
                     if (string.IsNullOrEmpty(name) || obj.name.Contains(name))
-                        results.Add(CreateGameObjectInfo(obj));
+                        results.Add(GameObjectHelper.CreateGameObjectInfo(obj));
                 }
             }
             else
@@ -116,7 +116,7 @@ namespace AIBridge.Editor
                         }
                         if (!hasComponent) continue;
                     }
-                    results.Add(CreateGameObjectInfo(obj));
+                    results.Add(GameObjectHelper.CreateGameObjectInfo(obj));
                 }
             }
 
@@ -131,7 +131,7 @@ namespace AIBridge.Editor
             [Description("Whether to activate the GameObject")] bool active = true,
             [Description("Toggle the current active state")] bool toggle = false)
         {
-            var go = GetTargetGameObject(path, instanceId);
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
             {
                 yield return CommandResult.Failure("GameObject not found");
@@ -156,7 +156,7 @@ namespace AIBridge.Editor
             [Description("Instance ID of the GameObject")] int instanceId = 0,
             [Description("New name for the GameObject")] string newName = null)
         {
-            var go = GetTargetGameObject(path, instanceId);
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
             {
                 yield return CommandResult.Failure("GameObject not found");
@@ -176,7 +176,7 @@ namespace AIBridge.Editor
             {
                 oldName,
                 newName = go.name,
-                path = GetGameObjectPath(go)
+                path = GameObjectHelper.GetGameObjectPath(go)
             });
         }
 
@@ -186,7 +186,7 @@ namespace AIBridge.Editor
             [Description("Hierarchy path of the GameObject")] string path = null,
             [Description("Instance ID of the GameObject")] int instanceId = 0)
         {
-            var go = GetTargetGameObject(path, instanceId);
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
             {
                 yield return CommandResult.Failure("GameObject not found");
@@ -202,7 +202,7 @@ namespace AIBridge.Editor
             {
                 originalName = go.name,
                 duplicateName = duplicate.name,
-                duplicatePath = GetGameObjectPath(duplicate),
+                duplicatePath = GameObjectHelper.GetGameObjectPath(duplicate),
                 duplicateInstanceId = duplicate.GetInstanceID()
             });
         }
@@ -213,7 +213,7 @@ namespace AIBridge.Editor
             [Description("Hierarchy path of the GameObject")] string path = null,
             [Description("Instance ID of the GameObject")] int instanceId = 0)
         {
-            var go = GetTargetGameObject(path, instanceId);
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
             {
                 yield return CommandResult.Failure("GameObject not found");
@@ -234,7 +234,7 @@ namespace AIBridge.Editor
             yield return CommandResult.Success(new
             {
                 name = go.name,
-                path = GetGameObjectPath(go),
+                path = GameObjectHelper.GetGameObjectPath(go),
                 instanceId = go.GetInstanceID(),
                 tag = go.tag,
                 layer = LayerMask.LayerToName(go.layer),
@@ -247,47 +247,6 @@ namespace AIBridge.Editor
                 children,
                 parentName = go.transform.parent?.name
             });
-        }
-
-        private static GameObject GetTargetGameObject(string path, int instanceId)
-        {
-            if (instanceId != 0)
-                return EditorUtility.InstanceIDToObject(instanceId) as GameObject;
-            if (!string.IsNullOrEmpty(path))
-                return GameObject.Find(path);
-            return Selection.activeGameObject;
-        }
-
-        private static string GetGameObjectPath(GameObject go)
-        {
-            var goPath = go.name;
-            var parent = go.transform.parent;
-            while (parent != null)
-            {
-                goPath = parent.name + "/" + goPath;
-                parent = parent.parent;
-            }
-            return goPath;
-        }
-
-        private static GameObjectInfo CreateGameObjectInfo(GameObject go)
-        {
-            return new GameObjectInfo
-            {
-                name = go.name,
-                path = GetGameObjectPath(go),
-                instanceId = go.GetInstanceID(),
-                activeSelf = go.activeSelf
-            };
-        }
-
-        [Serializable]
-        private class GameObjectInfo
-        {
-            public string name;
-            public string path;
-            public int instanceId;
-            public bool activeSelf;
         }
     }
 }

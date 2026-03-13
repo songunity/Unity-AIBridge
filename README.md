@@ -15,34 +15,23 @@ File-based communication framework between AI Code assistants and Unity Editor.
 - **Editor Control** - Compile, undo/redo, play mode, focus window
 - **Screenshot & GIF** - Capture game view, record animated GIFs
 - **Batch Commands** - Execute multiple commands efficiently
-- **Runtime Extension** - Custom handlers for Play mode
+- **Code Execution** - Execute C# code dynamically in Editor or Runtime
 
 ## Why AI Bridge? (vs Unity MCP)
 
-| Feature | AI Bridge | Unity MCP |
-|---------|-----------|-----------|
-| Communication | File-based | WebSocket |
-| During Unity Compile | **Works normally** | Connection lost |
-| Port Conflicts | None | May cause reconnection failure |
-| Multi-Project Support | **Yes** | No |
-| Stability | **High** | Affected by compile/restart |
-| Context Usage | **Low** | Higher |
-| Extensibility | Simple interface | Requires MCP protocol knowledge |
+| Feature               | AI Bridge          | Unity MCP                       |
+| --------------------- | ------------------ | ------------------------------- |
+| Communication         | File-based         | WebSocket                       |
+| During Unity Compile  | **Works normally** | Connection lost                 |
+| Port Conflicts        | None               | May cause reconnection failure  |
+| Multi-Project Support | **Yes**            | No                              |
+| Stability             | **High**           | Affected by compile/restart     |
+| Context Usage         | **Low**            | Higher                          |
+| Extensibility         | Simple interface   | Requires MCP protocol knowledge |
 
 **The Problem with MCP**: Unity MCP uses persistent WebSocket connections. When Unity recompiles (which happens frequently during development), the connection breaks. Port conflicts can also prevent reconnection, leading to a frustrating experience.
 
 **AI Bridge Solution**: By using file-based communication, AI Bridge completely avoids these issues. Commands are written as JSON files and results are read back - simple, stable, and reliable regardless of Unity's state.
-
-## Overview
-
-AI Bridge enables AI coding assistants (like Claude, GPT, etc.) to communicate with Unity Editor through a simple file-based protocol. This allows AI to:
-
-- Create and manipulate GameObjects
-- Modify Transforms and Components
-- Load and save Scenes
-- Capture screenshots and GIF recordings
-- Execute menu items
-- And much more...
 
 ## Installation
 
@@ -50,7 +39,7 @@ AI Bridge enables AI coding assistants (like Claude, GPT, etc.) to communicate w
 
 1. Open Unity Package Manager (Window > Package Manager)
 2. Click "+" > "Add package from git URL"
-3. Enter: `https://github.com/liyingsong99/AIBridge.git`
+3. Enter: `https://github.com/wang-er-s/AIBridge.git`
 
 ### Manual Installation
 
@@ -63,176 +52,103 @@ AI Bridge enables AI coding assistants (like Claude, GPT, etc.) to communicate w
 - .NET 6.0 Runtime (for CLI tool)
 - Newtonsoft.Json (com.unity.nuget.newtonsoft-json)
 
-## Package Structure
+## Quick Start
 
-```
-cn.lys.aibridge/
-├── package.json
-├── README.md
-├── Editor/
-│   ├── cn.lys.aibridge.Editor.asmdef
-│   ├── Core/
-│   │   ├── AIBridge.cs              # Main entry point
-│   │   ├── CommandWatcher.cs        # File watcher for commands
-│   │   └── CommandQueue.cs          # Command processing queue
-│   ├── Commands/
-│   │   ├── ICommand.cs              # Command interface
-│   │   ├── CommandRegistry.cs       # Command registration
-│   │   └── ...                      # Various command implementations
-│   ├── Models/
-│   │   ├── CommandRequest.cs        # Request model
-│   │   └── CommandResult.cs         # Result model
-│   └── Utils/
-│       ├── AIBridgeLogger.cs        # Logging utility
-│       └── ComponentTypeResolver.cs  # Component type resolution
-├── Runtime/
-│   ├── cn.lys.aibridge.Runtime.asmdef
-│   ├── AIBridgeRuntime.cs           # MonoBehaviour singleton for runtime
-│   ├── AIBridgeRuntimeData.cs       # Runtime data classes
-│   └── IAIBridgeHandler.cs          # Extension interface
-└── Tools~/
-    ├── CLI/
-    │   └── AIBridgeCLI.exe          # Command line tool
-    ├── AIBridgeCLI/                 # CLI source code
-    └── Exchange/
-        ├── commands/                # Command files written here
-        ├── results/                 # Result files returned here
-        └── screenshots/             # Screenshots saved here
+### 1. Add Custom Commands
+
+Create a static class with methods marked with `[AIBridge]` attribute:
+
+```csharp
+using AIBridge.Editor;
+using System.Collections;
+using System.ComponentModel;
+
+public static class MyCustomCommand
+{
+    [AIBridge("Create a custom cube with specific settings")]
+    public static IEnumerator CreateCustomCube(
+        [Description("Cube name")] string name = "CustomCube",
+        [Description("Cube size")] float size = 1.0f)
+    {
+        var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        cube.name = name;
+        cube.transform.localScale = Vector3.one * size;
+
+        yield return CommandResult.Success($"Created {name} with size {size}");
+    }
+}
 ```
 
-## Usage
+**Key Points:**
 
-### Editor Mode
+- Method must be `static` and return `IEnumerator`
+- Use `[AIBridge]` attribute with description
+- Use `[Description]` for parameter documentation
+- Return `CommandResult.Success()` or `CommandResult.Failure()`
 
-AI Bridge automatically starts when Unity Editor opens. Commands are processed from `Tools~/Exchange/commands/`.
+### 2. Scan Commands
 
-#### Menu Items
-- `AIBridge/Process Commands Now` - Process pending commands immediately
-- `AIBridge/Toggle Auto-Processing` - Enable/disable automatic command processing
+Open `AIBridge/Settings` window (menu: `AIBridge/Settings`) and click **"Scan Commands"** button to register your custom commands.
 
-### CLI Tool
+### 3. Generate Skill Documentation
 
-The CLI tool (`AIBridgeCLI.exe`) provides a command-line interface for sending commands.
+In the same settings window, click **"Generate Skill"** to auto-generate `Skill~/SKILL.md` documentation for AI assistants.
+
+**Important:** When generating the Skill documentation, it automatically scans and includes complete descriptions, parameter details, and usage examples for all registered commands, including both built-in and your custom commands.
+
+### 4. Use Commands
+
+Use the CLI tool or let AI assistants call your commands:
 
 ```bash
-# Show help
-AIBridgeCLI --help
-
-# Send a log message
-AIBridgeCLI editor log --message "Hello from AI!"
-
-# Create a GameObject
-AIBridgeCLI gameobject create --name "MyCube" --primitiveType Cube
-
-# Set transform position
-AIBridgeCLI transform set_position --path "MyCube" --x 1 --y 2 --z 3
-
-# Get scene hierarchy
-AIBridgeCLI scene get_hierarchy
-
-# Capture screenshot
-AIBridgeCLI screenshot game
-
-# Record GIF
-AIBridgeCLI screenshot gif --frameCount 60 --fps 20
+AIBridgeCLI.exe MyCustomCommand_CreateCustomCube --name "MyCube" --size 2.0
 ```
 
-### Available Commands
+## Command Registration
 
-| Command | Description |
-|---------|-------------|
-| `editor` | Editor operations (log, undo, redo, play mode, etc.) |
-| `compile` | Compilation operations (unity, dotnet) |
-| `gameobject` | GameObject operations (create, destroy, find, etc.) |
-| `transform` | Transform operations (position, rotation, scale, parent) |
-| `inspector` | Component/Inspector operations |
-| `selection` | Selection operations |
-| `scene` | Scene operations (load, save, hierarchy) |
-| `prefab` | Prefab operations (instantiate, save, unpack) |
-| `asset` | AssetDatabase operations |
-| `menu_item` | Invoke Unity menu items |
-| `get_logs` | Get Unity console logs |
-| `batch` | Execute multiple commands |
-| `screenshot` | Capture screenshots and GIF recordings |
-| `focus` | Bring Unity Editor to foreground (CLI-only) |
+### Auto-Scan Mode
 
-### Runtime Extension
+Enable **"Auto Scan on Startup"** in `AIBridge/Settings` to automatically scan and register commands when Unity starts. You can specify which assemblies to scan (default: `Assembly-CSharp-Editor-firstpass;Assembly-CSharp`).
 
-For runtime (Play mode) support, add `AIBridgeRuntime` component to your scene:
+**Note:** If the package is installed in `Library/PackageCache` (immutable), auto-scan is forced on.
 
-```csharp
-// Option 1: Add via code
-if (AIBridgeRuntime.Instance == null)
-{
-    var go = new GameObject("AIBridgeRuntime");
-    go.AddComponent<AIBridgeRuntime>();
-}
+### Manual Registration
 
-// Option 2: Add via Inspector
-// Create empty GameObject and add AIBridgeRuntime component
-```
+If auto-scan is disabled, commands are registered from the built-in `CommandRegistry.AutoRegister()` method. After adding new commands, click **"Scan Commands"** in the settings window.
 
-#### Implementing Custom Handlers
+## Skill Documentation
 
-```csharp
-using AIBridge.Runtime;
+The `Skill~/SKILL.md` file is auto-generated documentation for AI assistants (like Claude, GPT, etc.). It includes:
 
-public class MyCustomHandler : IAIBridgeHandler
-{
-    public string[] SupportedActions => new[] { "my_action", "another_action" };
+- All registered command names and descriptions (built-in + custom)
+- Parameter details for each command (types and descriptions)
+- Usage examples
+- CLI syntax
 
-    public AIBridgeRuntimeCommandResult HandleCommand(AIBridgeRuntimeCommand command)
-    {
-        switch (command.Action)
-        {
-            case "my_action":
-                // Handle the command
-                return AIBridgeRuntimeCommandResult.FromSuccess(command.Id, new { result = "success" });
+**To regenerate:** Click **"Generate Skill"** in `AIBridge/Settings` after adding or modifying commands. The system will automatically scan all commands and generate complete documentation.
 
-            case "another_action":
-                // Handle another command
-                return AIBridgeRuntimeCommandResult.FromSuccess(command.Id);
+**Usage:** Share `Skill~/SKILL.md` with your AI assistant to enable Unity Editor control. See the file for detailed command reference and examples.
 
-            default:
-                return null; // Not handled
-        }
-    }
-}
+## Install Skill to AI Editors
 
-// Register the handler
-AIBridgeRuntime.Instance.RegisterHandler(new MyCustomHandler());
-```
+To enable Claude Code or Cursor to automatically recognize the AIBridge Skill, you can install it with one click:
 
-## Command Protocol
+### Install to Claude Code
 
-Commands are JSON files placed in `Tools~/Exchange/commands/`:
+Menu: `AIBridge/Install to Claude Code (Symlink)`
 
-```json
-{
-    "id": "cmd_123456789",
-    "type": "gameobject",
-    "params": {
-        "action": "create",
-        "name": "MyCube",
-        "primitiveType": "Cube"
-    }
-}
-```
+This creates a `.claude/skills/aibridge` symlink in the project root, pointing to `Skill~/SKILL.md`.
 
-Results are returned in `Tools~/Exchange/results/`:
+### Install to Cursor
 
-```json
-{
-    "id": "cmd_123456789",
-    "success": true,
-    "data": {
-        "name": "MyCube",
-        "instanceId": 12345,
-        "path": "MyCube"
-    },
-    "executionTime": 15
-}
-```
+Menu: `AIBridge/Install to Cursor (Symlink)`
+
+This creates a `.cursor/skills/aibridge` symlink in the project root, pointing to `Skill~/SKILL.md`.
+
+**Notes:**
+- Using symlinks ensures AI editors automatically get the latest version when you regenerate the Skill documentation
+- Creating symlinks on Windows may require administrator privileges
+- If symlink creation fails, it will automatically fall back to file copy mode
 
 ## License
 

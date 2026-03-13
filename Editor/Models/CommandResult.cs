@@ -36,7 +36,12 @@ namespace AIBridge.Editor
         /// <summary>
         /// Create a successful result
         /// </summary>
-        public static CommandResult Success(string id, object data = null)
+        public static CommandResult Success(object data = null)
+        {
+            return SuccessWithId(null, data);
+        }
+        
+        public static CommandResult SuccessWithId(string id, object data = null)
         {
             return new CommandResult
             {
@@ -50,7 +55,12 @@ namespace AIBridge.Editor
         /// <summary>
         /// Create a failed result
         /// </summary>
-        public static CommandResult Failure(string id, string error)
+        public static CommandResult Failure(string error)
+        {
+            return FailureWithId(null, error);
+        }
+
+        public static CommandResult FailureWithId(string id, string error)
         {
             return new CommandResult
             {

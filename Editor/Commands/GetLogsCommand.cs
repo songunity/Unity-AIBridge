@@ -1,145 +1,109 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
+using System.ComponentModel;
+using System.Linq;
+using UnityEngine;
 
 namespace AIBridge.Editor
 {
-    /// <summary>
-    /// Get console logs from Unity Editor
-    /// </summary>
-    public class GetLogsCommand : ICommand
+    public static class GetLogsCommand
     {
-        public string Type => "get_logs";
-        public bool RequiresRefresh => false;
+        private static bool _capturing;
+        private static readonly List<LogEntry> _logs = new List<LogEntry>();
 
-        public CommandResult Execute(CommandRequest request)
+        [AIBridge("Get console logs from Unity Editor",
+            "AIBridgeCLI Log --count 50",
+            "Log")]
+        public static IEnumerator Log(
+            [Description("Log type filter: All, Error, Warning, Log")] string logType = "All",
+            [Description("Text filter (substring match)")] string filter = null,
+            [Description("Maximum number of logs to return")] int count = 50)
         {
-            var count = request.GetParam("count", 50);
-            var logType = request.GetParam("logType", "all");
+            if (_capturing)
+            {
+                IEnumerable<LogEntry> results = _logs;
+                if (!logType.Equals("All", StringComparison.OrdinalIgnoreCase))
+                    results = results.Where(l => MatchesType(l.type, logType));
+                if (!string.IsNullOrEmpty(filter))
+                    results = results.Where(l => l.message.Contains(filter));
 
-            try
-            {
-                var logs = GetConsoleLogs(count, logType);
-                return CommandResult.Success(request.id, new
+                var captured = results.TakeLast(count).Select(l => new
                 {
-                    logs = logs,
-                    count = logs.Count
-                });
+                    type = l.type.ToString(),
+                    message = l.message,
+                    time = l.time.ToString("HH:mm:ss.fff")
+                }).ToArray();
+
+                yield return CommandResult.Success(new { count = captured.Length, logs = captured });
             }
-            catch (Exception ex)
+            else
             {
-                return CommandResult.FromException(request.id, ex);
+                int targetMask = 0;
+                if (logType == "All" || logType.Contains("Error"))   targetMask |= DebugSkills.ErrorModeMask;
+                if (logType == "All" || logType.Contains("Warning")) targetMask |= DebugSkills.WarningModeMask;
+                if (logType == "All" || logType.Contains("Log"))     targetMask |= DebugSkills.LogModeMask;
+
+                var log = DebugSkills.ReadLogEntries(targetMask, filter, count);
+                if (log.Count <= 0)
+                {
+                    yield return CommandResult.Success("No logs found");
+                }
+                else
+                {
+                    yield return CommandResult.Success(log);
+                }
             }
         }
 
-        private List<LogEntry> GetConsoleLogs(int maxCount, string logTypeFilter)
+        [AIBridge("Start capturing Unity console logs into buffer",
+            "AIBridgeCLI GetLogsCommand_StartCapture")]
+        public static IEnumerator StartCapture()
         {
-            var logs = new List<LogEntry>();
-
-            try
+            if (!_capturing)
             {
-                // Use reflection to access internal LogEntries class
-                var logEntriesType = System.Type.GetType("UnityEditor.LogEntries, UnityEditor");
-                if (logEntriesType == null)
-                {
-                    return logs;
-                }
-
-                // Get log count
-                var getCountMethod = logEntriesType.GetMethod("GetCount", BindingFlags.Public | BindingFlags.Static);
-                if (getCountMethod == null)
-                {
-                    return logs;
-                }
-
-                var totalCount = (int)getCountMethod.Invoke(null, null);
-                if (totalCount == 0)
-                {
-                    return logs;
-                }
-
-                // Start getting entries
-                var startMethod = logEntriesType.GetMethod("StartGettingEntries", BindingFlags.Public | BindingFlags.Static);
-                var endMethod = logEntriesType.GetMethod("EndGettingEntries", BindingFlags.Public | BindingFlags.Static);
-                var getEntryMethod = logEntriesType.GetMethod("GetEntryInternal", BindingFlags.Public | BindingFlags.Static);
-
-                if (startMethod == null || endMethod == null || getEntryMethod == null)
-                {
-                    return logs;
-                }
-
-                // Get LogEntry type
-                var logEntryType = System.Type.GetType("UnityEditor.LogEntry, UnityEditor");
-                if (logEntryType == null)
-                {
-                    return logs;
-                }
-
-                startMethod.Invoke(null, null);
-
-                try
-                {
-                    var startIndex = Math.Max(0, totalCount - maxCount);
-                    for (var i = startIndex; i < totalCount; i++)
-                    {
-                        var entry = Activator.CreateInstance(logEntryType);
-                        var success = (bool)getEntryMethod.Invoke(null, new object[] { i, entry });
-
-                        if (success)
-                        {
-                            var message = (string)logEntryType.GetField("message", BindingFlags.Public | BindingFlags.Instance)?.GetValue(entry);
-                            var mode = (int)(logEntryType.GetField("mode", BindingFlags.Public | BindingFlags.Instance)?.GetValue(entry) ?? 0);
-
-                            var entryType = GetLogType(mode);
-
-                            // Filter by log type
-                            if (logTypeFilter != "all" && entryType.ToLower() != logTypeFilter.ToLower())
-                            {
-                                continue;
-                            }
-
-                            logs.Add(new LogEntry
-                            {
-                                message = message,
-                                type = entryType
-                            });
-                        }
-                    }
-                }
-                finally
-                {
-                    endMethod.Invoke(null, null);
-                }
+                Application.logMessageReceived += OnLogMessage;
+                _capturing = true;
             }
-            catch (Exception ex)
-            {
-                AIBridgeLogger.LogError($"Failed to get console logs: {ex.Message}");
-            }
-
-            return logs;
+            _logs.Clear();
+            yield return CommandResult.Success(new { success = true, message = "Console capture started" });
         }
 
-        private string GetLogType(int mode)
+        [AIBridge("Stop capturing Unity console logs",
+            "AIBridgeCLI GetLogsCommand_StopCapture")]
+        public static IEnumerator StopCapture()
         {
-            // Mode flags for log types
-            if ((mode & (1 << 0)) != 0) return "Error";
-            if ((mode & (1 << 1)) != 0) return "Assert";
-            if ((mode & (1 << 2)) != 0) return "Log";
-            if ((mode & (1 << 3)) != 0) return "Fatal";
-            if ((mode & (1 << 4)) != 0) return "DontPreprocess";
-            if ((mode & (1 << 7)) != 0) return "ScriptingError";
-            if ((mode & (1 << 8)) != 0) return "ScriptingWarning";
-            if ((mode & (1 << 9)) != 0) return "ScriptingLog";
-            if ((mode & (1 << 11)) != 0) return "Warning";
-
-            return "Log";
+            if (_capturing)
+            {
+                Application.logMessageReceived -= OnLogMessage;
+                _capturing = false;
+            }
+            yield return CommandResult.Success(new { success = true, message = "Console capture stopped", capturedCount = _logs.Count });
         }
 
-        [Serializable]
+        private static bool MatchesType(LogType logType, string typeFilter)
+        {
+            switch (typeFilter)
+            {
+                case "Error": return logType == LogType.Error || logType == LogType.Exception || logType == LogType.Assert;
+                case "Warning": return logType == LogType.Warning;
+                case "Log": return logType == LogType.Log;
+                default: return true;
+            }
+        }
+
+        private static void OnLogMessage(string message, string stackTrace, LogType type)
+        {
+            _logs.Add(new LogEntry { message = message, stackTrace = stackTrace, type = type, time = DateTime.Now });
+            if (_logs.Count > 1000) _logs.RemoveAt(0);
+        }
+
         private class LogEntry
         {
             public string message;
-            public string type;
+            public string stackTrace;
+            public LogType type;
+            public DateTime time;
         }
     }
 }

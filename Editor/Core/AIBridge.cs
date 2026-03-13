@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -58,7 +59,6 @@ namespace AIBridge.Editor
             BridgeDirectory = GetExchangeDirectory();
 
             // Initialize components
-            CommandRegistry.Initialize();
             _watcher = new CommandWatcher(BridgeDirectory);
 
             // Subscribe to editor update
@@ -70,7 +70,7 @@ namespace AIBridge.Editor
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
 
             AIBridgeLogger.LogInfo($"AI Bridge initialized. Directory: {BridgeDirectory}");
-            AIBridgeLogger.LogInfo($"Registered commands: {string.Join(", ", CommandRegistry.GetRegisteredTypes())}");
+            AIBridgeLogger.LogInfo($"Registered commands: {string.Join(", ", CommandRegistry.GetAll().Select(e => e.Name))}");
         }
 
         /// <summary>

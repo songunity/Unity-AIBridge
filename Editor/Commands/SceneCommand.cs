@@ -1,131 +1,78 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using UnityEditor;
+using System.ComponentModel;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Component = UnityEngine.Component;
 
 namespace AIBridge.Editor
 {
-    /// <summary>
-    /// Scene operations: load, save, get hierarchy
-    /// Supports multiple sub-commands via "action" parameter
-    /// </summary>
-    public class SceneCommand : ICommand
+    public static class SceneCommand
     {
-        public string Type => "scene";
-        public bool RequiresRefresh => true;
-
-        public CommandResult Execute(CommandRequest request)
+        [AIBridge("Load a scene in the Editor",
+            "AIBridgeCLI SceneCommand_Load --scenePath \"Assets/Scenes/Main.unity\"")]
+        public static IEnumerator Load(
+            [Description("Asset path to the scene file")] string scenePath = null,
+            [Description("Load mode: single or additive")] string mode = "single")
         {
-            var action = request.GetParam("action", "get_hierarchy");
-
-            try
-            {
-                switch (action.ToLower())
-                {
-                    case "load":
-                        return LoadScene(request);
-                    case "save":
-                        return SaveScene(request);
-                    case "get_hierarchy":
-                        return GetHierarchy(request);
-                    case "get_active":
-                        return GetActiveScene(request);
-                    case "new":
-                        return NewScene(request);
-                    default:
-                        return CommandResult.Failure(request.id, $"Unknown action: {action}. Supported: load, save, get_hierarchy, get_active, new");
-                }
-            }
-            catch (Exception ex)
-            {
-                return CommandResult.FromException(request.id, ex);
-            }
-        }
-
-        private CommandResult LoadScene(CommandRequest request)
-        {
-            var scenePath = request.GetParam<string>("scenePath");
             if (string.IsNullOrEmpty(scenePath))
             {
-                return CommandResult.Failure(request.id, "Missing 'scenePath' parameter");
+                yield return CommandResult.Failure("Missing 'scenePath' parameter");
+                yield break;
             }
-
-            var modeStr = request.GetParam("mode", "single");
-            var mode = modeStr.ToLower() == "additive"
-                ? OpenSceneMode.Additive
-                : OpenSceneMode.Single;
-
-            var scene = EditorSceneManager.OpenScene(scenePath, mode);
-
-            return CommandResult.Success(request.id, new
-            {
-                scenePath = scenePath,
-                sceneName = scene.name,
-                loaded = scene.isLoaded
-            });
+            var openMode = mode.ToLower() == "additive" ? OpenSceneMode.Additive : OpenSceneMode.Single;
+            var scene = EditorSceneManager.OpenScene(scenePath, openMode);
+            yield return CommandResult.Success(new { scenePath, sceneName = scene.name, loaded = scene.isLoaded });
         }
 
-        private CommandResult SaveScene(CommandRequest request)
+        [AIBridge("Save the current open scene(s)",
+            "AIBridgeCLI SceneCommand_Save")]
+        public static IEnumerator Save(
+            [Description("Save to a new path (save-as)")] string saveAs = null)
         {
-            var saveAs = request.GetParam<string>("saveAs", null);
-
-            Scene scene;
             bool saved;
-
+            var scene = SceneManager.GetActiveScene();
             if (!string.IsNullOrEmpty(saveAs))
-            {
-                scene = SceneManager.GetActiveScene();
                 saved = EditorSceneManager.SaveScene(scene, saveAs);
-            }
             else
-            {
                 saved = EditorSceneManager.SaveOpenScenes();
-                scene = SceneManager.GetActiveScene();
-            }
 
-            return CommandResult.Success(request.id, new
-            {
-                sceneName = scene.name,
-                scenePath = scene.path,
-                saved = saved
-            });
+            yield return CommandResult.Success(new { sceneName = scene.name, scenePath = scene.path, saved });
         }
 
-        private CommandResult GetHierarchy(CommandRequest request)
+        [AIBridge("Get the scene hierarchy as a tree",
+            "AIBridgeCLI SceneCommand_GetHierarchy --depth 3")]
+        public static IEnumerator GetHierarchy(
+            [Description("Maximum depth to traverse")] int depth = 3,
+            [Description("Include inactive GameObjects")] bool includeInactive = true)
         {
-            var depth = request.GetParam("depth", 3);
-            var includeInactive = request.GetParam("includeInactive", true);
-
             var scene = SceneManager.GetActiveScene();
             var rootObjects = scene.GetRootGameObjects();
             var hierarchy = new List<HierarchyNode>();
 
             foreach (var root in rootObjects)
             {
-                if (!includeInactive && !root.activeInHierarchy)
-                {
-                    continue;
-                }
-
+                if (!includeInactive && !root.activeInHierarchy) continue;
                 hierarchy.Add(BuildHierarchyNode(root, depth, includeInactive));
             }
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
                 sceneName = scene.name,
                 scenePath = scene.path,
                 rootCount = hierarchy.Count,
-                hierarchy = hierarchy
+                hierarchy
             });
         }
 
-        private CommandResult GetActiveScene(CommandRequest request)
+        [AIBridge("Get info about the active scene",
+            "AIBridgeCLI SceneCommand_GetActive")]
+        public static IEnumerator GetActive()
         {
             var scene = SceneManager.GetActiveScene();
-
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
                 name = scene.name,
                 path = scene.path,
@@ -135,23 +82,17 @@ namespace AIBridge.Editor
             });
         }
 
-        private CommandResult NewScene(CommandRequest request)
+        [AIBridge("Create a new empty scene",
+            "AIBridgeCLI SceneCommand_New --setup empty")]
+        public static IEnumerator New(
+            [Description("Scene setup: default or empty")] string setup = "default")
         {
-            var setup = request.GetParam("setup", "default");
-            var newSceneSetup = setup.ToLower() == "empty"
-                ? NewSceneSetup.EmptyScene
-                : NewSceneSetup.DefaultGameObjects;
-
+            var newSceneSetup = setup.ToLower() == "empty" ? NewSceneSetup.EmptyScene : NewSceneSetup.DefaultGameObjects;
             var scene = EditorSceneManager.NewScene(newSceneSetup, NewSceneMode.Single);
-
-            return CommandResult.Success(request.id, new
-            {
-                sceneName = scene.name,
-                created = true
-            });
+            yield return CommandResult.Success(new { sceneName = scene.name, created = true });
         }
 
-        private HierarchyNode BuildHierarchyNode(GameObject go, int remainingDepth, bool includeInactive)
+        private static HierarchyNode BuildHierarchyNode(GameObject go, int remainingDepth, bool includeInactive)
         {
             var node = new HierarchyNode
             {
@@ -159,30 +100,19 @@ namespace AIBridge.Editor
                 active = go.activeSelf,
                 components = new List<string>()
             };
-
             foreach (var component in go.GetComponents<Component>())
             {
-                if (component != null)
-                {
-                    node.components.Add(component.GetType().Name);
-                }
+                if (component != null) node.components.Add(component.GetType().Name);
             }
-
             if (remainingDepth > 0 && go.transform.childCount > 0)
             {
                 node.children = new List<HierarchyNode>();
-
                 foreach (Transform child in go.transform)
                 {
-                    if (!includeInactive && !child.gameObject.activeInHierarchy)
-                    {
-                        continue;
-                    }
-
+                    if (!includeInactive && !child.gameObject.activeInHierarchy) continue;
                     node.children.Add(BuildHierarchyNode(child.gameObject, remainingDepth - 1, includeInactive));
                 }
             }
-
             return node;
         }
 

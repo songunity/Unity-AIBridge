@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using UnityEditor;
@@ -17,18 +19,6 @@ namespace AIBridge.Editor
         public int Width;
         public int Height;
         public string Timestamp;
-        public string Error;
-    }
-
-    /// <summary>
-    /// Frame capture result for GIF recording.
-    /// </summary>
-    public class FrameCaptureResult
-    {
-        public bool Success;
-        public byte[] Pixels;  // RGBA32 pixel data
-        public int Width;
-        public int Height;
         public string Error;
     }
 
@@ -71,252 +61,149 @@ namespace AIBridge.Editor
         /// <summary>
         /// Capture Game view screenshot.
         /// </summary>
-        public static ScreenshotResult CaptureGameView(bool checkPlayMode = true)
+        public static IEnumerator CaptureGameView(Action<ScreenshotResult> onFinish)
         {
-            if (checkPlayMode && !EditorApplication.isPlaying)
-            {
-                return new ScreenshotResult
-                {
-                    Success = false,
-                    Error = "Screenshot requires Play mode. Please start the game first."
-                };
-            }
-
             EnsureScreenshotsDirectory();
 
             var timestamp = DateTime.Now;
-            var filename = $"game_{timestamp:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N").Substring(0, 8)}.jpg";
+            var filename = $"game_{timestamp:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N").Substring(0, 8)}.png";
             var fullPath = Path.Combine(ScreenshotsDir, filename);
 
-            try
+            // Get Game View window
+            var gameView = GetGameView();
+            if (gameView == null)
             {
-                var allCameras = Camera.allCameras;
-                if (allCameras.Length == 0)
-                {
-                    return new ScreenshotResult
-                    {
-                        Success = false,
-                        Error = "No active camera found in scene. Cannot capture screenshot."
-                    };
-                }
-
-                Array.Sort(allCameras, (a, b) => a.depth.CompareTo(b.depth));
-
-                var gameViewSize = GetGameViewSizeCached();
-                int width = (int)gameViewSize.x;
-                int height = (int)gameViewSize.y;
-
-                if (width <= 0 || height <= 0)
-                {
-                    width = Screen.width;
-                    height = Screen.height;
-                }
-
-                var renderTexture = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
-                var texture2D = new Texture2D(width, height, TextureFormat.ARGB32, false);
-
-                foreach (var camera in allCameras)
-                {
-                    if (!camera.enabled || !camera.gameObject.activeInHierarchy)
-                        continue;
-
-                    var originalTarget = camera.targetTexture;
-                    camera.targetTexture = renderTexture;
-                    camera.Render();
-                    camera.targetTexture = originalTarget;
-                }
-
-                RenderTexture.active = renderTexture;
-                texture2D.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-                texture2D.Apply();
-                RenderTexture.active = null;
-
-                var jpgData = texture2D.EncodeToJPG(85);
-                File.WriteAllBytes(fullPath, jpgData);
-
-                UnityEngine.Object.DestroyImmediate(renderTexture);
-                UnityEngine.Object.DestroyImmediate(texture2D);
-
-                AIBridgeLogger.LogInfo($"Screenshot saved: {fullPath}");
-
-                return new ScreenshotResult
-                {
-                    Success = true,
-                    ImagePath = fullPath,
-                    Filename = filename,
-                    Width = width,
-                    Height = height,
-                    Timestamp = timestamp.ToString("yyyy-MM-ddTHH:mm:ss")
-                };
-            }
-            catch (Exception ex)
-            {
-                return new ScreenshotResult
+                onFinish?.Invoke(new ScreenshotResult
                 {
                     Success = false,
-                    Error = $"Failed to capture screenshot: {ex.Message}"
-                };
+                    Error = "Cannot find Game View window. Make sure Game View is open.",
+                });
+                yield break;
             }
+
+            // Get Game View size
+            var size = GetGameViewSize(gameView);
+            int width = (int)size.x;
+            int height = (int)size.y;
+
+            // Capture screenshot using ScreenCapture
+            ScreenCapture.CaptureScreenshot(fullPath);
+
+            // Wait briefly for file to be written
+            int retryCount = 0;
+            while (!File.Exists(fullPath) && retryCount < 100)
+            {
+                yield return new WaitForSeconds(0.1f);
+                retryCount++;
+            }
+
+            if (!File.Exists(fullPath))
+            {
+                onFinish?.Invoke(new ScreenshotResult
+                {
+                    Success = false,
+                    Error = "Failed to capture screenshot - file was not created."
+                });
+                yield break;
+            }
+
+            onFinish?.Invoke(new ScreenshotResult
+            {
+                Success = true,
+                ImagePath = fullPath,
+                Filename = filename,
+                Width = width,
+                Height = height,
+                Timestamp = timestamp.ToString("yyyyMMdd_HHmmss"),
+            });
         }
 
         /// <summary>
-        /// Capture a single frame for GIF recording.
-        /// Optimized with cached RenderTexture and Texture2D.
+        /// Get the Unity Game View window using reflection.
         /// </summary>
-        public static FrameCaptureResult CaptureFrame(float scale = 1f)
+        private static EditorWindow GetGameView()
         {
-            if (!EditorApplication.isPlaying)
+            // UnityEditor.GameView is in the UnityEditor assembly
+            var gameViewType = Type.GetType("UnityEditor.GameView, UnityEditor");
+            if (gameViewType == null)
             {
-                return new FrameCaptureResult
-                {
-                    Success = false,
-                    Error = "Frame capture requires Play mode."
-                };
+                Debug.LogError("[AIBridge] Cannot find GameView type in UnityEditor assembly");
+                return null;
             }
 
-            try
+            // Get the main Game View window
+            var getMainGameView = gameViewType.GetMethod("GetMainGameView", BindingFlags.Static | BindingFlags.NonPublic);
+            if (getMainGameView != null)
             {
-                var allCameras = Camera.allCameras;
-                if (allCameras.Length == 0)
+                return getMainGameView.Invoke(null, null) as EditorWindow;
+            }
+
+            // Fallback: GetWindow with specific type
+            return EditorWindow.GetWindow(gameViewType);
+        }
+
+        /// <summary>
+        /// Get Game View resolution size.
+        /// </summary>
+        private static Vector2 GetGameViewSize(EditorWindow gameView)
+        {
+            // Try to get resolution from gameViewRenderResolution property
+            var prop = gameView.GetType().GetProperty("gameViewRenderResolution", BindingFlags.Instance | BindingFlags.Public);
+            if (prop != null)
+            {
+                var value = prop.GetValue(gameView);
+                if (value is Vector2 size && size.x > 0 && size.y > 0)
                 {
-                    return new FrameCaptureResult
-                    {
-                        Success = false,
-                        Error = "No active camera found."
-                    };
+                    return size;
                 }
+            }
 
-                Array.Sort(allCameras, (a, b) => a.depth.CompareTo(b.depth));
-
-                int width, height;
-
-                // If we have cached resources, use those dimensions for consistency
-                // This ensures all frames in a GIF recording have the same size
-                if (_cachedRenderTexture != null && _cachedWidth > 0 && _cachedHeight > 0)
+            // Try to get size from GetSize method (instance method)
+            var getSizeMethod = gameView.GetType().GetMethod("GetSize", BindingFlags.Instance | BindingFlags.Public);
+            if (getSizeMethod != null)
+            {
+                var result = getSizeMethod.Invoke(gameView, null);
+                if (result is Vector2 size && size.x > 0 && size.y > 0)
                 {
-                    width = _cachedWidth;
-                    height = _cachedHeight;
+                    return size;
                 }
-                else
-                {
-                    // First frame: get Game View size (not cached version to ensure fresh value)
-                    var gameViewSize = GetGameViewSize();
-                    int baseWidth = (int)gameViewSize.x;
-                    int baseHeight = (int)gameViewSize.y;
+            }
 
-                    if (baseWidth <= 0 || baseHeight <= 0)
+            // Try to use GameViewSize property
+            var sizeProp = gameView.GetType().GetProperty("GameViewSize", BindingFlags.Instance | BindingFlags.Public);
+            if (sizeProp != null)
+            {
+                var gameViewSize = sizeProp.GetValue(gameView);
+                if (gameViewSize != null)
+                {
+                    // GameViewSize has Width and Height properties
+                    var widthProp = gameViewSize.GetType().GetProperty("Width", BindingFlags.Instance | BindingFlags.Public);
+                    var heightProp = gameViewSize.GetType().GetProperty("Height", BindingFlags.Instance | BindingFlags.Public);
+                    if (widthProp != null && heightProp != null)
                     {
-                        baseWidth = Screen.width;
-                        baseHeight = Screen.height;
+                        int width = (int)widthProp.GetValue(gameViewSize);
+                        int height = (int)heightProp.GetValue(gameViewSize);
+                        if (width > 0 && height > 0)
+                        {
+                            return new Vector2(width, height);
+                        }
                     }
-
-                    scale = Mathf.Clamp(scale, 0.25f, 1f);
-                    width = Mathf.Max(1, (int)(baseWidth * scale));
-                    height = Mathf.Max(1, (int)(baseHeight * scale));
                 }
-
-                // Reuse or create cached resources
-                EnsureCachedResources(width, height);
-
-                // Render each camera
-                foreach (var camera in allCameras)
-                {
-                    if (!camera.enabled || !camera.gameObject.activeInHierarchy)
-                        continue;
-
-                    var originalTarget = camera.targetTexture;
-                    camera.targetTexture = _cachedRenderTexture;
-                    camera.Render();
-                    camera.targetTexture = originalTarget;
-                }
-
-                // Read pixels
-                RenderTexture.active = _cachedRenderTexture;
-                _cachedTexture2D.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-                _cachedTexture2D.Apply();
-                RenderTexture.active = null;
-
-                // Get raw pixel data and flip
-                var pixels = _cachedTexture2D.GetRawTextureData();
-                FlipVerticallyInPlace(pixels, _cachedFlipBuffer, width, height);
-
-                // Return a copy of the flipped buffer
-                var result = new byte[_cachedFlipBuffer.Length];
-                Buffer.BlockCopy(_cachedFlipBuffer, 0, result, 0, result.Length);
-
-                return new FrameCaptureResult
-                {
-                    Success = true,
-                    Pixels = result,
-                    Width = width,
-                    Height = height
-                };
             }
-            catch (Exception ex)
+
+            // Try to get target display resolution from Unity
+            // For mobile games in portrait mode, check the default screen width/height
+            #if UNITY_ANDROID || UNITY_IPHONE
+            if (Screen.width > 0 && Screen.height > 0)
             {
-                return new FrameCaptureResult
-                {
-                    Success = false,
-                    Error = $"Failed to capture frame: {ex.Message}"
-                };
+                return new Vector2(Screen.width, Screen.height);
             }
-        }
+            #endif
 
-        /// <summary>
-        /// Ensure cached resources exist and have correct size.
-        /// </summary>
-        private static void EnsureCachedResources(int width, int height)
-        {
-            if (_cachedRenderTexture != null && _cachedWidth == width && _cachedHeight == height)
-                return;
-
-            // Cleanup old resources
-            ReleaseCachedResources();
-
-            // Create new resources
-            _cachedRenderTexture = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
-            _cachedTexture2D = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            _cachedFlipBuffer = new byte[width * height * 4];
-            _cachedWidth = width;
-            _cachedHeight = height;
-        }
-
-        /// <summary>
-        /// Release cached resources. Call when recording ends.
-        /// </summary>
-        public static void ReleaseCachedResources()
-        {
-            if (_cachedRenderTexture != null)
-            {
-                UnityEngine.Object.DestroyImmediate(_cachedRenderTexture);
-                _cachedRenderTexture = null;
-            }
-
-            if (_cachedTexture2D != null)
-            {
-                UnityEngine.Object.DestroyImmediate(_cachedTexture2D);
-                _cachedTexture2D = null;
-            }
-
-            _cachedFlipBuffer = null;
-            _cachedWidth = 0;
-            _cachedHeight = 0;
-        }
-
-        /// <summary>
-        /// Get GameView size with caching to avoid reflection every frame.
-        /// </summary>
-        private static Vector2 GetGameViewSizeCached()
-        {
-            double currentTime = EditorApplication.timeSinceStartup;
-            if (currentTime - _lastGameViewSizeCheck < GameViewSizeCacheInterval && _cachedGameViewSize != Vector2.zero)
-            {
-                return _cachedGameViewSize;
-            }
-
-            _lastGameViewSizeCheck = currentTime;
-            _cachedGameViewSize = GetGameViewSize();
-            return _cachedGameViewSize;
+            // Default fallback - check if portrait mode (height > width)
+            int defaultWidth = 1080;
+            int defaultHeight = 1920;
+            return new Vector2(defaultWidth, defaultHeight);
         }
 
         /// <summary>
@@ -327,111 +214,167 @@ namespace AIBridge.Editor
             if (!Directory.Exists(ScreenshotsDir))
             {
                 Directory.CreateDirectory(ScreenshotsDir);
-                var gitignorePath = Path.Combine(ScreenshotsDir, ".gitignore");
-                File.WriteAllText(gitignorePath, "*\n!.gitignore\n");
             }
         }
-
-
-        /// <summary>
-        /// Flip pixel data vertically using pre-allocated buffer.
-        /// </summary>
-        private static void FlipVerticallyInPlace(byte[] src, byte[] dst, int width, int height)
+        
+        public static GifRecordResult ConvertFramesToGif(List<string> framePaths, float scale, int fps, int colorCount)
         {
-            int rowSize = width * 4;
+            var result = new GifRecordResult();
 
-            for (int y = 0; y < height; y++)
+            if (framePaths.Count == 0)
             {
-                int srcRow = y * rowSize;
-                int dstRow = (height - 1 - y) * rowSize;
-                Buffer.BlockCopy(src, srcRow, dst, dstRow, rowSize);
+                result.Success = false;
+                result.Error = "No frames to convert";
+                return result;
             }
+
+            try
+            {
+                // Load first frame to get dimensions
+                var firstTex = LoadTextureFromFile(framePaths[0]);
+                if (firstTex == null)
+                {
+                    result.Success = false;
+                    result.Error = "Failed to load first frame";
+                    return result;
+                }
+
+                int scaledWidth = Mathf.RoundToInt(firstTex.width * scale);
+                int scaledHeight = Mathf.RoundToInt(firstTex.height * scale);
+
+                // Create scaled textures
+                var frames = new List<Texture2D>();
+                foreach (var path in framePaths)
+                {
+                    var tex = LoadTextureFromFile(path);
+                    if (tex == null) continue;
+
+                    var scaled = ScaleTexture(tex, scaledWidth, scaledHeight);
+                    UnityEngine.Object.DestroyImmediate(tex);
+                    frames.Add(scaled);
+                }
+
+                if (frames.Count == 0)
+                {
+                    result.Success = false;
+                    result.Error = "Failed to load any frames";
+                    return result;
+                }
+
+                // Create GIF
+                ScreenshotHelper.EnsureScreenshotsDirectory();
+                string filename = $"gif_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N").Substring(0, 8)}.gif";
+                string gifPath = Path.Combine(ScreenshotHelper.ScreenshotsDir, filename);
+
+                using (var fs = new FileStream(gifPath, FileMode.Create, FileAccess.Write))
+                using (var encoder = new GifEncoder(fs, scaledWidth, scaledHeight, fps, colorCount))
+                {
+                    int frameDelay = Mathf.Max(1, 100 / fps);
+
+                    for (int i = 0; i < frames.Count; i++)
+                    {
+                        var pixels = TextureToRgba(frames[i]);
+                        // AddFrame will auto-initialize on first frame
+                        encoder.AddFrame(pixels, frameDelay);
+                    }
+
+                    encoder.Finish();
+                }
+
+                // Cleanup textures
+                foreach (var tex in frames)
+                {
+                    UnityEngine.Object.DestroyImmediate(tex);
+                }
+
+                var fileInfo = new FileInfo(gifPath);
+                result.Success = true;
+                result.GifPath = gifPath;
+                result.Filename = filename;
+                result.FrameCount = frames.Count;
+                result.Width = scaledWidth;
+                result.Height = scaledHeight;
+                result.Duration = (float)frames.Count / fps;
+                result.FileSize = fileInfo.Length;
+                result.Timestamp = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss");
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.Error = ex.Message;
+            }
+
+            return result;
         }
 
-        /// <summary>
-        /// Get Game View render target size.
-        /// Uses multiple methods to ensure correct resolution is obtained.
-        /// </summary>
-        private static Vector2 GetGameViewSize()
+        private static Texture2D LoadTextureFromFile(string path)
         {
             try
             {
-                // Method 1: Use Screen.width/height in Play mode (most reliable)
-                // This returns the actual game resolution, not the window size
-                if (EditorApplication.isPlaying)
-                {
-                    // Get the current render resolution from the main camera
-                    var mainCamera = Camera.main;
-                    if (mainCamera != null)
-                    {
-                        return new Vector2(mainCamera.pixelWidth, mainCamera.pixelHeight);
-                    }
-
-                    // Fallback to any active camera
-                    var allCameras = Camera.allCameras;
-                    if (allCameras.Length > 0)
-                    {
-                        // Find the camera with highest depth (usually the main render camera)
-                        Camera bestCamera = null;
-                        float highestDepth = float.MinValue;
-                        foreach (var cam in allCameras)
-                        {
-                            if (cam.enabled && cam.gameObject.activeInHierarchy && cam.depth > highestDepth)
-                            {
-                                highestDepth = cam.depth;
-                                bestCamera = cam;
-                            }
-                        }
-                        if (bestCamera != null)
-                        {
-                            return new Vector2(bestCamera.pixelWidth, bestCamera.pixelHeight);
-                        }
-                    }
-                }
-
-                // Method 2: Try reflection to get Game View size
-                var gameViewType = Type.GetType("UnityEditor.GameView,UnityEditor");
-                if (gameViewType != null)
-                {
-                    var getMainGameView = gameViewType.GetMethod("GetMainGameView", BindingFlags.NonPublic | BindingFlags.Static);
-                    if (getMainGameView != null)
-                    {
-                        var gameView = getMainGameView.Invoke(null, null);
-                        if (gameView != null)
-                        {
-                            // Try targetSize property
-                            var targetSizeProperty = gameViewType.GetProperty("targetSize", BindingFlags.NonPublic | BindingFlags.Instance);
-                            if (targetSizeProperty != null)
-                            {
-                                var targetSize = (Vector2)targetSizeProperty.GetValue(gameView);
-                                if (targetSize.x > 0 && targetSize.y > 0)
-                                    return targetSize;
-                            }
-                        }
-                    }
-
-                    // Try GetSizeOfMainGameView static method
-                    var getSizeMethod = gameViewType.GetMethod("GetSizeOfMainGameView", BindingFlags.NonPublic | BindingFlags.Static);
-                    if (getSizeMethod != null)
-                    {
-                        var size = (Vector2)getSizeMethod.Invoke(null, null);
-                        if (size.x > 0 && size.y > 0)
-                            return size;
-                    }
-                }
-
-                // Method 3: Fallback to Screen dimensions
-                if (Screen.width > 0 && Screen.height > 0)
-                {
-                    return new Vector2(Screen.width, Screen.height);
-                }
-
-                return Vector2.zero;
+                var bytes = File.ReadAllBytes(path);
+                var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                tex.LoadImage(bytes);
+                tex.Apply();
+                return tex;
             }
             catch
             {
-                return Vector2.zero;
+                return null;
             }
+        }
+
+        private static Texture2D ScaleTexture(Texture2D source, int width, int height)
+        {
+            var result = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float u = (float)x / width;
+                    float v = (float)y / height;
+                    result.SetPixel(x, y, source.GetPixelBilinear(u, v));
+                }
+            }
+            result.Apply();
+            return result;
+        }
+
+        private static byte[] TextureToRgba(Texture2D tex)
+        {
+            var pixels = tex.GetPixels32();
+            int width = tex.width;
+            int height = tex.height;
+            var result = new byte[width * height * 4];
+
+            // Flip vertically: GIF expects bottom-to-top order
+            for (int y = 0; y < height; y++)
+            {
+                int srcRow = height - 1 - y; // Flip vertically
+                for (int x = 0; x < width; x++)
+                {
+                    int srcIndex = srcRow * width + x;
+                    int dstIndex = (y * width + x) * 4;
+                    result[dstIndex] = pixels[srcIndex].r;
+                    result[dstIndex + 1] = pixels[srcIndex].g;
+                    result[dstIndex + 2] = pixels[srcIndex].b;
+                    result[dstIndex + 3] = pixels[srcIndex].a;
+                }
+            }
+            return result;
+        }
+
+        public class GifRecordResult
+        {
+            public bool Success;
+            public string GifPath;
+            public string Filename;
+            public int FrameCount;
+            public int Width;
+            public int Height;
+            public float Duration;
+            public long FileSize;
+            public string Timestamp;
+            public string Error;
         }
     }
 }

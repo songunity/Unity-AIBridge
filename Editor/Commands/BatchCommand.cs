@@ -1,95 +1,89 @@
-using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 
 namespace AIBridge.Editor
 {
-    /// <summary>
-    /// Batch command execution.
-    /// Supports executing multiple commands in a single request.
-    /// </summary>
-    public class BatchCommand : ICommand
+    public static class BatchCommand
     {
-        public string Type => "batch";
-        public bool RequiresRefresh => true;
-
-        public CommandResult Execute(CommandRequest request)
+        [AIBridge("Execute multiple commands in sequence and return all results",
+            "AIBridgeCLI Batch --commands \"[{\\\"type\\\":\\\"GameObjectCommand_Find\\\",\\\"params\\\":{\\\"name\\\":\\\"Player\\\"}}]\"",
+            "Batch")]
+        public static IEnumerator Execute(
+            [Description("Array of command objects, each with 'type' and 'params' fields")] object commands = null)
         {
-            var commandsParam = request.GetParam<object>("commands");
-            if (commandsParam == null)
+            if (commands == null)
             {
-                return CommandResult.Failure(request.id, "Missing 'commands' parameter");
+                yield return CommandResult.Failure("Missing 'commands' parameter");
+                yield break;
             }
 
-            var commands = commandsParam as List<object>;
-            if (commands == null || commands.Count == 0)
+            var cmdList = commands as List<object>;
+            if (cmdList == null || cmdList.Count == 0)
             {
-                return CommandResult.Failure(request.id, "'commands' must be a non-empty array");
+                yield return CommandResult.Failure("'commands' must be a non-empty array");
+                yield break;
             }
 
             var results = new List<object>();
             var successCount = 0;
             var failureCount = 0;
 
-            foreach (var cmdObj in commands)
+            foreach (var cmdObj in cmdList)
             {
-                try
+                var cmdDict = cmdObj as Dictionary<string, object>;
+                if (cmdDict == null)
                 {
-                    var cmdDict = cmdObj as Dictionary<string, object>;
-                    if (cmdDict == null)
-                    {
-                        results.Add(new { success = false, error = "Invalid command format" });
-                        failureCount++;
-                        continue;
-                    }
-
-                    var subRequest = new CommandRequest
-                    {
-                        id = $"{request.id}_{results.Count}",
-                        type = cmdDict.ContainsKey("type") ? cmdDict["type"]?.ToString() : null,
-                        @params = cmdDict.ContainsKey("params")
-                            ? cmdDict["params"] as Dictionary<string, object>
-                            : new Dictionary<string, object>()
-                    };
-
-                    if (string.IsNullOrEmpty(subRequest.type))
-                    {
-                        results.Add(new { success = false, error = "Missing 'type' in command" });
-                        failureCount++;
-                        continue;
-                    }
-
-                    if (!CommandRegistry.TryGetCommand(subRequest.type, out var command))
-                    {
-                        results.Add(new { success = false, error = $"Unknown command: {subRequest.type}" });
-                        failureCount++;
-                        continue;
-                    }
-
-                    var result = command.Execute(subRequest);
-                    results.Add(new
-                    {
-                        type = subRequest.type,
-                        success = result.success,
-                        data = result.data,
-                        error = result.error
-                    });
-
-                    if (result.success) successCount++;
-                    else failureCount++;
-                }
-                catch (Exception ex)
-                {
-                    results.Add(new { success = false, error = ex.Message });
+                    results.Add(new { success = false, error = "Invalid command format" });
                     failureCount++;
+                    continue;
                 }
+
+                var type = cmdDict.ContainsKey("type") ? cmdDict["type"]?.ToString() : null;
+                if (string.IsNullOrEmpty(type))
+                {
+                    results.Add(new { success = false, error = "Missing 'type' in command" });
+                    failureCount++;
+                    continue;
+                }
+
+                var @params = cmdDict.ContainsKey("params")
+                    ? cmdDict["params"] as Dictionary<string, object>
+                    : new Dictionary<string, object>();
+
+                if (!CommandRegistry.TryGetCommand(type, out var entry))
+                {
+                    results.Add(new { type, success = false, error = $"Unknown command: {type}" });
+                    failureCount++;
+                    continue;
+                }
+
+                var subRequest = new CommandRequest { id = $"batch_sub_{results.Count}", type = type, @params = @params };
+                if (!CommandParamBinder.TryBind(entry, subRequest, out var args, out var bindError))
+                {
+                    results.Add(new { type, success = false, error = bindError });
+                    failureCount++;
+                    continue;
+                }
+
+                // Run sub-command coroutine and wait for it to complete
+                bool done = false;
+                CommandResult subResult = null;
+                var subCoroutine = (System.Collections.IEnumerator)entry.Method.Invoke(null, args);
+                EditorCoroutineRunner.Start(subCoroutine, r => { subResult = r; done = true; }, subRequest.id);
+                while (!done) yield return null;
+
+                results.Add(new { type, success = subResult.success, data = subResult.data, error = subResult.error });
+                if (subResult.success) successCount++;
+                else failureCount++;
             }
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
-                totalCommands = commands.Count,
-                successCount = successCount,
-                failureCount = failureCount,
-                results = results
+                totalCommands = cmdList.Count,
+                successCount,
+                failureCount,
+                results
             });
         }
     }

@@ -1,188 +1,82 @@
-using System;
+using System.Collections;
+using System.ComponentModel;
 using UnityEditor;
-using UnityEditor.Compilation;
+using UnityEngine;
 
 namespace AIBridge.Editor
 {
-    /// <summary>
-    /// Editor operations: undo, redo, compile, play mode control
-    /// Supports multiple sub-commands via "action" parameter
-    /// </summary>
-    public class EditorCommand : ICommand
+    public static class EditorCommand
     {
-        public string Type => "editor";
-        public bool RequiresRefresh => false;  // Editor commands handle refresh internally if needed
-
-        public CommandResult Execute(CommandRequest request)
+        [AIBridge("Perform undo operations",
+            "AIBridgeCLI EditorCommand_Undo --count 3")]
+        public static IEnumerator Undo(
+            [Description("Number of undo steps")] int count = 1)
         {
-            var action = request.GetParam("action", "undo");
-
-            try
-            {
-                switch (action.ToLower())
-                {
-                    case "undo":
-                        return Undo(request);
-                    case "redo":
-                        return Redo(request);
-                    case "compile":
-                        // Redirect to CompileCommand for backward compatibility
-                        return RedirectToCompileCommand(request);
-                    case "refresh":
-                        return Refresh(request);
-                    case "play":
-                        return Play(request);
-                    case "stop":
-                        return Stop(request);
-                    case "pause":
-                        return Pause(request);
-                    case "get_state":
-                        return GetState(request);
-                    case "log":
-                        return Log(request);
-                    default:
-                        return CommandResult.Failure(request.id, $"Unknown action: {action}. Supported: undo, redo, compile, refresh, play, stop, pause, get_state, log");
-                }
-            }
-            catch (Exception ex)
-            {
-                return CommandResult.FromException(request.id, ex);
-            }
-        }
-
-        private CommandResult Undo(CommandRequest request)
-        {
-            var count = request.GetParam("count", 1);
-
             for (var i = 0; i < count; i++)
-            {
                 UnityEditor.Undo.PerformUndo();
-            }
-
-            return CommandResult.Success(request.id, new
-            {
-                action = "undo",
-                count = count
-            });
+            yield return CommandResult.Success(new { action = "undo", count });
         }
 
-        private CommandResult Redo(CommandRequest request)
+        [AIBridge("Perform redo operations",
+            "AIBridgeCLI EditorCommand_Redo --count 1")]
+        public static IEnumerator Redo(
+            [Description("Number of redo steps")] int count = 1)
         {
-            var count = request.GetParam("count", 1);
-
             for (var i = 0; i < count; i++)
-            {
                 UnityEditor.Undo.PerformRedo();
-            }
-
-            return CommandResult.Success(request.id, new
-            {
-                action = "redo",
-                count = count
-            });
+            yield return CommandResult.Success(new { action = "redo", count });
         }
 
-        /// <summary>
-        /// Redirect compile action to CompileCommand for backward compatibility.
-        /// The new CompileCommand provides more features (status polling, dotnet build).
-        /// </summary>
-        private CommandResult RedirectToCompileCommand(CommandRequest request)
+        [AIBridge("Refresh the AssetDatabase",
+            "AIBridgeCLI EditorCommand_Refresh")]
+        public static IEnumerator Refresh(
+            [Description("Force update all assets")] bool forceUpdate = false)
         {
-            // Create a new request for CompileCommand with action=start
-            var compileRequest = new CommandRequest
-            {
-                id = request.id,
-                type = "compile",
-                @params = new System.Collections.Generic.Dictionary<string, object>
-                {
-                    { "action", "start" }
-                }
-            };
-
-            var compileCommand = new CompileCommand();
-            return compileCommand.Execute(compileRequest);
+            AssetDatabase.Refresh(forceUpdate ? ImportAssetOptions.ForceUpdate : ImportAssetOptions.Default);
+            yield return CommandResult.Success(new { action = "refresh", forceUpdate });
         }
 
-        private CommandResult Refresh(CommandRequest request)
-        {
-            var forceUpdate = request.GetParam("forceUpdate", false);
-            var options = forceUpdate
-                ? ImportAssetOptions.ForceUpdate
-                : ImportAssetOptions.Default;
-
-            AssetDatabase.Refresh(options);
-
-            return CommandResult.Success(request.id, new
-            {
-                action = "refresh",
-                forceUpdate = forceUpdate
-            });
-        }
-
-        private CommandResult Play(CommandRequest request)
+        [AIBridge("Enter Play mode",
+            "AIBridgeCLI EditorCommand_Play")]
+        public static IEnumerator Play()
         {
             if (EditorApplication.isPlaying)
-            {
-                return CommandResult.Success(request.id, new
-                {
-                    action = "play",
-                    alreadyPlaying = true
-                });
-            }
-
-            EditorApplication.isPlaying = true;
-
-            return CommandResult.Success(request.id, new
-            {
-                action = "play",
-                started = true
-            });
-        }
-
-        private CommandResult Stop(CommandRequest request)
-        {
-            if (!EditorApplication.isPlaying)
-            {
-                return CommandResult.Success(request.id, new
-                {
-                    action = "stop",
-                    alreadyStopped = true
-                });
-            }
-
-            EditorApplication.isPlaying = false;
-
-            return CommandResult.Success(request.id, new
-            {
-                action = "stop",
-                stopped = true
-            });
-        }
-
-        private CommandResult Pause(CommandRequest request)
-        {
-            var toggle = request.GetParam("toggle", true);
-
-            if (toggle)
-            {
-                EditorApplication.isPaused = !EditorApplication.isPaused;
-            }
+                yield return CommandResult.Success(new { action = "play", alreadyPlaying = true });
             else
             {
-                var pause = request.GetParam("pause", true);
-                EditorApplication.isPaused = pause;
+                EditorApplication.isPlaying = true;
+                yield return CommandResult.Success(new { action = "play", started = true });
             }
-
-            return CommandResult.Success(request.id, new
-            {
-                action = "pause",
-                isPaused = EditorApplication.isPaused
-            });
         }
 
-        private CommandResult GetState(CommandRequest request)
+        [AIBridge("Exit Play mode",
+            "AIBridgeCLI EditorCommand_Stop")]
+        public static IEnumerator Stop()
         {
-            return CommandResult.Success(request.id, new
+            if (!EditorApplication.isPlaying)
+                yield return CommandResult.Success(new { action = "stop", alreadyStopped = true });
+            else
+            {
+                EditorApplication.isPlaying = false;
+                yield return CommandResult.Success(new { action = "stop", stopped = true });
+            }
+        }
+
+        [AIBridge("Toggle or set pause state",
+            "AIBridgeCLI EditorCommand_Pause")]
+        public static IEnumerator Pause(
+            [Description("Toggle pause (true) or set specific value (false)")] bool toggle = true,
+            [Description("Pause state to set when toggle is false")] bool pause = true)
+        {
+            EditorApplication.isPaused = toggle ? !EditorApplication.isPaused : pause;
+            yield return CommandResult.Success(new { action = "pause", isPaused = EditorApplication.isPaused });
+        }
+
+        [AIBridge("Get current Editor state (play/pause/compile status)",
+            "AIBridgeCLI EditorCommand_GetState")]
+        public static IEnumerator GetState()
+        {
+            yield return CommandResult.Success(new
             {
                 isPlaying = EditorApplication.isPlaying,
                 isPaused = EditorApplication.isPaused,
@@ -193,35 +87,24 @@ namespace AIBridge.Editor
             });
         }
 
-        private CommandResult Log(CommandRequest request)
+        [AIBridge("Log a message to the Unity console",
+            "AIBridgeCLI EditorCommand_Log --message \"Hello World\"")]
+        public static IEnumerator Log(
+            [Description("Message to log")] string message,
+            [Description("Log type: Log, Warning, Error")] string logType = "Log")
         {
-            var message = request.GetParam<string>("message");
             if (string.IsNullOrEmpty(message))
             {
-                return CommandResult.Failure(request.id, "Parameter 'message' is required");
+                yield return CommandResult.Failure("Parameter 'message' is required");
+                yield break;
             }
-
-            var logType = request.GetParam("logType", "Log");
-
             switch (logType.ToLower())
             {
-                case "warning":
-                    UnityEngine.Debug.LogWarning($"[AIBridge] {message}");
-                    break;
-                case "error":
-                    UnityEngine.Debug.LogError($"[AIBridge] {message}");
-                    break;
-                default:
-                    UnityEngine.Debug.Log($"[AIBridge] {message}");
-                    break;
+                case "warning": Debug.LogWarning($"[AIBridge] {message}"); break;
+                case "error": Debug.LogError($"[AIBridge] {message}"); break;
+                default: Debug.Log($"[AIBridge] {message}"); break;
             }
-
-            return CommandResult.Success(request.id, new
-            {
-                action = "log",
-                message = message,
-                logType = logType
-            });
+            yield return CommandResult.Success(new { action = "log", message, logType });
         }
     }
 }

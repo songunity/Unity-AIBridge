@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="AIBridge.Test/AIBridge.Test.csproj" />
+  <Project Path="AIBridgeCLI/AIBridgeCLI.csproj" />
+</Solution>

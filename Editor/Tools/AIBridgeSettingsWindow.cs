@@ -1,4 +1,6 @@
 using System.IO;
+using System.Linq;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 
@@ -18,6 +20,11 @@ namespace AIBridge.Editor
         private int _gifFps;
         private float _gifScale;
         private int _gifColorCount;
+
+        // Command Registration Settings
+        private bool _autoScan;
+        private string _scanAssemblies;
+
 
         [MenuItem("AIBridge/Settings")]
         private static void OpenWindow()
@@ -42,6 +49,19 @@ namespace AIBridge.Editor
             _gifFps = GifRecorderSettings.DefaultFps;
             _gifScale = GifRecorderSettings.DefaultScale;
             _gifColorCount = GifRecorderSettings.DefaultColorCount;
+
+            _scanAssemblies = EditorPrefs.GetString(CommandRegistry.PrefKeyScanAssemblies, "Assembly-CSharp-Editor-firstpass;Assembly-CSharp");
+
+            // Package in Library/PackageCache cannot be modified – force auto-scan
+            if (!CommandRegistry.IsEditablePackage)
+            {
+                _autoScan = true;
+                EditorPrefs.SetBool(CommandRegistry.PrefKeyAutoScan, true);
+            }
+            else
+            {
+                _autoScan = EditorPrefs.GetBool(CommandRegistry.PrefKeyAutoScan, false);
+            }
         }
 
         private void OnGUI()
@@ -54,10 +74,10 @@ namespace AIBridge.Editor
             DrawBridgeSettings();
             EditorGUILayout.Space(10);
 
-            DrawGifSettings();
+            DrawDirectoryInfo();
             EditorGUILayout.Space(10);
 
-            DrawDirectoryInfo();
+            DrawCommandRegistrationSettings();
             EditorGUILayout.Space(10);
 
             DrawActions();
@@ -93,46 +113,6 @@ namespace AIBridge.Editor
             }
         }
 
-        private void DrawGifSettings()
-        {
-            EditorGUILayout.LabelField("GIF Recording Settings (F11)", EditorStyles.boldLabel);
-
-            _gifFrameCount = EditorGUILayout.IntSlider("Frame Count", _gifFrameCount, 10, GifRecorder.MaxFrameCount);
-            EditorGUILayout.LabelField($"  Duration: {(float)_gifFrameCount / _gifFps:F1}s", EditorStyles.miniLabel);
-
-            _gifFps = EditorGUILayout.IntSlider("FPS", _gifFps, 10, 30);
-
-            _gifScale = EditorGUILayout.Slider("Scale", _gifScale, 0.25f, 1f);
-            EditorGUILayout.LabelField($"  Output: {(int)(1920 * _gifScale)}x{(int)(1080 * _gifScale)} (at 1080p)", EditorStyles.miniLabel);
-
-            _gifColorCount = EditorGUILayout.IntSlider("Color Count", _gifColorCount, 64, 256);
-
-            EditorGUILayout.Space(5);
-
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Save GIF Settings"))
-            {
-                GifRecorderSettings.DefaultFrameCount = _gifFrameCount;
-                GifRecorderSettings.DefaultFps = _gifFps;
-                GifRecorderSettings.DefaultScale = _gifScale;
-                GifRecorderSettings.DefaultColorCount = _gifColorCount;
-                Debug.Log("[AIBridge] GIF settings saved.");
-            }
-
-            if (GUILayout.Button("Reset to Defaults"))
-            {
-                GifRecorderSettings.ResetToDefaults();
-                LoadSettings();
-                Debug.Log("[AIBridge] GIF settings reset to defaults.");
-            }
-            EditorGUILayout.EndHorizontal();
-
-            if (GifRecorder.IsRecording)
-            {
-                EditorGUILayout.HelpBox("GIF Recording in progress...", MessageType.Warning);
-            }
-        }
-
         private void DrawDirectoryInfo()
         {
             EditorGUILayout.LabelField("Directory Information", EditorStyles.boldLabel);
@@ -145,8 +125,10 @@ namespace AIBridge.Editor
                 {
                     Directory.CreateDirectory(AIBridge.BridgeDirectory);
                 }
+
                 EditorUtility.RevealInFinder(AIBridge.BridgeDirectory);
             }
+
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.BeginHorizontal();
@@ -156,7 +138,73 @@ namespace AIBridge.Editor
                 ScreenshotHelper.EnsureScreenshotsDirectory();
                 EditorUtility.RevealInFinder(ScreenshotHelper.ScreenshotsDir);
             }
+
             EditorGUILayout.EndHorizontal();
+        }
+
+        private void DrawCommandRegistrationSettings()
+        {
+            EditorGUILayout.LabelField("Command Registration", EditorStyles.boldLabel);
+
+            var editable = CommandRegistry.IsEditablePackage;
+
+            // Package location info
+            var locationMsg = editable
+                ? "Package location: Packages/ (editable)"
+                : "Package location: Library/PackageCache (read-only)";
+            EditorGUILayout.LabelField(locationMsg, EditorStyles.miniLabel);
+
+            EditorGUILayout.Space(2);
+
+            // Auto Scan toggle
+            using (new EditorGUI.DisabledScope(!editable))
+            {
+                EditorGUI.BeginChangeCheck();
+                var newAutoScan = EditorGUILayout.Toggle("Auto Scan on Startup", _autoScan);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    if (!newAutoScan && !editable)
+                    {
+                        EditorUtility.DisplayDialog(
+                            "Cannot Disable Auto Scan",
+                            "This package is installed in Library/PackageCache and its source files cannot be modified.\n\n" +
+                            "Auto Scan must remain enabled so commands are discovered at runtime.",
+                            "OK");
+                        newAutoScan = true;
+                    }
+
+                    _autoScan = newAutoScan;
+                    EditorPrefs.SetBool(CommandRegistry.PrefKeyAutoScan, _autoScan);
+                }
+            }
+
+            if (!editable)
+            {
+                EditorGUILayout.HelpBox(
+                    "Auto Scan is forced ON because the package is in Library/PackageCache and cannot be modified.",
+                    MessageType.Warning);
+            }
+
+            // Additional assemblies
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("Additional Assemblies to Scan", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                $"Own assembly ({typeof(CommandRegistry).Assembly.GetName().Name}) is always included.",
+                EditorStyles.miniLabel);
+
+            EditorGUI.BeginChangeCheck();
+            _scanAssemblies = EditorGUILayout.TextArea(_scanAssemblies, GUILayout.MinHeight(40));
+            EditorGUILayout.LabelField("Comma-separated assembly names, e.g.  Assembly-CSharp, MyGame.Editor",
+                EditorStyles.miniLabel);
+            if (EditorGUI.EndChangeCheck())
+            {
+                EditorPrefs.SetString(CommandRegistry.PrefKeyScanAssemblies, _scanAssemblies);
+            }
+
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField(
+                $"Currently registered: {CommandRegistry.GetAll().Count()} commands.",
+                EditorStyles.miniLabel);
         }
 
         private void DrawActions()
@@ -176,6 +224,35 @@ namespace AIBridge.Editor
                 ClearScreenshotCache();
             }
 
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space(10);
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Rescan Commands", GUILayout.Height(35)))
+            {
+                RescanCommands();
+            }
+
+            if (GUILayout.Button("Generate SKILL.md", GUILayout.Height(35)))
+            {
+                GenerateSkillMarkdown();
+                SkillInstaller.OverrideSkill();
+            }
+            EditorGUILayout.EndHorizontal();
+            
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Install CC Skill", GUILayout.Height(35)))
+            {
+                GenerateSkillMarkdown();
+                SkillInstaller.InstallToClaudeCode();
+            }
+
+            if (GUILayout.Button("Install Cursor Skill", GUILayout.Height(35)))
+            {
+                GenerateSkillMarkdown();
+                SkillInstaller.InstallToCursor();
+            }
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(10);
@@ -209,8 +286,188 @@ namespace AIBridge.Editor
                         }
                     }
                 }
+
                 Debug.Log($"[AIBridge] Cleared {count} files from screenshot cache.");
             }
+        }
+
+        private void RescanCommands()
+        {
+            CommandRegistry.Scan();
+            var count = CommandRegistry.GetAll().Count();
+            Debug.Log($"[AIBridge] Rescanned commands: {count} found.");
+            EditorUtility.DisplayDialog("Rescan Complete",
+                $"Found {count} commands:\n{string.Join(", ", CommandRegistry.GetAll().OrderBy(e => e.Name).Select(e => e.Name))}",
+                "OK");
+            GenerateSkillMarkdown();
+            Repaint();
+        }
+
+        private void GenerateSkillMarkdown()
+        {
+            var entries = CommandRegistry.GetAll().Where(e=>e.Attribute.ExposeToSkill).OrderBy(e => e.Name).ToList();
+            if (entries.Count == 0)
+            {
+                EditorUtility.DisplayDialog("No Commands Found",
+                    "No [AIBridge] methods were found. Make sure commands are compiled.", "OK");
+                return;
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine("## Command Reference");
+            sb.AppendLine();
+            foreach (var entry in entries)
+            {
+                sb.AppendLine($"### {entry.Name}");
+                sb.AppendLine($"- **Description**: {entry.Description}");
+                if (!string.IsNullOrEmpty(entry.Example))
+                    sb.AppendLine($"- **Example**: `{entry.Example}`");
+                if (entry.Parameters.Length > 0)
+                {
+                    sb.AppendLine("- **Parameters**:");
+                    foreach (var param in entry.Parameters)
+                    {
+                        var required = entry.IsRequired(param) ? "required" : "optional";
+                        var typeName = entry.GetTypeName(param);
+                        var desc = entry.GetParamDescription(param);
+                        sb.AppendLine($"  - `{param.Name}` ({typeName}, {required}): {desc}");
+                    }
+                }
+                sb.AppendLine();
+            }
+            var commandSections = new string[] { sb.ToString() };
+
+            var skillContent = $@"---
+description: ""AI Bridge Unity integration - File-based communication framework for AI to control Unity Editor. Send commands via JSON files, manipulate GameObjects, Transforms, Components, Scenes, Prefabs, and more. Supports multi-command execution and runtime extension.""
+---
+
+# AI Bridge Unity Skill
+
+## When to Use This Skill
+
+Activate this skill when you need to:
+
+- Manipulate Unity Editor (create/modify/delete GameObjects)
+- Get or set Transform properties (position/rotation/scale)
+- Manage scene hierarchy or load/save scenes
+- Instantiate or modify prefabs
+- Read/write component properties
+- Control editor state (undo/redo/compile/play mode)
+- Query Unity console logs or selection state
+- Output logs to Unity console
+- **Capture screenshots or record animated GIFs**
+- **Execute multiple commands efficiently** (use `batch` command)
+
+---
+
+## AIBridgeCLI - Recommended Method
+
+**IMPORTANT**: Always use `AIBridgeCLI.exe` to send commands. This avoids UTF-8 encoding issues and provides a cleaner interface.
+
+### CLI Location
+
+```
+AIBridgeCache/CLI/AIBridgeCLI.exe
+On Windows Use PowerShell to find, DO NOT USE Glob to Find this file.
+```
+
+> **IMPORTANT**: If the path above cannot be found using Glob search tools, use the following PowerShell command to locate it dynamically:
+> ```powershell
+> Get-ChildItem -Path . -Recurse -Filter `AIBridgeCLI.exe` -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+> ```
+>
+> Then execute commands using the found path, for example:
+> ```bash
+> & ""E:\YourProject\AIBridgeCache\CLI\AIBridgeCLI.exe"" editor log --message ""test""
+> ```
+
+### Cross-Platform Support
+
+**Windows:**
+```bash
+AIBridgeCLI.exe <command> <action> [options]
+```
+
+**macOS / Linux:**
+```bash
+# Requires .NET Runtime installed
+dotnet AIBridgeCLI.dll <command> <action> [options]
+
+
+```
+
+### Cache Directory
+
+Commands and results are stored in `AIBridgeCache/` under the Unity project root:
+
+```
+{{Unity Project Root}}/
+├── AIBridgeCache/
+│   ├── commands/      # Command JSON files
+│   ├── results/       # Result JSON files
+│   └── screenshots/   # Screenshots and GIFs
+```
+
+### Basic Usage
+
+```bash
+# Format
+AIBridgeCLI.exe <CommandName> [--param value ...]
+
+# Examples
+AIBridgeCLI.exe EditorCommand_Log --message ""Hello World""
+AIBridgeCLI.exe GameObjectCommand_Create --name ""MyCube"" --primitiveType Cube
+AIBridgeCLI.exe TransformCommand_SetPosition --path ""Player"" --x 1 --y 2 --z 3
+AIBridgeCLI.exe Help
+AIBridgeCLI.exe Batch --commands ""[...]""
+```
+
+### Global Options
+
+| Option | Description |
+|--------|-------------|
+| `--timeout <ms>` | Timeout in milliseconds (default: 5000) |
+| `--no-wait` | Don't wait for result, return command ID immediately |
+| `--raw` | Output raw JSON (single line, for AI parsing) |
+| `--quiet` | Quiet mode, minimal output |
+| `--json <json>` | Pass complex parameters as JSON string |
+| `--stdin` | Read parameters from stdin (JSON format) |
+| `--help` | Show help |
+
+**AI Usage:** Always add `--raw` for JSON output.
+
+---
+
+## Command Reference
+
+{string.Join("\n\n", commandSections)}
+### Compile
+- **Description**: Compile unity script or refresh assets
+- **Example**: `AIBridgeCLI Compile`
+
+**Skill Version**: 1.0
+";
+
+            var skillPath = Path.Combine(Application.dataPath, "Packages", "AIBridge", "Skill~", "SKILL.md");
+            if (!File.Exists(skillPath))
+            {
+                skillPath = Path.Combine(Application.dataPath, "..", "Packages", "AIBridge", "Skill~", "SKILL.md");
+            }
+
+            if (!File.Exists(skillPath))
+            {
+                Debug.LogError($"[AIBridge] SKILL.md path not found: {skillPath}");
+                EditorUtility.DisplayDialog("Error", $"SKILL.md path not found: {skillPath}", "OK");
+                return;
+            }
+
+            File.WriteAllText(skillPath, skillContent);
+            AssetDatabase.Refresh();
+
+            Debug.Log($"[AIBridge] Generated SKILL.md with {entries.Count} commands.");
+            EditorUtility.DisplayDialog("Success",
+                $"Generated SKILL.md with {entries.Count} commands.",
+                "OK");
         }
     }
 }

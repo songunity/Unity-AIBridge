@@ -16,9 +16,8 @@ Activate this skill when you need to:
 - Control editor state (undo/redo/compile/play mode)
 - Query Unity console logs or selection state
 - Output logs to Unity console
-- **Bring Unity Editor window to foreground** (triggers auto-refresh/compile)
-- **Capture screenshots or record animated GIFs** (requires Play Mode)
-- **Execute multiple commands efficiently** (use `multi` command)
+- **Capture screenshots or record animated GIFs**
+- **Execute multiple commands efficiently** (use `batch` command)
 
 ---
 
@@ -30,9 +29,18 @@ Activate this skill when you need to:
 
 ```
 AIBridgeCache/CLI/AIBridgeCLI.exe
+On Windows Use PowerShell to find, DO NOT USE Glob to Find this file.
 ```
 
-> **Note**: The CLI is automatically copied to `AIBridgeCache/CLI/` when the package is installed. This provides a stable, fixed path regardless of how the package was installed (local, git, or registry).
+> **IMPORTANT**: If the path above cannot be found using Glob search tools, use the following PowerShell command to locate it dynamically:
+> ```powershell
+> Get-ChildItem -Path . -Recurse -Filter `AIBridgeCLI.exe` -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+> ```
+>
+> Then execute commands using the found path, for example:
+> ```bash
+> & "E:\YourProject\AIBridgeCache\CLI\AIBridgeCLI.exe" editor log --message "test"
+> ```
 
 ### Cross-Platform Support
 
@@ -46,11 +54,8 @@ AIBridgeCLI.exe <command> <action> [options]
 # Requires .NET Runtime installed
 dotnet AIBridgeCLI.dll <command> <action> [options]
 
-# Example
-dotnet AIBridgeCLI.dll get_logs --logType Error --raw
-```
 
-> **Note**: The CLI is built as a .NET assembly, so it can run on macOS/Linux via `dotnet` command. Install .NET Runtime from https://dotnet.microsoft.com/download if not already installed.
+```
 
 ### Cache Directory
 
@@ -68,20 +73,14 @@ Commands and results are stored in `AIBridgeCache/` under the Unity project root
 
 ```bash
 # Format
-AIBridgeCLI.exe <command-type> <action> [options]
+AIBridgeCLI.exe <CommandName> [--param value ...]
 
 # Examples
-AIBridgeCLI.exe editor log --message "Hello World"
-AIBridgeCLI.exe gameobject create --name "MyCube" --primitiveType Cube
-AIBridgeCLI.exe transform set_position --path "Player" --x 1 --y 2 --z 3
-```
-
-### PowerShell Execution
-
-When the project path contains spaces, use the `&` call operator:
-
-```powershell
-& "{ProjectRoot}\AIBridgeCache\CLI\AIBridgeCLI.exe" <command> <action> [options] --raw
+AIBridgeCLI.exe EditorCommand_Log --message "Hello World"
+AIBridgeCLI.exe GameObjectCommand_Create --name "MyCube" --primitiveType Cube
+AIBridgeCLI.exe TransformCommand_SetPosition --path "Player" --x 1 --y 2 --z 3
+AIBridgeCLI.exe Help
+AIBridgeCLI.exe Batch --commands "[...]"
 ```
 
 ### Global Options
@@ -102,380 +101,417 @@ When the project path contains spaces, use the `&` call operator:
 
 ## Command Reference
 
-### 0. `focus` - Bring Unity to Foreground (CLI-only)
-
-**IMPORTANT**: This is a CLI-only command that does NOT require Unity to process it. It uses Windows API to bring the Unity Editor window to the foreground, which triggers automatic asset refresh and code compilation.
-
-```bash
-# Bring Unity Editor window to foreground
-AIBridgeCLI.exe focus
-
-# With raw JSON output
-AIBridgeCLI.exe focus --raw
-# Output: {"Success":true,"ProcessId":1234,"WindowTitle":"MyProject - Unity 6000.0.51f1","Error":null}
-```
-
-**Use Cases:**
-
-- After modifying code files, use `focus` to trigger Unity's automatic recompilation
-- After adding/modifying assets, use `focus` to trigger AssetDatabase refresh
-- Useful in automation scripts to ensure Unity processes pending changes
-
-**Notes:**
-
-- Works only on Windows (uses Windows API)
-- Does not require Unity to be responsive (direct window manipulation)
-- Returns process ID and window title on success
-
-### 1. `editor` - Editor Control
-
-```bash
-# Log to Unity console
-AIBridgeCLI.exe editor log --message "Hello World"
-AIBridgeCLI.exe editor log --message "Warning!" --logType Warning
-AIBridgeCLI.exe editor log --message "Error!" --logType Error
-
-# Undo/Redo
-AIBridgeCLI.exe editor undo
-AIBridgeCLI.exe editor undo --count 3
-AIBridgeCLI.exe editor redo
-
-# Compile and Refresh (simple, use `compile` command for full features)
-AIBridgeCLI.exe editor compile
-AIBridgeCLI.exe editor refresh
-AIBridgeCLI.exe editor refresh --forceUpdate true
-
-# Play Mode
-AIBridgeCLI.exe editor play
-AIBridgeCLI.exe editor stop
-AIBridgeCLI.exe editor pause
-
-# Get Editor State
-AIBridgeCLI.exe editor get_state
-```
-
-### 1.1 `compile` - Compilation Operations (Recommended for AI)
-
-**IMPORTANT for AI**: Use `compile unity` (recommended) or `compile dotnet` (fallback) to verify code changes compile successfully.
-
-```bash
-# Recommended: Unity internal compilation (requires Unity Editor running)
-AIBridgeCLI.exe compile unity --raw
-
-# Fallback: External dotnet build (when Unity is not running)
-AIBridgeCLI.exe compile dotnet --raw
-```
-
-**Workflow for AI after modifying code:**
-
-```bash
-# Step 1: Try Unity compile first (recommended)
-AIBridgeCLI.exe compile unity --raw
-
-# If timeout (Unity not running), fallback to dotnet
-AIBridgeCLI.exe compile dotnet --raw
-
-# Output (success): {"success":true,"status":"success","duration":5.2,"errorCount":0,"warningCount":3,...}
-# Output (failed):  {"success":false,"status":"failed","errorCount":3,"errors":[{"file":"...","line":10,"code":"CS0103","message":"..."}],...}
-```
-
-**Unity compile response fields:**
-
-| Field | Description |
-|-------|-------------|
-| `success` | Whether build succeeded |
-| `status` | "success", "failed", "idle", or "timeout" |
-| `duration` | Build duration in seconds |
-| `errorCount` | Number of errors |
-| `warningCount` | Number of warnings |
-| `errors` | Array of error details (file, line, column, code, message) |
-| `warnings` | Array of warning details (limited to 20) |
-
-**Unity compile parameters:**
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `--timeout` | Total compilation timeout in ms | `120000` |
-| `--poll-interval` | Status polling interval in ms | `500` |
-
-**Dotnet compile parameters (fallback):**
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `--solution` | Solution file path | `ET.sln` |
-| `--configuration` | Build configuration | `Debug` |
-| `--verbosity` | MSBuild verbosity | `minimal` |
-| `--timeout` | Timeout in ms | `300000` |
-| `--no-filter` | Disable error filtering | `false` |
-| `--exclude` | Custom exclude paths (comma separated) | - |
-
-**NOTE**:
-
-- `compile unity` requires Unity Editor to be running, automatically polls for completion
-- `compile dotnet` runs independently without Unity, has intelligent error filtering
-- Use `compile start` and `compile status` for low-level manual compilation control
-
-### 2. `gameobject` - GameObject Operations
-
-```bash
-# Create
-AIBridgeCLI.exe gameobject create --name "MyCube" --primitiveType Cube
-AIBridgeCLI.exe gameobject create --name "Child" --parentPath "Parent"
-
-# Destroy
-AIBridgeCLI.exe gameobject destroy --path "MyCube"
-AIBridgeCLI.exe gameobject destroy --instanceId 12345
-
-# Find
-AIBridgeCLI.exe gameobject find --name "Player"
-AIBridgeCLI.exe gameobject find --tag "Enemy" --maxResults 10
-AIBridgeCLI.exe gameobject find --withComponent "BoxCollider"
-
-# Set Active
-AIBridgeCLI.exe gameobject set_active --path "Player" --active false
-AIBridgeCLI.exe gameobject set_active --path "Player" --toggle true
-
-# Rename
-AIBridgeCLI.exe gameobject rename --path "OldName" --newName "NewName"
-
-# Duplicate
-AIBridgeCLI.exe gameobject duplicate --path "Original"
-
-# Get Info
-AIBridgeCLI.exe gameobject get_info --path "Player"
-```
-
-### 3. `transform` - Transform Operations
-
-```bash
-# Get Transform
-AIBridgeCLI.exe transform get --path "Player"
-
-# Set Position
-AIBridgeCLI.exe transform set_position --path "Player" --x 0 --y 1 --z 0
-AIBridgeCLI.exe transform set_position --path "Player" --x 0 --y 1 --z 0 --local true
-
-# Set Rotation
-AIBridgeCLI.exe transform set_rotation --path "Player" --x 0 --y 90 --z 0
-
-# Set Scale
-AIBridgeCLI.exe transform set_scale --path "Player" --x 2 --y 2 --z 2
-AIBridgeCLI.exe transform set_scale --path "Player" --uniform 2
-
-# Set Parent
-AIBridgeCLI.exe transform set_parent --path "Child" --parentPath "Parent"
-
-# Look At
-AIBridgeCLI.exe transform look_at --path "Player" --targetPath "Enemy"
-AIBridgeCLI.exe transform look_at --path "Player" --targetX 0 --targetY 0 --targetZ 10
-
-# Reset
-AIBridgeCLI.exe transform reset --path "Player"
-
-# Sibling Index
-AIBridgeCLI.exe transform set_sibling_index --path "Child" --index 0
-AIBridgeCLI.exe transform set_sibling_index --path "Child" --first true
-```
-
-### 4. `inspector` - Component Operations
-
-```bash
-# Get Components
-AIBridgeCLI.exe inspector get_components --path "Player"
-
-# Get Properties
-AIBridgeCLI.exe inspector get_properties --path "Player" --componentName "Transform"
-
-# Set Property
-AIBridgeCLI.exe inspector set_property --path "Player" --componentName "Rigidbody" --propertyName "mass" --value 10
-
-# Add Component
-AIBridgeCLI.exe inspector add_component --path "Player" --typeName "Rigidbody"
-AIBridgeCLI.exe inspector add_component --path "Player" --typeName "BoxCollider"
-
-# Remove Component
-AIBridgeCLI.exe inspector remove_component --path "Player" --componentName "Rigidbody"
-```
-
-### 5. `selection` - Selection Operations
-
-```bash
-# Get Selection
-AIBridgeCLI.exe selection get
-AIBridgeCLI.exe selection get --includeComponents true
-
-# Set Selection
-AIBridgeCLI.exe selection set --path "Player"
-AIBridgeCLI.exe selection set --assetPath "Assets/Prefabs/Player.prefab"
-
-# Clear
-AIBridgeCLI.exe selection clear
-
-# Add/Remove
-AIBridgeCLI.exe selection add --path "Enemy1"
-AIBridgeCLI.exe selection remove --path "Enemy1"
-```
-
-### 6. `scene` - Scene Operations
-
-```bash
-# Load Scene
-AIBridgeCLI.exe scene load --scenePath "Assets/Scenes/Main.unity"
-AIBridgeCLI.exe scene load --scenePath "Assets/Scenes/UI.unity" --mode additive
-
-# Save Scene
-AIBridgeCLI.exe scene save
-AIBridgeCLI.exe scene save --saveAs "Assets/Scenes/NewScene.unity"
-
-# Get Hierarchy
-AIBridgeCLI.exe scene get_hierarchy
-AIBridgeCLI.exe scene get_hierarchy --depth 3 --includeInactive false
-
-# Get Active Scene
-AIBridgeCLI.exe scene get_active
-
-# New Scene
-AIBridgeCLI.exe scene new
-AIBridgeCLI.exe scene new --setup empty
-```
-
-### 7. `prefab` - Prefab Operations
-
-```bash
-# Instantiate
-AIBridgeCLI.exe prefab instantiate --prefabPath "Assets/Prefabs/Player.prefab"
-AIBridgeCLI.exe prefab instantiate --prefabPath "Assets/Prefabs/Enemy.prefab" --posX 5 --posY 0 --posZ 0
-
-# Save as Prefab
-AIBridgeCLI.exe prefab save --gameObjectPath "Player" --savePath "Assets/Prefabs/Player.prefab"
-
-# Unpack
-AIBridgeCLI.exe prefab unpack --gameObjectPath "Player(Clone)"
-AIBridgeCLI.exe prefab unpack --gameObjectPath "Player(Clone)" --completely true
-
-# Get Info
-AIBridgeCLI.exe prefab get_info --prefabPath "Assets/Prefabs/Player.prefab"
-
-# Apply Overrides
-AIBridgeCLI.exe prefab apply --gameObjectPath "Player(Clone)"
-```
-
-### 8. `asset` - AssetDatabase Operations
-
-```bash
-# Search Assets (recommended, simplified search)
-AIBridgeCLI.exe asset search --mode script --keyword "Player" --raw    # Search scripts
-AIBridgeCLI.exe asset search --mode prefab --keyword "UI" --raw        # Search prefabs
-AIBridgeCLI.exe asset search --mode all --keyword "Config" --raw       # Search all assets
-AIBridgeCLI.exe asset search --filter "t:ScriptableObject" --raw       # Custom filter
-
-# Preset modes: all, prefab, scene, script, texture, material, audio, animation, shader, font, model, so
-
-# Find Assets (precise control)
-AIBridgeCLI.exe asset find --filter "t:Prefab"
-AIBridgeCLI.exe asset find --filter "t:Texture2D" --searchInFolders "Assets/Textures" --maxResults 50
-
-# Import / Refresh
-AIBridgeCLI.exe asset import --assetPath "Assets/Textures/icon.png"
-AIBridgeCLI.exe asset refresh
-
-# Get Path from GUID / Load Asset Info
-AIBridgeCLI.exe asset get_path --guid "abc123..."
-AIBridgeCLI.exe asset load --assetPath "Assets/Prefabs/Player.prefab"
-```
-
-### 9. `menu_item` - Invoke Menu Item
-
-```bash
-AIBridgeCLI.exe menu_item --menuPath "GameObject/Create Empty"
-AIBridgeCLI.exe menu_item --menuPath "Assets/Create/Folder"
-```
-
-### 10. `get_logs` - Get Console Logs
-
-```bash
-AIBridgeCLI.exe get_logs
-AIBridgeCLI.exe get_logs --count 100
-AIBridgeCLI.exe get_logs --logType Error
-AIBridgeCLI.exe get_logs --logType Warning --count 20
-```
-
-### 11. `screenshot` - Screenshot & GIF Recording (Play Mode)
-
-**Requires Play mode.** Files saved to `AIBridgeCache/screenshots/`.
-
-#### Static Screenshot
-
-```bash
-# Capture Game view screenshot (JPG format)
-AIBridgeCLI.exe screenshot game --raw
-```
-
-**Response:**
-
-```json
-{"success":true,"data":{"action":"game","imagePath":"...screenshots/game_xxx.jpg","width":1920,"height":1080,"filename":"game_xxx.jpg","timestamp":"2025-01-19T12:00:00"}}
-```
-
-#### Animated GIF Recording
-
-```bash
-# Record GIF (required: frameCount)
-AIBridgeCLI.exe screenshot gif --frameCount 50 --raw
-
-# With custom parameters
-AIBridgeCLI.exe screenshot gif --frameCount 100 --fps 25 --scale 0.5 --colorCount 128 --raw
-```
-
-**Parameters:**
-
-| Parameter | Range | Default | Description |
-|-----------|-------|---------|-------------|
-| `--frameCount` | 1-200 | Required | Number of frames to capture |
-| `--fps` | 10-30 | 25 | Frames per second |
-| `--scale` | 0.25-1.0 | 0.5 | Resolution scale factor |
-| `--colorCount` | 64-256 | 128 | GIF palette color count |
-
-**Response:**
-
-```json
-{"success":true,"data":{"action":"gif","gifPath":"...screenshots/gif_xxx.gif","filename":"gif_xxx.gif","frameCount":50,"width":480,"height":270,"duration":2.0,"fileSize":512000,"timestamp":"2025-01-19T12:00:00"}}
-```
-
-**Estimated File Sizes:**
-
-| Frames | Duration | Resolution | Size |
-|--------|----------|------------|------|
-| 25 | 1s | 480x270 | 200KB - 800KB |
-| 50 | 2s | 480x270 | 400KB - 1.5MB |
-| 100 | 4s | 480x270 | 800KB - 3MB |
-| 200 | 8s | 480x270 | 1.5MB - 6MB |
-
-### 12. `batch` - Batch Commands
-
-```bash
-# Execute multiple commands from JSON
-AIBridgeCLI.exe batch execute --commands "[{\"type\":\"editor\",\"params\":{\"action\":\"log\",\"message\":\"Step 1\"}},{\"type\":\"editor\",\"params\":{\"action\":\"log\",\"message\":\"Step 2\"}}]"
-
-# Execute from file
-AIBridgeCLI.exe batch from_file --file "commands.json"
-```
-
-### 13. `multi` - Execute Multiple Commands (RECOMMENDED)
-
-Execute multiple commands in one CLI call (more efficient than multiple calls).
-
-```bash
-# Commands separated by &
-AIBridgeCLI.exe multi --cmd 'editor log --message Step1&gameobject create --name Cube --primitiveType Cube' --raw
-```
-
-| Option | Description |
-|--------|-------------|
-| `--cmd <commands>` | Commands separated by `&` |
-| `--stdin` | Read from stdin (one per line) |
-
----
+## Command Reference
+
+### AssetDatabaseCommand_Find
+- **Description**: Find assets by AssetDatabase filter
+- **Example**: `AIBridgeCLI AssetDatabaseCommand_Find --filter "t:Prefab"`
+- **Parameters**:
+  - `filter` (string, optional): AssetDatabase filter (e.g. t:Prefab, t:Texture2D)
+  - `searchInFolders` (string, optional): Comma-separated list of folders to search in
+  - `maxResults` (integer, optional): Maximum number of results
+
+### AssetDatabaseCommand_GetPath
+- **Description**: Get asset path from GUID
+- **Example**: `AIBridgeCLI AssetDatabaseCommand_GetPath --guid "abc123..."`
+- **Parameters**:
+  - `guid` (string, optional): Asset GUID
+
+### AssetDatabaseCommand_Import
+- **Description**: Import a specific asset
+- **Example**: `AIBridgeCLI AssetDatabaseCommand_Import --assetPath "Assets/Textures/icon.png"`
+- **Parameters**:
+  - `assetPath` (string, optional): Asset path to import
+  - `forceUpdate` (boolean, optional): Force update even if asset is unchanged
+
+### AssetDatabaseCommand_Load
+- **Description**: Load and get info about an asset
+- **Example**: `AIBridgeCLI AssetDatabaseCommand_Load --assetPath "Assets/Prefabs/Player.prefab"`
+- **Parameters**:
+  - `assetPath` (string, optional): Asset path to load
+
+### AssetDatabaseCommand_Refresh
+- **Description**: Refresh the AssetDatabase
+- **Example**: `AIBridgeCLI AssetDatabaseCommand_Refresh`
+- **Parameters**:
+  - `forceUpdate` (boolean, optional): Force update all assets
+
+### AssetDatabaseCommand_Search
+- **Description**: Search assets with preset modes (all/prefab/scene/script/texture/material/audio/animation/shader/font/model/so)
+- **Example**: `AIBridgeCLI AssetDatabaseCommand_Search --mode prefab --keyword "Player"`
+- **Parameters**:
+  - `mode` (string, optional): Preset mode: all, prefab, scene, script, texture, material, audio, animation, shader, font, model, so
+  - `filter` (string, optional): Custom filter string (overrides mode)
+  - `keyword` (string, optional): Keyword to search within the mode
+  - `searchInFolders` (string, optional): Comma-separated list of folders to search in
+  - `maxResults` (integer, optional): Maximum number of results
+
+### Batch
+- **Description**: Execute multiple commands in sequence and return all results
+- **Example**: `AIBridgeCLI Batch --commands "[{\"type\":\"GameObjectCommand_Find\",\"params\":{\"name\":\"Player\"}}]"`
+- **Parameters**:
+  - `commands` (string, optional): Array of command objects, each with 'type' and 'params' fields
+
+### EditorCommand_GetState
+- **Description**: Get current Editor state (play/pause/compile status)
+- **Example**: `AIBridgeCLI EditorCommand_GetState`
+
+### EditorCommand_Log
+- **Description**: Log a message to the Unity console
+- **Example**: `AIBridgeCLI EditorCommand_Log --message "Hello World"`
+- **Parameters**:
+  - `message` (string, required): Message to log
+  - `logType` (string, optional): Log type: Log, Warning, Error
+
+### EditorCommand_Pause
+- **Description**: Toggle or set pause state
+- **Example**: `AIBridgeCLI EditorCommand_Pause`
+- **Parameters**:
+  - `toggle` (boolean, optional): Toggle pause (true) or set specific value (false)
+  - `pause` (boolean, optional): Pause state to set when toggle is false
+
+### EditorCommand_Play
+- **Description**: Enter Play mode
+- **Example**: `AIBridgeCLI EditorCommand_Play`
+
+### EditorCommand_Redo
+- **Description**: Perform redo operations
+- **Example**: `AIBridgeCLI EditorCommand_Redo --count 1`
+- **Parameters**:
+  - `count` (integer, optional): Number of redo steps
+
+### EditorCommand_Refresh
+- **Description**: Refresh the AssetDatabase
+- **Example**: `AIBridgeCLI EditorCommand_Refresh`
+- **Parameters**:
+  - `forceUpdate` (boolean, optional): Force update all assets
+
+### EditorCommand_Stop
+- **Description**: Exit Play mode
+- **Example**: `AIBridgeCLI EditorCommand_Stop`
+
+### EditorCommand_Undo
+- **Description**: Perform undo operations
+- **Example**: `AIBridgeCLI EditorCommand_Undo --count 3`
+- **Parameters**:
+  - `count` (integer, optional): Number of undo steps
+
+### GameObjectCommand_Create
+- **Description**: Create a new GameObject in the scene
+- **Example**: `AIBridgeCLI GameObjectCommand_Create --name "MyCube" --primitiveType Cube`
+- **Parameters**:
+  - `name` (string, optional): Name for the new GameObject
+  - `primitiveType` (string, optional): Primitive type: Cube, Sphere, Capsule, Cylinder, Plane, Quad
+  - `parentPath` (string, optional): Hierarchy path of parent GameObject
+
+### GameObjectCommand_Destroy
+- **Description**: Destroy a GameObject
+- **Example**: `AIBridgeCLI GameObjectCommand_Destroy --path "Player"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `instanceId` (integer, optional): Instance ID of the GameObject
+
+### GameObjectCommand_Duplicate
+- **Description**: Duplicate a GameObject
+- **Example**: `AIBridgeCLI GameObjectCommand_Duplicate --path "Original"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `instanceId` (integer, optional): Instance ID of the GameObject
+
+### GameObjectCommand_Find
+- **Description**: Find GameObjects by name, tag, or component
+- **Example**: `AIBridgeCLI GameObjectCommand_Find --name "Player"`
+- **Parameters**:
+  - `name` (string, optional): Name or partial name to search
+  - `tag` (string, optional): Tag to filter by
+  - `withComponent` (string, optional): Component type name to filter by
+  - `maxResults` (integer, optional): Maximum number of results
+
+### GameObjectCommand_GetInfo
+- **Description**: Get detailed info about a GameObject
+- **Example**: `AIBridgeCLI GameObjectCommand_GetInfo --path "Player"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `instanceId` (integer, optional): Instance ID of the GameObject
+
+### GameObjectCommand_Rename
+- **Description**: Rename a GameObject
+- **Example**: `AIBridgeCLI GameObjectCommand_Rename --path "OldName" --newName "NewName"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `instanceId` (integer, optional): Instance ID of the GameObject
+  - `newName` (string, optional): New name for the GameObject
+
+### GameObjectCommand_SetActive
+- **Description**: Set a GameObject active or inactive
+- **Example**: `AIBridgeCLI GameObjectCommand_SetActive --path "Player" --active false`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `instanceId` (integer, optional): Instance ID of the GameObject
+  - `active` (boolean, optional): Whether to activate the GameObject
+  - `toggle` (boolean, optional): Toggle the current active state
+
+### GetLogsCommand_StartCapture
+- **Description**: Start capturing Unity console logs into buffer
+- **Example**: `AIBridgeCLI GetLogsCommand_StartCapture`
+
+### GetLogsCommand_StopCapture
+- **Description**: Stop capturing Unity console logs
+- **Example**: `AIBridgeCLI GetLogsCommand_StopCapture`
+
+### Help
+- **Description**: Get help for all registered commands, or detailed info for a specific one
+- **Example**: `AIBridgeCLI Help`
+- **Parameters**:
+  - `command` (string, optional): Command name to get detailed help for (leave empty for all commands)
+
+### InspectorCommand_AddComponent
+- **Description**: Add a component to a GameObject
+- **Example**: `AIBridgeCLI InspectorCommand_AddComponent --path "Player" --typeName "Rigidbody"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `instanceId` (integer, optional): Instance ID of the GameObject
+  - `typeName` (string, optional): Component type name (e.g. Rigidbody, BoxCollider)
+
+### InspectorCommand_GetComponents
+- **Description**: Get all components on a GameObject
+- **Example**: `AIBridgeCLI InspectorCommand_GetComponents --path "Player"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `instanceId` (integer, optional): Instance ID of the GameObject
+
+### InspectorCommand_GetProperties
+- **Description**: Get serialized properties of a component
+- **Example**: `AIBridgeCLI InspectorCommand_GetProperties --path "Player" --componentName "Transform"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `instanceId` (integer, optional): Instance ID of the GameObject
+  - `componentName` (string, optional): Component type name
+  - `componentIndex` (integer, optional): Component index (alternative to componentName)
+
+### InspectorCommand_RemoveComponent
+- **Description**: Remove a component from a GameObject
+- **Example**: `AIBridgeCLI InspectorCommand_RemoveComponent --path "Player" --componentName "Rigidbody"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `instanceId` (integer, optional): Instance ID of the GameObject
+  - `componentName` (string, optional): Component type name
+  - `componentIndex` (integer, optional): Component index
+  - `componentInstanceId` (integer, optional): Instance ID of the component
+
+### InspectorCommand_SetProperty
+- **Description**: Set a serialized property on a component
+- **Example**: `AIBridgeCLI InspectorCommand_SetProperty --path "Player" --componentName "Rigidbody" --propertyName "mass" --value 10`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `instanceId` (integer, optional): Instance ID of the GameObject
+  - `componentName` (string, optional): Component type name
+  - `componentIndex` (integer, optional): Component index (alternative to componentName)
+  - `propertyName` (string, optional): Serialized property name
+  - `value` (string, optional): New value for the property
+
+### Log
+- **Description**: Get console logs from Unity Editor
+- **Example**: `AIBridgeCLI Log --count 50`
+- **Parameters**:
+  - `logType` (string, optional): Log type filter: All, Error, Warning, Log
+  - `filter` (string, optional): Text filter (substring match)
+  - `count` (integer, optional): Maximum number of logs to return
+
+### MenuItemCommand_Execute
+- **Description**: Execute a Unity Editor menu item by its path
+- **Example**: `AIBridgeCLI MenuItemCommand_Execute --menuPath "GameObject/Create Empty"`
+- **Parameters**:
+  - `menuPath` (string, optional): Menu item path (e.g. GameObject/Create Empty)
+
+### PrefabCommand_Apply
+- **Description**: Apply prefab instance overrides back to the prefab asset
+- **Example**: `AIBridgeCLI PrefabCommand_Apply --gameObjectPath "Player(Clone)"`
+- **Parameters**:
+  - `gameObjectPath` (string, optional): Hierarchy path of the prefab instance (uses selection if omitted)
+
+### PrefabCommand_GetInfo
+- **Description**: Get prefab info for an asset or instance
+- **Example**: `AIBridgeCLI PrefabCommand_GetInfo --prefabPath "Assets/Prefabs/Player.prefab"`
+- **Parameters**:
+  - `prefabPath` (string, optional): Asset path to the prefab
+  - `gameObjectPath` (string, optional): Hierarchy path of a prefab instance
+
+### PrefabCommand_Instantiate
+- **Description**: Instantiate a prefab in the scene
+- **Example**: `AIBridgeCLI PrefabCommand_Instantiate --prefabPath "Assets/Prefabs/Player.prefab"`
+- **Parameters**:
+  - `prefabPath` (string, optional): Asset path to the prefab
+  - `posX` (number, optional): X position
+  - `posY` (number, optional): Y position
+  - `posZ` (number, optional): Z position
+
+### PrefabCommand_Save
+- **Description**: Save a GameObject as a prefab asset
+- **Example**: `AIBridgeCLI PrefabCommand_Save --gameObjectPath "Player" --savePath "Assets/Prefabs/Player.prefab"`
+- **Parameters**:
+  - `gameObjectPath` (string, optional): Hierarchy path of the GameObject (uses selection if omitted)
+  - `savePath` (string, optional): Asset path to save the prefab to
+
+### PrefabCommand_Unpack
+- **Description**: Unpack a prefab instance
+- **Example**: `AIBridgeCLI PrefabCommand_Unpack --gameObjectPath "Player(Clone)"`
+- **Parameters**:
+  - `gameObjectPath` (string, optional): Hierarchy path of the prefab instance (uses selection if omitted)
+  - `completely` (boolean, optional): Unpack completely (all nested prefabs)
+
+### SceneCommand_GetActive
+- **Description**: Get info about the active scene
+- **Example**: `AIBridgeCLI SceneCommand_GetActive`
+
+### SceneCommand_GetHierarchy
+- **Description**: Get the scene hierarchy as a tree
+- **Example**: `AIBridgeCLI SceneCommand_GetHierarchy --depth 3`
+- **Parameters**:
+  - `depth` (integer, optional): Maximum depth to traverse
+  - `includeInactive` (boolean, optional): Include inactive GameObjects
+
+### SceneCommand_Load
+- **Description**: Load a scene in the Editor
+- **Example**: `AIBridgeCLI SceneCommand_Load --scenePath "Assets/Scenes/Main.unity"`
+- **Parameters**:
+  - `scenePath` (string, optional): Asset path to the scene file
+  - `mode` (string, optional): Load mode: single or additive
+
+### SceneCommand_New
+- **Description**: Create a new empty scene
+- **Example**: `AIBridgeCLI SceneCommand_New --setup empty`
+- **Parameters**:
+  - `setup` (string, optional): Scene setup: default or empty
+
+### SceneCommand_Save
+- **Description**: Save the current open scene(s)
+- **Example**: `AIBridgeCLI SceneCommand_Save`
+- **Parameters**:
+  - `saveAs` (string, optional): Save to a new path (save-as)
+
+### ScreenshotCommand_Gif
+- **Description**: Capture multiple screenshots and combine into GIF, need least 15s timeout
+- **Example**: `AIBridgeCLI ScreenshotCommand_Gif --frameCount 30 --fps 15`
+- **Parameters**:
+  - `frameCount` (integer, optional): Number of frames to capture (1-200)
+  - `delay` (number, optional): Delay between frames in seconds (0.1-2.0)
+  - `scale` (number, optional): Scale factor (0.25-1.0)
+  - `colorCount` (integer, optional): Color count (64-256)
+  - `fps` (integer, optional): FPS for GIF playback (10-30)
+
+### ScreenshotCommand_Image
+- **Description**: Capture a screenshot of the Game view
+- **Example**: `AIBridgeCLI ScreenshotCommand_Image`
+
+### SelectionCommand_Add
+- **Description**: Add an object to the current selection
+- **Example**: `AIBridgeCLI SelectionCommand_Add --path "Enemy1"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `assetPath` (string, optional): Asset path
+  - `instanceId` (integer, optional): Instance ID
+
+### SelectionCommand_Clear
+- **Description**: Clear the current selection
+- **Example**: `AIBridgeCLI SelectionCommand_Clear`
+
+### SelectionCommand_Get
+- **Description**: Get the current selection
+- **Example**: `AIBridgeCLI SelectionCommand_Get`
+- **Parameters**:
+  - `includeComponents` (boolean, optional): Include component list for each selected GameObject
+
+### SelectionCommand_Remove
+- **Description**: Remove an object from the current selection
+- **Example**: `AIBridgeCLI SelectionCommand_Remove --path "Enemy1"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `assetPath` (string, optional): Asset path
+  - `instanceId` (integer, optional): Instance ID
+
+### SelectionCommand_Set
+- **Description**: Set the current selection
+- **Example**: `AIBridgeCLI SelectionCommand_Set --path "Player"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject to select
+  - `assetPath` (string, optional): Asset path to select
+  - `instanceId` (integer, optional): Instance ID to select
+  - `instanceIds` (string, optional): Comma-separated list of instance IDs to select
+
+### TransformCommand_Get
+- **Description**: Get Transform data of a GameObject
+- **Example**: `AIBridgeCLI TransformCommand_Get --path "Player"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the GameObject
+  - `instanceId` (integer, optional): Instance ID of the GameObject
+
+### TransformCommand_LookAt
+- **Description**: Make a GameObject look at a target position
+- **Example**: `AIBridgeCLI TransformCommand_LookAt --path "Player" --targetX 0 --targetY 0 --targetZ 10`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path
+  - `instanceId` (integer, optional): Instance ID
+  - `targetX` (number, optional): Target X coordinate
+  - `targetY` (number, optional): Target Y coordinate
+  - `targetZ` (number, optional): Target Z coordinate
+
+### TransformCommand_Reset
+- **Description**: Reset Transform to default values
+- **Example**: `AIBridgeCLI TransformCommand_Reset --path "Player"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path
+  - `instanceId` (integer, optional): Instance ID
+  - `position` (boolean, optional): Reset position
+  - `rotation` (boolean, optional): Reset rotation
+  - `scale` (boolean, optional): Reset scale
+
+### TransformCommand_SetParent
+- **Description**: Set parent of a GameObject
+- **Example**: `AIBridgeCLI TransformCommand_SetParent --path "Child" --parentPath "Parent"`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path of the child
+  - `instanceId` (integer, optional): Instance ID of the child
+  - `parentPath` (string, optional): Hierarchy path of the new parent (empty to unparent)
+  - `parentInstanceId` (integer, optional): Instance ID of the new parent
+  - `worldPositionStays` (boolean, optional): Keep world position after reparenting
+
+### TransformCommand_SetPosition
+- **Description**: Set position of a GameObject
+- **Example**: `AIBridgeCLI TransformCommand_SetPosition --path "Player" --x 0 --y 1 --z 0`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path
+  - `instanceId` (integer, optional): Instance ID
+  - `x` (number, optional): X coordinate (omit to keep current)
+  - `y` (number, optional): Y coordinate (omit to keep current)
+  - `z` (number, optional): Z coordinate (omit to keep current)
+  - `local` (boolean, optional): Use local space
+
+### TransformCommand_SetRotation
+- **Description**: Set rotation of a GameObject (Euler angles)
+- **Example**: `AIBridgeCLI TransformCommand_SetRotation --path "Player" --y 90`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path
+  - `instanceId` (integer, optional): Instance ID
+  - `x` (number, optional): X euler angle (omit to keep current)
+  - `y` (number, optional): Y euler angle (omit to keep current)
+  - `z` (number, optional): Z euler angle (omit to keep current)
+  - `local` (boolean, optional): Use local space
+
+### TransformCommand_SetScale
+- **Description**: Set scale of a GameObject
+- **Example**: `AIBridgeCLI TransformCommand_SetScale --path "Player" --uniform 2`
+- **Parameters**:
+  - `path` (string, optional): Hierarchy path
+  - `instanceId` (integer, optional): Instance ID
+  - `x` (number, optional): X scale (omit to keep current)
+  - `y` (number, optional): Y scale (omit to keep current)
+  - `z` (number, optional): Z scale (omit to keep current)
+  - `uniform` (number, optional): Uniform scale for all axes
+
+
+### Compile
+- **Description**: Compile unity script or refresh assets
+- **Example**: `AIBridgeCLI Compile`
 
 **Skill Version**: 1.0
-**Package**: cn.lys.aibridge

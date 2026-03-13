@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -184,45 +183,21 @@ namespace AIBridge.Editor
                 return false;
             }
 
-            var stopwatch = Stopwatch.StartNew();
-            CommandResult result;
-
-            try
+            if (!CommandRegistry.TryGetCommand(request.type, out var entry))
             {
-                if (!CommandRegistry.TryGetCommand(request.type, out var command))
-                {
-                    result = CommandResult.Failure(request.id, $"Unknown command type: {request.type}");
-                }
-                else
-                {
-                    result = command.Execute(request);
-
-                    // If result is null, the command handles its own result writing (async commands)
-                    if (result == null)
-                    {
-                        AIBridgeLogger.LogDebug($"Command {request.id} ({request.type}) started async processing");
-                        return true;
-                    }
-
-                    result.id = request.id;
-
-                    // Refresh AssetDatabase if command requires it
-                    if (command.RequiresRefresh)
-                    {
-                        AssetDatabase.Refresh();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                result = CommandResult.FromException(request.id, ex);
+                WriteResult(CommandResult.FailureWithId(request.id, $"Unknown command: {request.type}"));
+                return true;
             }
 
-            stopwatch.Stop();
-            result.executionTime = stopwatch.ElapsedMilliseconds;
+            if (!CommandParamBinder.TryBind(entry, request, out var args, out var bindError))
+            {
+                WriteResult(CommandResult.FailureWithId(request.id, bindError));
+                return true;
+            }
 
-            WriteResult(result);
-            AIBridgeLogger.LogDebug($"Processed command {request.id} in {result.executionTime}ms, success={result.success}");
+            var coroutine = (System.Collections.IEnumerator)entry.Method.Invoke(null, args);
+            EditorCoroutineRunner.Start(coroutine, WriteResult, request.id);
+            AIBridgeLogger.LogDebug($"Command {request.id} ({request.type}) started async processing");
 
             return true;
         }
@@ -267,13 +242,6 @@ namespace AIBridge.Editor
                 if (!Directory.Exists(_resultsDir))
                 {
                     Directory.CreateDirectory(_resultsDir);
-                }
-
-                // Create .gitignore if not exists
-                var gitignorePath = Path.Combine(Path.GetDirectoryName(_commandsDir), ".gitignore");
-                if (!File.Exists(gitignorePath))
-                {
-                    File.WriteAllText(gitignorePath, "*\n!.gitignore\n");
                 }
             }
             catch (Exception ex)

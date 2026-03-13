@@ -1,70 +1,32 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using UnityEditor;
 using UnityEngine;
+using Component = UnityEngine.Component;
 
 namespace AIBridge.Editor
 {
-    /// <summary>
-    /// GameObject operations: create, destroy, find, set_active, rename, duplicate
-    /// Supports multiple sub-commands via "action" parameter
-    /// </summary>
-    public class GameObjectCommand : ICommand
+    public static class GameObjectCommand
     {
-        public string Type => "gameobject";
-        public bool RequiresRefresh => true;
-
-        public CommandResult Execute(CommandRequest request)
+        [AIBridge("Create a new GameObject in the scene",
+            "AIBridgeCLI GameObjectCommand_Create --name \"MyCube\" --primitiveType Cube")]
+        public static IEnumerator Create(
+            [Description("Name for the new GameObject")] string name = "New GameObject",
+            [Description("Primitive type: Cube, Sphere, Capsule, Cylinder, Plane, Quad")] string primitiveType = null,
+            [Description("Hierarchy path of parent GameObject")] string parentPath = null)
         {
-            var action = request.GetParam("action", "find");
-
-            try
-            {
-                switch (action.ToLower())
-                {
-                    case "create":
-                        return Create(request);
-                    case "destroy":
-                        return Destroy(request);
-                    case "find":
-                        return Find(request);
-                    case "set_active":
-                        return SetActive(request);
-                    case "rename":
-                        return Rename(request);
-                    case "duplicate":
-                        return Duplicate(request);
-                    case "get_info":
-                        return GetInfo(request);
-                    default:
-                        return CommandResult.Failure(request.id, $"Unknown action: {action}. Supported: create, destroy, find, set_active, rename, duplicate, get_info");
-                }
-            }
-            catch (Exception ex)
-            {
-                return CommandResult.FromException(request.id, ex);
-            }
-        }
-
-        private CommandResult Create(CommandRequest request)
-        {
-            var name = request.GetParam("name", "New GameObject");
-            var primitiveType = request.GetParam<string>("primitiveType", null);
-            var parentPath = request.GetParam<string>("parentPath", null);
-
             GameObject go;
-
             if (!string.IsNullOrEmpty(primitiveType))
             {
-                if (Enum.TryParse<PrimitiveType>(primitiveType, true, out var primitive))
+                if (!Enum.TryParse<PrimitiveType>(primitiveType, true, out var primitive))
                 {
-                    go = GameObject.CreatePrimitive(primitive);
-                    go.name = name;
+                    yield return CommandResult.Failure($"Unknown primitive type: {primitiveType}. Supported: Cube, Sphere, Capsule, Cylinder, Plane, Quad");
+                    yield break;
                 }
-                else
-                {
-                    return CommandResult.Failure(request.id, $"Unknown primitive type: {primitiveType}. Supported: Cube, Sphere, Capsule, Cylinder, Plane, Quad");
-                }
+                go = GameObject.CreatePrimitive(primitive);
+                go.name = name;
             }
             else
             {
@@ -75,15 +37,13 @@ namespace AIBridge.Editor
             {
                 var parent = GameObject.Find(parentPath);
                 if (parent != null)
-                {
                     go.transform.SetParent(parent.transform, false);
-                }
             }
 
             Undo.RegisterCreatedObjectUndo(go, $"Create {name}");
             Selection.activeGameObject = go;
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
                 name = go.name,
                 path = GetGameObjectPath(go),
@@ -91,34 +51,39 @@ namespace AIBridge.Editor
             });
         }
 
-        private CommandResult Destroy(CommandRequest request)
+        [AIBridge("Destroy a GameObject",
+            "AIBridgeCLI GameObjectCommand_Destroy --path \"Player\"")]
+        public static IEnumerator Destroy(
+            [Description("Hierarchy path of the GameObject")] string path = null,
+            [Description("Instance ID of the GameObject")] int instanceId = 0)
         {
-            var go = GetTargetGameObject(request);
+            var go = GetTargetGameObject(path, instanceId);
             if (go == null)
             {
-                return CommandResult.Failure(request.id, "GameObject not found. Provide 'path' or 'instanceId', or select a GameObject");
+                yield return CommandResult.Failure("GameObject not found. Provide 'path' or 'instanceId', or select a GameObject");
+                yield break;
             }
 
-            var name = go.name;
-            var path = GetGameObjectPath(go);
-
+            var goName = go.name;
+            var goPath = GetGameObjectPath(go);
             Undo.DestroyObjectImmediate(go);
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
                 action = "destroy",
-                destroyedName = name,
-                destroyedPath = path
+                destroyedName = goName,
+                destroyedPath = goPath
             });
         }
 
-        private CommandResult Find(CommandRequest request)
+        [AIBridge("Find GameObjects by name, tag, or component",
+            "AIBridgeCLI GameObjectCommand_Find --name \"Player\"")]
+        public static IEnumerator Find(
+            [Description("Name or partial name to search")] string name = null,
+            [Description("Tag to filter by")] string tag = null,
+            [Description("Component type name to filter by")] string withComponent = null,
+            [Description("Maximum number of results")] int maxResults = 50)
         {
-            var name = request.GetParam<string>("name", null);
-            var tag = request.GetParam<string>("tag", null);
-            var withComponent = request.GetParam<string>("withComponent", null);
-            var maxResults = request.GetParam("maxResults", 50);
-
             var results = new List<GameObjectInfo>();
 
             if (!string.IsNullOrEmpty(tag))
@@ -128,24 +93,16 @@ namespace AIBridge.Editor
                 {
                     if (results.Count >= maxResults) break;
                     if (string.IsNullOrEmpty(name) || obj.name.Contains(name))
-                    {
                         results.Add(CreateGameObjectInfo(obj));
-                    }
                 }
             }
             else
             {
                 var allObjects = UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
-
                 foreach (var obj in allObjects)
                 {
                     if (results.Count >= maxResults) break;
-
-                    if (!string.IsNullOrEmpty(name) && !obj.name.Contains(name))
-                    {
-                        continue;
-                    }
-
+                    if (!string.IsNullOrEmpty(name) && !obj.name.Contains(name)) continue;
                     if (!string.IsNullOrEmpty(withComponent))
                     {
                         var hasComponent = false;
@@ -159,38 +116,32 @@ namespace AIBridge.Editor
                         }
                         if (!hasComponent) continue;
                     }
-
                     results.Add(CreateGameObjectInfo(obj));
                 }
             }
 
-            return CommandResult.Success(request.id, new
-            {
-                results = results,
-                count = results.Count
-            });
+            yield return CommandResult.Success(new { results, count = results.Count });
         }
 
-        private CommandResult SetActive(CommandRequest request)
+        [AIBridge("Set a GameObject active or inactive",
+            "AIBridgeCLI GameObjectCommand_SetActive --path \"Player\" --active false")]
+        public static IEnumerator SetActive(
+            [Description("Hierarchy path of the GameObject")] string path = null,
+            [Description("Instance ID of the GameObject")] int instanceId = 0,
+            [Description("Whether to activate the GameObject")] bool active = true,
+            [Description("Toggle the current active state")] bool toggle = false)
         {
-            var go = GetTargetGameObject(request);
+            var go = GetTargetGameObject(path, instanceId);
             if (go == null)
             {
-                return CommandResult.Failure(request.id, "GameObject not found");
-            }
-
-            var active = request.GetParam("active", true);
-            var toggle = request.GetParam("toggle", false);
-
-            if (toggle)
-            {
-                active = !go.activeSelf;
+                yield return CommandResult.Failure("GameObject not found");
+                yield break;
             }
 
             Undo.RecordObject(go, $"Set Active {go.name}");
-            go.SetActive(active);
+            go.SetActive(toggle ? !go.activeSelf : active);
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
                 name = go.name,
                 activeSelf = go.activeSelf,
@@ -198,48 +149,56 @@ namespace AIBridge.Editor
             });
         }
 
-        private CommandResult Rename(CommandRequest request)
+        [AIBridge("Rename a GameObject",
+            "AIBridgeCLI GameObjectCommand_Rename --path \"OldName\" --newName \"NewName\"")]
+        public static IEnumerator Rename(
+            [Description("Hierarchy path of the GameObject")] string path = null,
+            [Description("Instance ID of the GameObject")] int instanceId = 0,
+            [Description("New name for the GameObject")] string newName = null)
         {
-            var go = GetTargetGameObject(request);
+            var go = GetTargetGameObject(path, instanceId);
             if (go == null)
             {
-                return CommandResult.Failure(request.id, "GameObject not found");
+                yield return CommandResult.Failure("GameObject not found");
+                yield break;
             }
-
-            var newName = request.GetParam<string>("newName");
             if (string.IsNullOrEmpty(newName))
             {
-                return CommandResult.Failure(request.id, "Missing 'newName' parameter");
+                yield return CommandResult.Failure("Missing 'newName' parameter");
+                yield break;
             }
 
             var oldName = go.name;
-
             Undo.RecordObject(go, $"Rename {oldName}");
             go.name = newName;
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
-                oldName = oldName,
+                oldName,
                 newName = go.name,
                 path = GetGameObjectPath(go)
             });
         }
 
-        private CommandResult Duplicate(CommandRequest request)
+        [AIBridge("Duplicate a GameObject",
+            "AIBridgeCLI GameObjectCommand_Duplicate --path \"Original\"")]
+        public static IEnumerator Duplicate(
+            [Description("Hierarchy path of the GameObject")] string path = null,
+            [Description("Instance ID of the GameObject")] int instanceId = 0)
         {
-            var go = GetTargetGameObject(request);
+            var go = GetTargetGameObject(path, instanceId);
             if (go == null)
             {
-                return CommandResult.Failure(request.id, "GameObject not found");
+                yield return CommandResult.Failure("GameObject not found");
+                yield break;
             }
 
             var duplicate = UnityEngine.Object.Instantiate(go, go.transform.parent);
             duplicate.name = go.name;
-
             Undo.RegisterCreatedObjectUndo(duplicate, $"Duplicate {go.name}");
             Selection.activeGameObject = duplicate;
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
                 originalName = go.name,
                 duplicateName = duplicate.name,
@@ -248,31 +207,31 @@ namespace AIBridge.Editor
             });
         }
 
-        private CommandResult GetInfo(CommandRequest request)
+        [AIBridge("Get detailed info about a GameObject",
+            "AIBridgeCLI GameObjectCommand_GetInfo --path \"Player\"")]
+        public static IEnumerator GetInfo(
+            [Description("Hierarchy path of the GameObject")] string path = null,
+            [Description("Instance ID of the GameObject")] int instanceId = 0)
         {
-            var go = GetTargetGameObject(request);
+            var go = GetTargetGameObject(path, instanceId);
             if (go == null)
             {
-                return CommandResult.Failure(request.id, "GameObject not found");
+                yield return CommandResult.Failure("GameObject not found");
+                yield break;
             }
 
             var components = new List<string>();
             foreach (var comp in go.GetComponents<Component>())
             {
-                if (comp != null)
-                {
-                    components.Add(comp.GetType().FullName);
-                }
+                if (comp != null) components.Add(comp.GetType().FullName);
             }
 
             var childCount = go.transform.childCount;
             var children = new List<string>();
             for (var i = 0; i < Math.Min(childCount, 20); i++)
-            {
                 children.Add(go.transform.GetChild(i).name);
-            }
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
                 name = go.name,
                 path = GetGameObjectPath(go),
@@ -283,46 +242,35 @@ namespace AIBridge.Editor
                 activeSelf = go.activeSelf,
                 activeInHierarchy = go.activeInHierarchy,
                 isStatic = go.isStatic,
-                components = components,
-                childCount = childCount,
-                children = children,
+                components,
+                childCount,
+                children,
                 parentName = go.transform.parent?.name
             });
         }
 
-        private GameObject GetTargetGameObject(CommandRequest request)
+        private static GameObject GetTargetGameObject(string path, int instanceId)
         {
-            var path = request.GetParam<string>("path", null);
-            var instanceId = request.GetParam("instanceId", 0);
-
             if (instanceId != 0)
-            {
                 return EditorUtility.InstanceIDToObject(instanceId) as GameObject;
-            }
-
             if (!string.IsNullOrEmpty(path))
-            {
                 return GameObject.Find(path);
-            }
-
             return Selection.activeGameObject;
         }
 
-        private string GetGameObjectPath(GameObject go)
+        private static string GetGameObjectPath(GameObject go)
         {
-            var path = go.name;
+            var goPath = go.name;
             var parent = go.transform.parent;
-
             while (parent != null)
             {
-                path = parent.name + "/" + path;
+                goPath = parent.name + "/" + goPath;
                 parent = parent.parent;
             }
-
-            return path;
+            return goPath;
         }
 
-        private GameObjectInfo CreateGameObjectInfo(GameObject go)
+        private static GameObjectInfo CreateGameObjectInfo(GameObject go)
         {
             return new GameObjectInfo
             {

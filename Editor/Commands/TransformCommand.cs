@@ -1,178 +1,173 @@
-using System;
+using System.Collections;
+using System.ComponentModel;
 using UnityEditor;
 using UnityEngine;
 
 namespace AIBridge.Editor
 {
-    /// <summary>
-    /// Transform operations: get, set_position, set_rotation, set_scale, set_parent
-    /// </summary>
-    public class TransformCommand : ICommand
+    public static class TransformCommand
     {
-        public string Type => "transform";
-        public bool RequiresRefresh => false;
-
-        public CommandResult Execute(CommandRequest request)
+        [AIBridge("Get Transform data of a GameObject",
+            "AIBridgeCLI TransformCommand_Get --path \"Player\"")]
+        public static IEnumerator Get(
+            [Description("Hierarchy path of the GameObject")] string path = null,
+            [Description("Instance ID of the GameObject")] int instanceId = 0)
         {
-            var action = request.GetParam("action", "get");
-
-            try
+            var t = GetTargetTransform(path, instanceId);
+            if (t == null)
             {
-                switch (action.ToLower())
-                {
-                    case "get":
-                        return Get(request);
-                    case "set_position":
-                        return SetPosition(request);
-                    case "set_rotation":
-                        return SetRotation(request);
-                    case "set_scale":
-                        return SetScale(request);
-                    case "set_parent":
-                        return SetParent(request);
-                    case "look_at":
-                        return LookAt(request);
-                    case "reset":
-                        return Reset(request);
-                    default:
-                        return CommandResult.Failure(request.id, $"Unknown action: {action}");
-                }
-            }
-            catch (Exception ex)
-            {
-                return CommandResult.FromException(request.id, ex);
-            }
-        }
-
-        private CommandResult Get(CommandRequest request)
-        {
-            var transform = GetTargetTransform(request);
-            if (transform == null)
-            {
-                return CommandResult.Failure(request.id, "Transform not found");
+                yield return CommandResult.Failure("Transform not found");
+                yield break;
             }
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
-                name = transform.name,
-                position = new { x = transform.position.x, y = transform.position.y, z = transform.position.z },
-                localPosition = new { x = transform.localPosition.x, y = transform.localPosition.y, z = transform.localPosition.z },
-                rotation = new { x = transform.eulerAngles.x, y = transform.eulerAngles.y, z = transform.eulerAngles.z },
-                localRotation = new { x = transform.localEulerAngles.x, y = transform.localEulerAngles.y, z = transform.localEulerAngles.z },
-                localScale = new { x = transform.localScale.x, y = transform.localScale.y, z = transform.localScale.z },
-                parent = transform.parent?.name,
-                childCount = transform.childCount
+                name = t.name,
+                position = new { x = t.position.x, y = t.position.y, z = t.position.z },
+                localPosition = new { x = t.localPosition.x, y = t.localPosition.y, z = t.localPosition.z },
+                rotation = new { x = t.eulerAngles.x, y = t.eulerAngles.y, z = t.eulerAngles.z },
+                localRotation = new { x = t.localEulerAngles.x, y = t.localEulerAngles.y, z = t.localEulerAngles.z },
+                localScale = new { x = t.localScale.x, y = t.localScale.y, z = t.localScale.z },
+                parent = t.parent?.name,
+                childCount = t.childCount
             });
         }
 
-        private CommandResult SetPosition(CommandRequest request)
+        [AIBridge("Set position of a GameObject",
+            "AIBridgeCLI TransformCommand_SetPosition --path \"Player\" --x 0 --y 1 --z 0")]
+        public static IEnumerator SetPosition(
+            [Description("Hierarchy path")] string path = null,
+            [Description("Instance ID")] int instanceId = 0,
+            [Description("X coordinate (omit to keep current)")] float x = float.NaN,
+            [Description("Y coordinate (omit to keep current)")] float y = float.NaN,
+            [Description("Z coordinate (omit to keep current)")] float z = float.NaN,
+            [Description("Use local space")] bool local = false)
         {
-            var transform = GetTargetTransform(request);
-            if (transform == null)
+            var t = GetTargetTransform(path, instanceId);
+            if (t == null)
             {
-                return CommandResult.Failure(request.id, "Transform not found");
+                yield return CommandResult.Failure("Transform not found");
+                yield break;
             }
 
-            var x = request.GetParam("x", transform.position.x);
-            var y = request.GetParam("y", transform.position.y);
-            var z = request.GetParam("z", transform.position.z);
-            var local = request.GetParam("local", false);
-
-            Undo.RecordObject(transform, $"Set Position {transform.name}");
-
+            Undo.RecordObject(t, $"Set Position {t.name}");
             if (local)
             {
-                transform.localPosition = new Vector3(x, y, z);
+                t.localPosition = new Vector3(
+                    float.IsNaN(x) ? t.localPosition.x : x,
+                    float.IsNaN(y) ? t.localPosition.y : y,
+                    float.IsNaN(z) ? t.localPosition.z : z);
             }
             else
             {
-                transform.position = new Vector3(x, y, z);
+                t.position = new Vector3(
+                    float.IsNaN(x) ? t.position.x : x,
+                    float.IsNaN(y) ? t.position.y : y,
+                    float.IsNaN(z) ? t.position.z : z);
             }
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
-                name = transform.name,
-                position = new { x = transform.position.x, y = transform.position.y, z = transform.position.z },
-                localPosition = new { x = transform.localPosition.x, y = transform.localPosition.y, z = transform.localPosition.z }
+                name = t.name,
+                position = new { x = t.position.x, y = t.position.y, z = t.position.z },
+                localPosition = new { x = t.localPosition.x, y = t.localPosition.y, z = t.localPosition.z }
             });
         }
 
-        private CommandResult SetRotation(CommandRequest request)
+        [AIBridge("Set rotation of a GameObject (Euler angles)",
+            "AIBridgeCLI TransformCommand_SetRotation --path \"Player\" --y 90")]
+        public static IEnumerator SetRotation(
+            [Description("Hierarchy path")] string path = null,
+            [Description("Instance ID")] int instanceId = 0,
+            [Description("X euler angle (omit to keep current)")] float x = float.NaN,
+            [Description("Y euler angle (omit to keep current)")] float y = float.NaN,
+            [Description("Z euler angle (omit to keep current)")] float z = float.NaN,
+            [Description("Use local space")] bool local = false)
         {
-            var transform = GetTargetTransform(request);
-            if (transform == null)
+            var t = GetTargetTransform(path, instanceId);
+            if (t == null)
             {
-                return CommandResult.Failure(request.id, "Transform not found");
+                yield return CommandResult.Failure("Transform not found");
+                yield break;
             }
 
-            var x = request.GetParam("x", transform.eulerAngles.x);
-            var y = request.GetParam("y", transform.eulerAngles.y);
-            var z = request.GetParam("z", transform.eulerAngles.z);
-            var local = request.GetParam("local", false);
-
-            Undo.RecordObject(transform, $"Set Rotation {transform.name}");
-
+            Undo.RecordObject(t, $"Set Rotation {t.name}");
             if (local)
             {
-                transform.localEulerAngles = new Vector3(x, y, z);
+                t.localEulerAngles = new Vector3(
+                    float.IsNaN(x) ? t.localEulerAngles.x : x,
+                    float.IsNaN(y) ? t.localEulerAngles.y : y,
+                    float.IsNaN(z) ? t.localEulerAngles.z : z);
             }
             else
             {
-                transform.eulerAngles = new Vector3(x, y, z);
+                t.eulerAngles = new Vector3(
+                    float.IsNaN(x) ? t.eulerAngles.x : x,
+                    float.IsNaN(y) ? t.eulerAngles.y : y,
+                    float.IsNaN(z) ? t.eulerAngles.z : z);
             }
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
-                name = transform.name,
-                rotation = new { x = transform.eulerAngles.x, y = transform.eulerAngles.y, z = transform.eulerAngles.z }
+                name = t.name,
+                rotation = new { x = t.eulerAngles.x, y = t.eulerAngles.y, z = t.eulerAngles.z }
             });
         }
 
-        private CommandResult SetScale(CommandRequest request)
+        [AIBridge("Set scale of a GameObject",
+            "AIBridgeCLI TransformCommand_SetScale --path \"Player\" --uniform 2")]
+        public static IEnumerator SetScale(
+            [Description("Hierarchy path")] string path = null,
+            [Description("Instance ID")] int instanceId = 0,
+            [Description("X scale (omit to keep current)")] float x = float.NaN,
+            [Description("Y scale (omit to keep current)")] float y = float.NaN,
+            [Description("Z scale (omit to keep current)")] float z = float.NaN,
+            [Description("Uniform scale for all axes")] float uniform = float.NaN)
         {
-            var transform = GetTargetTransform(request);
-            if (transform == null)
+            var t = GetTargetTransform(path, instanceId);
+            if (t == null)
             {
-                return CommandResult.Failure(request.id, "Transform not found");
+                yield return CommandResult.Failure("Transform not found");
+                yield break;
             }
 
-            var x = request.GetParam("x", transform.localScale.x);
-            var y = request.GetParam("y", transform.localScale.y);
-            var z = request.GetParam("z", transform.localScale.z);
-            var uniform = request.GetParam("uniform", float.NaN);
-
-            Undo.RecordObject(transform, $"Set Scale {transform.name}");
-
+            Undo.RecordObject(t, $"Set Scale {t.name}");
             if (!float.IsNaN(uniform))
             {
-                transform.localScale = new Vector3(uniform, uniform, uniform);
+                t.localScale = new Vector3(uniform, uniform, uniform);
             }
             else
             {
-                transform.localScale = new Vector3(x, y, z);
+                t.localScale = new Vector3(
+                    float.IsNaN(x) ? t.localScale.x : x,
+                    float.IsNaN(y) ? t.localScale.y : y,
+                    float.IsNaN(z) ? t.localScale.z : z);
             }
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
-                name = transform.name,
-                localScale = new { x = transform.localScale.x, y = transform.localScale.y, z = transform.localScale.z }
+                name = t.name,
+                localScale = new { x = t.localScale.x, y = t.localScale.y, z = t.localScale.z }
             });
         }
 
-        private CommandResult SetParent(CommandRequest request)
+        [AIBridge("Set parent of a GameObject",
+            "AIBridgeCLI TransformCommand_SetParent --path \"Child\" --parentPath \"Parent\"")]
+        public static IEnumerator SetParent(
+            [Description("Hierarchy path of the child")] string path = null,
+            [Description("Instance ID of the child")] int instanceId = 0,
+            [Description("Hierarchy path of the new parent (empty to unparent)")] string parentPath = null,
+            [Description("Instance ID of the new parent")] int parentInstanceId = 0,
+            [Description("Keep world position after reparenting")] bool worldPositionStays = true)
         {
-            var transform = GetTargetTransform(request);
-            if (transform == null)
+            var t = GetTargetTransform(path, instanceId);
+            if (t == null)
             {
-                return CommandResult.Failure(request.id, "Transform not found");
+                yield return CommandResult.Failure("Transform not found");
+                yield break;
             }
 
-            var parentPath = request.GetParam<string>("parentPath", null);
-            var parentInstanceId = request.GetParam("parentInstanceId", 0);
-            var worldPositionStays = request.GetParam("worldPositionStays", true);
-
             Transform newParent = null;
-
             if (parentInstanceId != 0)
             {
                 var parentGo = EditorUtility.InstanceIDToObject(parentInstanceId) as GameObject;
@@ -184,96 +179,89 @@ namespace AIBridge.Editor
                 newParent = parentGo?.transform;
             }
 
-            Undo.SetTransformParent(transform, newParent, $"Set Parent {transform.name}");
-            transform.SetParent(newParent, worldPositionStays);
+            Undo.SetTransformParent(t, newParent, $"Set Parent {t.name}");
+            t.SetParent(newParent, worldPositionStays);
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
-                name = transform.name,
-                parent = transform.parent?.name
+                name = t.name,
+                parent = t.parent?.name
             });
         }
 
-        private CommandResult LookAt(CommandRequest request)
+        [AIBridge("Make a GameObject look at a target position",
+            "AIBridgeCLI TransformCommand_LookAt --path \"Player\" --targetX 0 --targetY 0 --targetZ 10")]
+        public static IEnumerator LookAt(
+            [Description("Hierarchy path")] string path = null,
+            [Description("Instance ID")] int instanceId = 0,
+            [Description("Target X coordinate")] float targetX = float.NaN,
+            [Description("Target Y coordinate")] float targetY = float.NaN,
+            [Description("Target Z coordinate")] float targetZ = float.NaN)
         {
-            var transform = GetTargetTransform(request);
-            if (transform == null)
+            var t = GetTargetTransform(path, instanceId);
+            if (t == null)
             {
-                return CommandResult.Failure(request.id, "Transform not found");
+                yield return CommandResult.Failure("Transform not found");
+                yield break;
             }
-
-            var targetX = request.GetParam("targetX", float.NaN);
-            var targetY = request.GetParam("targetY", float.NaN);
-            var targetZ = request.GetParam("targetZ", float.NaN);
-
             if (float.IsNaN(targetX) || float.IsNaN(targetY) || float.IsNaN(targetZ))
             {
-                return CommandResult.Failure(request.id, "Missing target coordinates");
+                yield return CommandResult.Failure("Missing target coordinates (targetX, targetY, targetZ)");
+                yield break;
             }
 
-            Undo.RecordObject(transform, $"LookAt {transform.name}");
-            transform.LookAt(new Vector3(targetX, targetY, targetZ));
+            Undo.RecordObject(t, $"LookAt {t.name}");
+            t.LookAt(new Vector3(targetX, targetY, targetZ));
 
-            return CommandResult.Success(request.id, new
+            yield return CommandResult.Success(new
             {
-                name = transform.name,
-                rotation = new { x = transform.eulerAngles.x, y = transform.eulerAngles.y, z = transform.eulerAngles.z }
+                name = t.name,
+                rotation = new { x = t.eulerAngles.x, y = t.eulerAngles.y, z = t.eulerAngles.z }
             });
         }
 
-        private CommandResult Reset(CommandRequest request)
+        [AIBridge("Reset Transform to default values",
+            "AIBridgeCLI TransformCommand_Reset --path \"Player\"")]
+        public static IEnumerator Reset(
+            [Description("Hierarchy path")] string path = null,
+            [Description("Instance ID")] int instanceId = 0,
+            [Description("Reset position")] bool position = true,
+            [Description("Reset rotation")] bool rotation = true,
+            [Description("Reset scale")] bool scale = true)
         {
-            var transform = GetTargetTransform(request);
-            if (transform == null)
+            var t = GetTargetTransform(path, instanceId);
+            if (t == null)
             {
-                return CommandResult.Failure(request.id, "Transform not found");
+                yield return CommandResult.Failure("Transform not found");
+                yield break;
             }
 
-            var position = request.GetParam("position", true);
-            var rotation = request.GetParam("rotation", true);
-            var scale = request.GetParam("scale", true);
+            Undo.RecordObject(t, $"Reset Transform {t.name}");
+            if (position) t.localPosition = Vector3.zero;
+            if (rotation) t.localRotation = Quaternion.identity;
+            if (scale) t.localScale = Vector3.one;
 
-            Undo.RecordObject(transform, $"Reset Transform {transform.name}");
-
-            if (position)
+            yield return CommandResult.Success(new
             {
-                transform.localPosition = Vector3.zero;
-            }
-            if (rotation)
-            {
-                transform.localRotation = Quaternion.identity;
-            }
-            if (scale)
-            {
-                transform.localScale = Vector3.one;
-            }
-
-            return CommandResult.Success(request.id, new
-            {
-                name = transform.name,
-                localPosition = new { x = transform.localPosition.x, y = transform.localPosition.y, z = transform.localPosition.z },
-                localRotation = new { x = transform.localEulerAngles.x, y = transform.localEulerAngles.y, z = transform.localEulerAngles.z },
-                localScale = new { x = transform.localScale.x, y = transform.localScale.y, z = transform.localScale.z }
+                name = t.name,
+                localPosition = new { x = t.localPosition.x, y = t.localPosition.y, z = t.localPosition.z },
+                localRotation = new { x = t.localEulerAngles.x, y = t.localEulerAngles.y, z = t.localEulerAngles.z },
+                localScale = new { x = t.localScale.x, y = t.localScale.y, z = t.localScale.z }
             });
         }
 
-        private Transform GetTargetTransform(CommandRequest request)
+        private static Transform GetTargetTransform(string path, int instanceId)
         {
-            var path = request.GetParam<string>("path", null);
-            var instanceId = request.GetParam("instanceId", 0);
-
             if (instanceId != 0)
             {
                 var go = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
                 return go?.transform;
             }
-
             if (!string.IsNullOrEmpty(path))
             {
                 var go = GameObject.Find(path);
                 return go?.transform;
             }
-
             return Selection.activeTransform;
         }
     }

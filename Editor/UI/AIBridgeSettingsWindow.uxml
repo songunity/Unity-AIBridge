@@ -1,0 +1,98 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <Style src="AIBridgeSettingsWindow.uss" />
+    
+    <ui:VisualElement class="root">
+        <!-- Header -->
+        <ui:VisualElement class="header">
+            <ui:Label text="AI Bridge Settings" class="header-title" />
+            <ui:Label text="Configure AI Bridge behavior and tools" class="header-subtitle" />
+        </ui:VisualElement>
+        
+        <!-- Tab Bar -->
+        <ui:VisualElement class="tab-bar">
+            <ui:Button name="tab-general" text="General" class="tab-button tab-active" />
+            <ui:Button name="tab-gif" text="GIF Recorder" class="tab-button" />
+            <ui:Button name="tab-commands" text="Commands" class="tab-button" />
+            <ui:Button name="tab-tools" text="Tools" class="tab-button" />
+        </ui:VisualElement>
+        
+        <ui:ScrollView class="content-scroll">
+            <!-- General Tab -->
+            <ui:VisualElement name="content-general" class="tab-content">
+                <ui:VisualElement class="section">
+                    <ui:Label text="Bridge Settings" class="section-title" />
+                    <ui:Toggle name="bridge-enabled" label="Enable AI Bridge" class="setting-item" />
+                    <ui:Toggle name="debug-logging" label="Debug Logging" class="setting-item" />
+                </ui:VisualElement>
+                
+                <ui:VisualElement class="section">
+                    <ui:Label text="Directory Information" class="section-title" />
+                    <ui:VisualElement class="info-row">
+                        <ui:Label text="Command Queue:" class="info-label" />
+                        <ui:TextField name="queue-dir" readonly="true" class="info-value" />
+                        <ui:Button name="open-queue-dir" text="Open" class="small-button" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="info-row">
+                        <ui:Label text="Screenshots:" class="info-label" />
+                        <ui:TextField name="screenshot-dir" readonly="true" class="info-value" />
+                        <ui:Button name="open-screenshot-dir" text="Open" class="small-button" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="info-row">
+                        <ui:Label text="CLI Path:" class="info-label" />
+                        <ui:TextField name="cli-path" readonly="true" class="info-value" />
+                        <ui:Button name="open-cli-dir" text="Open" class="small-button" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            
+            <!-- GIF Recorder Tab -->
+            <ui:VisualElement name="content-gif" class="tab-content" style="display: none;">
+                <ui:VisualElement class="section">
+                    <ui:Label text="GIF Recording Settings" class="section-title" />
+                    <ui:SliderInt name="gif-frame-count" label="Frame Count" low-value="10" high-value="300" class="setting-item" />
+                    <ui:SliderInt name="gif-fps" label="FPS" low-value="5" high-value="60" class="setting-item" />
+                    <ui:Slider name="gif-scale" label="Scale" low-value="0.1" high-value="1.0" class="setting-item" />
+                    <ui:SliderInt name="gif-color-count" label="Color Count" low-value="16" high-value="256" class="setting-item" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            
+            <!-- Commands Tab -->
+            <ui:VisualElement name="content-commands" class="tab-content" style="display: none;">
+                <ui:VisualElement class="section">
+                    <ui:Label text="Command Registration" class="section-title" />
+                    <ui:Toggle name="auto-scan" label="Auto-scan Assemblies" class="setting-item" />
+                    <ui:Label text="When enabled, commands are scanned at runtime. When disabled, commands are pre-registered in code for better performance." class="help-text" />
+                    <ui:TextField name="scan-assemblies" label="Scan Assemblies" multiline="true" class="setting-item assembly-field" />
+                    <ui:Label text="Separate multiple assemblies with semicolons (e.g., Assembly-CSharp;Assembly-CSharp-Editor)" class="help-text" />
+                </ui:VisualElement>
+                
+                <ui:VisualElement class="section">
+                    <ui:Label text="Registered Commands" class="section-title" />
+                    <ui:Label name="command-count" text="Loading..." class="info-text" />
+                    <ui:Button name="refresh-commands" text="Refresh Command List" class="action-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            
+            <!-- Tools Tab -->
+            <ui:VisualElement name="content-tools" class="tab-content" style="display: none;">
+                <ui:VisualElement class="section">
+                    <ui:Label text="Skill Documentation" class="section-title" />
+                    <ui:Label text="Generate SKILL.md file for Droid integration" class="help-text" />
+                    <ui:Button name="generate-skill" text="Generate SKILL.md" class="action-button" />
+                </ui:VisualElement>
+                
+                <ui:VisualElement class="section">
+                    <ui:Label text="Skill Installation" class="section-title" />
+                    <ui:Label text="Copy AIBridge skill to .agent directory" class="help-text" />
+                    <ui:Button name="install-skill-agent" text="Copy to .agent" class="action-button" />
+                </ui:VisualElement>
+                
+                <ui:VisualElement class="section">
+                    <ui:Label text="Maintenance" class="section-title" />
+                    <ui:Button name="clear-cache" text="Clear Screenshot Cache" class="action-button" />
+                    <ui:Button name="reset-settings" text="Reset All Settings" class="action-button warning-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:ScrollView>
+    </ui:VisualElement>
+</ui:UXML>

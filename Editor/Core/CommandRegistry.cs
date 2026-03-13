@@ -228,6 +228,14 @@ namespace AIBridge.Editor
             RegisterCommand(getLogsCommandType.GetMethod("StopCapture", flags));
             var helpCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.HelpCommand");
             RegisterCommand(helpCommandType.GetMethod("Help", flags));
+            var inputSimulationCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.InputSimulationCommand");
+            RegisterCommand(inputSimulationCommandType.GetMethod("Click", flags));
+            RegisterCommand(inputSimulationCommandType.GetMethod("ClickAt", flags));
+            RegisterCommand(inputSimulationCommandType.GetMethod("ClickByInstanceId", flags));
+            RegisterCommand(inputSimulationCommandType.GetMethod("Drag", flags));
+            RegisterCommand(inputSimulationCommandType.GetMethod("DragByInstanceId", flags));
+            RegisterCommand(inputSimulationCommandType.GetMethod("LongPress", flags));
+            RegisterCommand(inputSimulationCommandType.GetMethod("LongPressByInstanceId", flags));
             var inspectorCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.InspectorCommand");
             RegisterCommand(inspectorCommandType.GetMethod("AddComponent", flags));
             RegisterCommand(inspectorCommandType.GetMethod("GetComponents", flags));
@@ -265,6 +273,8 @@ namespace AIBridge.Editor
             RegisterCommand(transformCommandType.GetMethod("SetPosition", flags));
             RegisterCommand(transformCommandType.GetMethod("SetRotation", flags));
             RegisterCommand(transformCommandType.GetMethod("SetScale", flags));
+            var codeExecuteCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("CodeExecuteCommand");
+            RegisterCommand(codeExecuteCommandType.GetMethod("Execute", flags));
 
             AIBridgeLogger.LogInfo($"[CommandRegistry] Registered {_registry.Count} commands.");
                 }

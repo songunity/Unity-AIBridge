@@ -31,6 +31,17 @@ namespace AIBridge.Editor
         /// Communication directory path
         /// </summary>
         public static string BridgeDirectory { get; private set; }
+        public static string BridgeCLI { get; private set; }
+        
+        /// <summary>
+        /// Package root directory path
+        /// </summary>
+        public static string PackageRoot { get; private set; }
+        
+        /// <summary>
+        /// Project root directory path
+        /// </summary>
+        public static string ProjectRoot { get; private set; }
 
         /// <summary>
         /// Enable or disable the bridge
@@ -55,8 +66,16 @@ namespace AIBridge.Editor
         /// </summary>
         private static void Initialize()
         {
-            // Get the exchange directory inside the package (Tools~/Exchange)
+            // Get project and package paths
+            ProjectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            PackageRoot = FindPackageRoot();
+            
+            // Get the exchange directory
             BridgeDirectory = GetExchangeDirectory();
+            BridgeCLI = Path.Combine(BridgeDirectory, "CLI", "AIBridgeCLI.exe");
+
+            // Copy CLI to AIBridgeCache if needed
+            CopyCLIIfNeeded();
 
             // Initialize components
             _watcher = new CommandWatcher(BridgeDirectory);
@@ -65,12 +84,36 @@ namespace AIBridge.Editor
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.update += OnEditorUpdate;
 
-            // Handle play mode changes
-            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
-            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
-
             AIBridgeLogger.LogInfo($"AI Bridge initialized. Directory: {BridgeDirectory}");
-            AIBridgeLogger.LogInfo($"Registered commands: {string.Join(", ", CommandRegistry.GetAll().Select(e => e.Name))}");
+            AIBridgeLogger.LogInfo(
+                $"Registered commands: {string.Join(", ", CommandRegistry.GetAll().Select(e => e.Name))}");
+        }
+
+        /// <summary>
+        /// Find the AIBridge package root directory
+        /// </summary>
+        private static string FindPackageRoot()
+        {
+            // Try local package first: Packages/AIBridge
+            var localPath = Path.Combine(ProjectRoot, "Packages", "AIBridge");
+            if (Directory.Exists(localPath))
+            {
+                return localPath;
+            }
+
+            // Try PackageCache: Library/PackageCache/cn.lys.aibridge@*
+            var packageCachePath = Path.Combine(ProjectRoot, "Library", "PackageCache");
+            if (Directory.Exists(packageCachePath))
+            {
+                var dirs = Directory.GetDirectories(packageCachePath, "cn.lys.aibridge@*");
+                if (dirs.Length > 0)
+                {
+                    return dirs[0];
+                }
+            }
+
+            AIBridgeLogger.LogWarning("AIBridge package root not found, using fallback path");
+            return localPath; // Fallback
         }
 
         /// <summary>
@@ -103,74 +146,82 @@ namespace AIBridge.Editor
         }
 
         /// <summary>
-        /// Handle play mode state changes
-        /// </summary>
-        private static void OnPlayModeStateChanged(PlayModeStateChange state)
-        {
-            switch (state)
-            {
-                case PlayModeStateChange.ExitingEditMode:
-                    // Entering play mode - continue processing
-                    break;
-
-                case PlayModeStateChange.EnteredPlayMode:
-                    // In play mode - still process commands
-                    break;
-
-                case PlayModeStateChange.ExitingPlayMode:
-                    // Exiting play mode
-                    break;
-
-                case PlayModeStateChange.EnteredEditMode:
-                    // Back to edit mode - reinitialize if needed
-                    break;
-            }
-        }
-
-        /// <summary>
-        /// Manually trigger a scan and process cycle
-        /// </summary>
-        [MenuItem("AIBridge/Process Commands Now")]
-        public static void ProcessCommandsNow()
-        {
-            _watcher.ScanForCommands();
-            while (_watcher.ProcessOneCommand())
-            {
-                // Process all pending commands
-            }
-        }
-
-        /// <summary>
-        /// Open the bridge directory in file explorer
-        /// </summary>
-        [MenuItem("AIBridge/Open Bridge Directory")]
-        public static void OpenBridgeDirectory()
-        {
-            if (!Directory.Exists(BridgeDirectory))
-            {
-                Directory.CreateDirectory(BridgeDirectory);
-            }
-            EditorUtility.RevealInFinder(BridgeDirectory);
-        }
-
-        /// <summary>
-        /// Toggle debug logging
-        /// </summary>
-        [MenuItem("AIBridge/Toggle Debug Logging")]
-        public static void ToggleDebugLogging()
-        {
-            AIBridgeLogger.DebugEnabled = !AIBridgeLogger.DebugEnabled;
-            AIBridgeLogger.LogInfo($"Debug logging {(AIBridgeLogger.DebugEnabled ? "enabled" : "disabled")}");
-        }
-
-        /// <summary>
         /// Get the exchange directory path in the Unity project root
         /// </summary>
         private static string GetExchangeDirectory()
         {
             // Use AIBridgeCache in Unity project root for better compatibility with git/UPM installation
-            var projectRoot = Path.GetDirectoryName(Application.dataPath);
-            return Path.Combine(projectRoot, "AIBridgeCache");
+            return Path.Combine(ProjectRoot, "AIBridgeCache");
+        }
+
+        /// <summary>
+        /// Get the current platform CLI folder name
+        /// </summary>
+        private static string GetPlatformCliFolder()
+        {
+#if UNITY_EDITOR_WIN
+            return "win-x64";
+#elif UNITY_EDITOR_OSX
+            // Check for Apple Silicon (arm64) vs Intel (x64)
+            if (SystemInfo.processorType.Contains("Apple") && SystemInfo.processorType.Contains("M"))
+            {
+                return "osx-arm64";
+            }
+            return "osx-x64";
+#elif UNITY_EDITOR_LINUX
+            return "linux-x64";
+#else
+            return "win-x64"; // Default fallback
+#endif
+        }
+
+        /// <summary>
+        /// Copy CLI executables to AIBridgeCache if needed
+        /// </summary>
+        private static void CopyCLIIfNeeded()
+        {
+            try
+            {
+                var platformFolder = GetPlatformCliFolder();
+                
+                // Source: {PackageRoot}/Tools~/CLI/{platform}/
+                var sourcePath = Path.Combine(PackageRoot, "Tools~", "CLI", platformFolder);
+                
+                // Target: AIBridgeCache/CLI/
+                var targetPath = Path.Combine(BridgeDirectory, "CLI");
+
+                if (!Directory.Exists(sourcePath))
+                {
+                    AIBridgeLogger.LogWarning($"CLI source not found: {sourcePath}");
+                    return;
+                }
+
+                // Create target directory if needed
+                if (!Directory.Exists(targetPath))
+                {
+                    Directory.CreateDirectory(targetPath);
+                }
+
+                // Copy all files from source to target
+                foreach (var sourceFile in Directory.GetFiles(sourcePath))
+                {
+                    var fileName = Path.GetFileName(sourceFile);
+                    var targetFile = Path.Combine(targetPath, fileName);
+                    
+                    // Only copy if target doesn't exist or source is newer
+                    if (!File.Exists(targetFile) || File.GetLastWriteTime(sourceFile) > File.GetLastWriteTime(targetFile))
+                    {
+                        File.Copy(sourceFile, targetFile, true);
+                        AIBridgeLogger.LogDebug($"Copied CLI file: {fileName}");
+                    }
+                }
+
+                AIBridgeLogger.LogDebug($"CLI ready at: {targetPath}");
+            }
+            catch (System.Exception ex)
+            {
+                AIBridgeLogger.LogError($"Failed to copy CLI: {ex.Message}");
+            }
         }
     }
 }

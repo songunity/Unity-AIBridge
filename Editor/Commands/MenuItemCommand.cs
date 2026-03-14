@@ -14,7 +14,6 @@ namespace AIBridge.Editor
             if (string.IsNullOrEmpty(menuPath))
             {
                 yield return CommandResult.Failure("Missing 'menuPath' parameter");
-                yield break;
             }
 
             var executed = EditorApplication.ExecuteMenuItem(menuPath);

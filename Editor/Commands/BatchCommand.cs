@@ -6,11 +6,15 @@ namespace AIBridge.Editor
 {
     public static class BatchCommand
     {
-        [AIBridge("Execute multiple commands in sequence and return all results",
-            "AIBridgeCLI Batch --commands \"[{\\\"type\\\":\\\"GameObjectCommand_Find\\\",\\\"params\\\":{\\\"name\\\":\\\"Player\\\"}}]\"",
+        [AIBridge("批量执行多个命令，按顺序执行并返回每个命令的结果。用于需要执行多个相关操作的场景",
+            @"Windows CMD 必须使用单引号包裹 JSON：
+AIBridgeCLI Batch --commands '[{""type"":""GameObjectCommand_Find"",""params"":{""name"":""Player""}},{""type"":""TransformCommand_Get"",""params"":{""path"":""Player""}}]' --raw
+
+注意：如果使用双引号会导致参数解析错误（Unexpected positional argument），必须使用单引号。
+PowerShell 或 Bash 环境下可以使用双引号但需要转义内部引号。",
             "Batch")]
         public static IEnumerator Execute(
-            [Description("Array of command objects, each with 'type' and 'params' fields")] object commands = null)
+            [Description("命令对象数组，每个对象包含 'type' 和 'params' 字段")] object commands = null)
         {
             if (commands == null)
             {

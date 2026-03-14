@@ -83,8 +83,8 @@
                 
                 <ui:VisualElement class="section">
                     <ui:Label text="Skill Installation" class="section-title" />
-                    <ui:Label text="Copy AIBridge skill to .agent directory" class="help-text" />
-                    <ui:Button name="install-skill-agent" text="Copy to .agent" class="action-button" />
+                    <ui:Label text="Copy AIBridge skill to agent directory" class="help-text" />
+                    <ui:Button name="install-skill-agent" text="Copy to Agent" class="action-button" />
                 </ui:VisualElement>
                 
                 <ui:VisualElement class="section">

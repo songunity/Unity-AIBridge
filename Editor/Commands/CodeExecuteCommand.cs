@@ -7,9 +7,13 @@ using UnityEngine;
 
 public static class CodeExecuteCommand
 {
-    [AIBridge("this command is use to run code, both editor or runtime. pass code or file. 如果脚本内容过多更建议写入文件来运行，脚本文件放到AIBridgeCache/code中", 
+    [AIBridge("执行C#代码片段或脚本文件，支持编辑器或运行时。如果脚本内容过多更建议写入文件来运行，脚本文件放到AIBridgeCache/code中", 
         example:@"
-AIBridge.exe CodeExecuteCommand_Execute --code 'using UnityEngine;Debug.Log(""Log"");Debug.LogWarning(""Warning"");'
+Windows CMD 必须使用单引号包裹代码：
+AIBridgeCLI CodeExecuteCommand_Execute --code 'using UnityEngine; Debug.Log(""Hello"");' --raw
+
+PowerShell 或 Bash 可以使用双引号（需要转义）：
+AIBridgeCLI CodeExecuteCommand_Execute --code ""using UnityEngine; Debug.Log(\""Hello\"");"" --raw
 
 // 上边代码是你需要提供的逻辑，不需要写方法，只需要写using和逻辑
 // 以上的代码会被编译成下边的
@@ -19,13 +23,12 @@ public static class CodeExecutor
 {{
     public static object Execute()
     {{
-        Debug.Log(""Log"");
-        Debug.LogWarning(""Warning"");
+        Debug.Log(""Hello"");
         return null;
     }}
 }}
 ")]
-    public static IEnumerator Execute([Description("code to execute")]string code = null, [Description("file to execute, need full path")]string file = null)
+    public static IEnumerator Execute([Description("要执行的代码")]string code = null, [Description("要执行的文件，需要完整路径")]string file = null)
     {
         CSharpCodeRunner codeRunner = new CSharpCodeRunner();
         if (!string.IsNullOrEmpty(file))

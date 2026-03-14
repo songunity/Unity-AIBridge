@@ -7,11 +7,11 @@ namespace AIBridge.Editor
 {
     public static class TransformCommand
     {
-        [AIBridge("Get Transform data of a GameObject",
+        [AIBridge("获取 GameObject 的 Transform 数据",
             "AIBridgeCLI TransformCommand_Get --path \"Player\"")]
         public static IEnumerator Get(
-            [Description("Hierarchy path of the GameObject")] string path = null,
-            [Description("Instance ID of the GameObject")] int instanceId = 0)
+            [Description("GameObject 的层级路径")] string path = null,
+            [Description("GameObject 的实例 ID")] int instanceId = 0)
         {
             var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             var t = go?.transform ?? Selection.activeTransform;
@@ -34,15 +34,15 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Set position of a GameObject",
+        [AIBridge("设置 GameObject 的位置",
             "AIBridgeCLI TransformCommand_SetPosition --path \"Player\" --x 0 --y 1 --z 0")]
         public static IEnumerator SetPosition(
-            [Description("Hierarchy path")] string path = null,
-            [Description("Instance ID")] int instanceId = 0,
-            [Description("X coordinate (omit to keep current)")] float x = float.NaN,
-            [Description("Y coordinate (omit to keep current)")] float y = float.NaN,
-            [Description("Z coordinate (omit to keep current)")] float z = float.NaN,
-            [Description("Use local space")] bool local = false)
+            [Description("层级路径")] string path = null,
+            [Description("实例 ID")] int instanceId = 0,
+            [Description("X 坐标（省略则保持当前值）")] float x = float.NaN,
+            [Description("Y 坐标（省略则保持当前值）")] float y = float.NaN,
+            [Description("Z 坐标（省略则保持当前值）")] float z = float.NaN,
+            [Description("使用本地空间")] bool local = false)
         {
             var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
             if (t == null)
@@ -115,15 +115,15 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Set scale of a GameObject",
+        [AIBridge("设置 GameObject 的缩放",
             "AIBridgeCLI TransformCommand_SetScale --path \"Player\" --uniform 2")]
         public static IEnumerator SetScale(
-            [Description("Hierarchy path")] string path = null,
-            [Description("Instance ID")] int instanceId = 0,
-            [Description("X scale (omit to keep current)")] float x = float.NaN,
-            [Description("Y scale (omit to keep current)")] float y = float.NaN,
-            [Description("Z scale (omit to keep current)")] float z = float.NaN,
-            [Description("Uniform scale for all axes")] float uniform = float.NaN)
+            [Description("层级路径")] string path = null,
+            [Description("实例 ID")] int instanceId = 0,
+            [Description("X 缩放（省略则保持当前值）")] float x = float.NaN,
+            [Description("Y 缩放（省略则保持当前值）")] float y = float.NaN,
+            [Description("Z 缩放（省略则保持当前值）")] float z = float.NaN,
+            [Description("统一缩放所有轴")] float uniform = float.NaN)
         {
             var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
             if (t == null)
@@ -152,14 +152,14 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Set parent of a GameObject",
+        [AIBridge("设置 GameObject 的父级",
             "AIBridgeCLI TransformCommand_SetParent --path \"Child\" --parentPath \"Parent\"")]
         public static IEnumerator SetParent(
-            [Description("Hierarchy path of the child")] string path = null,
-            [Description("Instance ID of the child")] int instanceId = 0,
-            [Description("Hierarchy path of the new parent (empty to unparent)")] string parentPath = null,
-            [Description("Instance ID of the new parent")] int parentInstanceId = 0,
-            [Description("Keep world position after reparenting")] bool worldPositionStays = true)
+            [Description("子对象的层级路径")] string path = null,
+            [Description("子对象的实例 ID")] int instanceId = 0,
+            [Description("新父级的层级路径（空表示取消父级）")] string parentPath = null,
+            [Description("新父级的实例 ID")] int parentInstanceId = 0,
+            [Description("重新设置父级后保持世界位置")] bool worldPositionStays = true)
         {
             var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
             if (t == null)
@@ -190,14 +190,14 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Make a GameObject look at a target position",
+        [AIBridge("使 GameObject 朝向目标位置",
             "AIBridgeCLI TransformCommand_LookAt --path \"Player\" --targetX 0 --targetY 0 --targetZ 10")]
         public static IEnumerator LookAt(
-            [Description("Hierarchy path")] string path = null,
-            [Description("Instance ID")] int instanceId = 0,
-            [Description("Target X coordinate")] float targetX = float.NaN,
-            [Description("Target Y coordinate")] float targetY = float.NaN,
-            [Description("Target Z coordinate")] float targetZ = float.NaN)
+            [Description("层级路径")] string path = null,
+            [Description("实例 ID")] int instanceId = 0,
+            [Description("目标 X 坐标")] float targetX = float.NaN,
+            [Description("目标 Y 坐标")] float targetY = float.NaN,
+            [Description("目标 Z 坐标")] float targetZ = float.NaN)
         {
             var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
             if (t == null)
@@ -221,14 +221,14 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Reset Transform to default values",
+        [AIBridge("重置 Transform 为默认值",
             "AIBridgeCLI TransformCommand_Reset --path \"Player\"")]
         public static IEnumerator Reset(
-            [Description("Hierarchy path")] string path = null,
-            [Description("Instance ID")] int instanceId = 0,
-            [Description("Reset position")] bool position = true,
-            [Description("Reset rotation")] bool rotation = true,
-            [Description("Reset scale")] bool scale = true)
+            [Description("层级路径")] string path = null,
+            [Description("实例 ID")] int instanceId = 0,
+            [Description("重置位置")] bool position = true,
+            [Description("重置旋转")] bool rotation = true,
+            [Description("重置缩放")] bool scale = true)
         {
             var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
             if (t == null)

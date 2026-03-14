@@ -1,225 +1,182 @@
-# AI Bridge Unity Skill
-
-Control Unity Editor through AI Bridge CLI.
-
-## Installation
-
-1. Ensure Unity project has AI Bridge package installed
-2. CLI is located at: `D:\UnityProject\Test\AIBridgeCache\CLI\AIBridgeCLI.exe`
-
-## Usage
-
-```bash
-AIBridgeCLI <CommandName> [--param value] [--raw]
-```
-
-### Common Flags
-| Flag | Description |
-|------|-------------|
-| `--raw` | Output raw JSON (recommended for AI) |
-| `--stdin` | Read parameters from stdin (JSON format) |
-| `--help` | Show help |
-
-**AI Usage:** Always add `--raw` for JSON output.
-
+---
+name: aibridge
+description: 通过 AI Bridge CLI 自动化 Unity Editor 操作 - 管理 GameObject、场景、资源、预制体、组件，执行 C# 代码，截图和控制播放模式。当用户需要以编程方式与 Unity 项目交互时使用。
 ---
 
-## Command Reference
+# AI Bridge Unity Skill
+
+## 概述
+
+通过 AI Bridge CLI 以编程方式控制 Unity Editor，用于快速原型开发、测试和自动化。
+
+## 何时使用此 Skill
+
+- 测试 UI 交互（按钮、滑块、输入框）
+- 调试场景对象和组件
+- 使用代码执行进行快速原型开发
+- 自动化重复的 Editor 任务
+- 为文档捕获截图或 GIF
+
+## 前置条件
+
+- Unity 项目已安装 AI Bridge 包
+- CLI 位置：`AIBridgeCache\CLI\AIBridgeCLI`
+- 始终添加 `--raw` 标志以获取 JSON 输出
+
+## 常见工作流
+
+### 工作流 1：测试 UI 交互
+
+1. 创建 UI 元素（Canvas、Button、EventSystem）
+2. 进入播放模式：`EditorCommand_Play`
+3. 模拟点击：`InputSimulationCommand_Click --path "Canvas/Button1"`
+4. 使用代码执行验证结果
+5. 退出播放模式：`EditorCommand_Stop`
+
+**注意：** UI 点击需要场景中有 EventSystem。
+
+### 工作流 2：调试场景对象
+
+1. 获取场景层级：`SceneCommand_GetHierarchy`
+2. 查找特定对象：`GameObjectCommand_Find --name "Player"`
+3. 获取组件信息：`InspectorCommand_GetComponents --path "Player"`
+4. 执行代码检查/修改：`CodeExecuteCommand_Execute --code '...'`
+
+### 工作流 3：快速代码原型
+
+1. 编写 C# 代码片段（仅 using 语句 + 逻辑）
+2. 执行：`CodeExecuteCommand_Execute --code 'using UnityEngine; Debug.Log("Test");'`
+3. 在 Unity 控制台查看输出
+4. 快速迭代，无需创建脚本文件
+
+**对于较长代码：** 保存到 `AIBridgeCache/code/` 并使用 `--file` 参数。
+
+### 工作流 4：资源管理
+
+1. 搜索资源：`AssetDatabaseCommand_Search --mode prefab --keyword "Player"`
+2. 加载资源信息：`AssetDatabaseCommand_Load --assetPath "Assets/Prefabs/Player.prefab"`
+3. 根据需要实例化或修改
+
+## 如何查询命令详情
+
+### 查看命令详细用法
+```bash
+AIBridgeCLI Help --command "GameObjectCommand_Find" --raw
+```
+
+返回包含：
+- 命令描述
+- 参数列表（名称、类型、是否必需、描述、默认值）
+- 使用示例
+
+通常来说使用一个命令前，你都要查询一下该命令的详细用法（除非你之前查询过）
+
+<!-- AUTO-GENERATED-COMMANDS-START -->
+## 命令分类
 
 ### AssetDatabase
-- **AssetDatabaseCommand_Find**: Find assets by AssetDatabase filter
-  - Example: `AIBridgeCLI AssetDatabaseCommand_Find --filter "t:Prefab"`
-- **AssetDatabaseCommand_GetPath**: Get asset path from GUID
-  - Example: `AIBridgeCLI AssetDatabaseCommand_GetPath --guid "abc123..."`
-- **AssetDatabaseCommand_Import**: Import a specific asset
-  - Example: `AIBridgeCLI AssetDatabaseCommand_Import --assetPath "Assets/Textures/icon.png"`
-- **AssetDatabaseCommand_Load**: Load and get info about an asset
-  - Example: `AIBridgeCLI AssetDatabaseCommand_Load --assetPath "Assets/Prefabs/Player.prefab"`
-- **AssetDatabaseCommand_Refresh**: Refresh the AssetDatabase
-  - Example: `AIBridgeCLI AssetDatabaseCommand_Refresh`
-- **AssetDatabaseCommand_Search**: Search assets with preset modes (all/prefab/scene/script/texture/material/audio/animation/shader/font/model/so)
-  - Example: `AIBridgeCLI AssetDatabaseCommand_Search --mode prefab --keyword "Player"`
 
+- **AssetDatabaseCommand_Find** - 通过 AssetDatabase 过滤器查找资源
+- **AssetDatabaseCommand_Refresh** - 刷新资源数据库
 
 ### Batch
-- **Batch**: Execute multiple commands in sequence and return all results
-  - Example: `AIBridgeCLI Batch --commands "[{\"type\":\"GameObjectCommand_Find\",\"params\":{\"name\":\"Player\"}}]"`
 
+- **Batch** - 批量执行多个命令，按顺序执行并返回每个命令的结果。用于需要执行多个相关操作的场景
 
 ### CodeExecute
-- **CodeExecuteCommand_Execute**: this command is use to run code, both editor or runtime. pass code or file. 如果脚本内容过多更建议写入文件来运行，脚本文件放到AIBridgeCache/code中
-  - Example: `
-AIBridge.exe CodeExecuteCommand_Execute --code 'using UnityEngine;Debug.Log("Log");Debug.LogWarning("Warning");'
 
-// 上边代码是你需要提供的逻辑，不需要写方法，只需要写using和逻辑
-// 以上的代码会被编译成下边的
-using UnityEngine;
-
-public static class CodeExecutor
-{{
-    public static object Execute()
-    {{
-        Debug.Log("Log");
-        Debug.LogWarning("Warning");
-        return null;
-    }}
-}}
-`
-
-
-### Compile
-- **CompileCommand_Start**: 内部调用的
-  - Example: ``
-- **CompileCommand_Status**: 内部调用的
-  - Example: ``
-
+- **CodeExecuteCommand_Execute** - 执行C#代码片段或脚本文件，支持编辑器或运行时。如果脚本内容过多更建议写入文件来运行，脚本文件放到AIBridgeCache/code中
 
 ### Editor
-- **EditorCommand_GetState**: Get current Editor state (play/pause/compile status)
-  - Example: `AIBridgeCLI EditorCommand_GetState`
-- **EditorCommand_Log**: Log a message to the Unity console
-  - Example: `AIBridgeCLI EditorCommand_Log --message "Hello World"`
-- **EditorCommand_Pause**: Toggle or set pause state
-  - Example: `AIBridgeCLI EditorCommand_Pause`
-- **EditorCommand_Play**: Enter Play mode
-  - Example: `AIBridgeCLI EditorCommand_Play`
-- **EditorCommand_Redo**: Perform redo operations
-  - Example: `AIBridgeCLI EditorCommand_Redo --count 1`
-- **EditorCommand_Refresh**: Refresh the AssetDatabase
-  - Example: `AIBridgeCLI EditorCommand_Refresh`
-- **EditorCommand_Stop**: Exit Play mode
-  - Example: `AIBridgeCLI EditorCommand_Stop`
-- **EditorCommand_Undo**: Perform undo operations
-  - Example: `AIBridgeCLI EditorCommand_Undo --count 3`
 
+- **EditorCommand_GetState** - 获取当前编辑器状态（播放/暂停/编译状态）
+- **EditorCommand_Log** - 向 Unity 控制台输出日志消息
+- **EditorCommand_Pause** - 切换或设置暂停状态
+- **EditorCommand_Play** - 进入播放模式
+- **EditorCommand_Stop** - 退出播放模式
 
 ### GameObject
-- **GameObjectCommand_Create**: Create a new GameObject in the scene
-  - Example: `AIBridgeCLI GameObjectCommand_Create --name "MyCube" --primitiveType Cube`
-- **GameObjectCommand_Destroy**: Destroy a GameObject
-  - Example: `AIBridgeCLI GameObjectCommand_Destroy --path "Player"`
-- **GameObjectCommand_Duplicate**: Duplicate a GameObject
-  - Example: `AIBridgeCLI GameObjectCommand_Duplicate --path "Original"`
-- **GameObjectCommand_Find**: Find GameObjects by name, tag, or component
-  - Example: `AIBridgeCLI GameObjectCommand_Find --name "Player"`
-- **GameObjectCommand_GetInfo**: Get detailed info about a GameObject
-  - Example: `AIBridgeCLI GameObjectCommand_GetInfo --path "Player"`
-- **GameObjectCommand_Rename**: Rename a GameObject
-  - Example: `AIBridgeCLI GameObjectCommand_Rename --path "OldName" --newName "NewName"`
-- **GameObjectCommand_SetActive**: Set a GameObject active or inactive
-  - Example: `AIBridgeCLI GameObjectCommand_SetActive --path "Player" --active false`
 
+- **GameObjectCommand_Create** - 在场景中创建新的 GameObject
+- **GameObjectCommand_Destroy** - 销毁 GameObject
+- **GameObjectCommand_Find** - 在场景中查找GameObject
+- **GameObjectCommand_GetInfo** - 获取 GameObject 的详细信息
+- **GameObjectCommand_SetActive** - 设置 GameObject 的激活或非激活状态
 
 ### GetLogs
-- **GetLogsCommand_StartCapture**: Start capturing Unity console logs into buffer
-  - Example: `AIBridgeCLI GetLogsCommand_StartCapture`
-- **GetLogsCommand_StopCapture**: Stop capturing Unity console logs
-  - Example: `AIBridgeCLI GetLogsCommand_StopCapture`
-- **Log**: Get console logs from Unity Editor
-  - Example: `AIBridgeCLI Log --count 50`
 
+- **GetLogsCommand_StartCapture** - 开始捕获日志到缓冲区（精准模式），捕获的日志带毫秒级时间戳
+- **GetLogsCommand_StopCapture** - 停止捕获日志，返回捕获的日志总数
+- **Log** - 从 Unity 编辑器获取控制台日志
 
 ### Help
-- **Help**: Get help for all registered commands, or detailed info for a specific one
-  - Example: `AIBridgeCLI Help`
 
+- **Help** - 获取特定命令的详细信息
 
 ### InputSimulation
-- **InputSimulationCommand_Click**: Simulate click on a GameObject by path
-  - Example: `AIBridgeCLI InputSimulationCommand_Click --path "Canvas/Button"`
-- **InputSimulationCommand_ClickAt**: Simulate click at screen coordinates
-  - Example: `AIBridgeCLI InputSimulationCommand_ClickAt --x 100 --y 200`
-- **InputSimulationCommand_ClickByInstanceId**: Simulate click on a GameObject by instance ID
-  - Example: `AIBridgeCLI InputSimulationCommand_ClickByInstanceId --instanceId 12345`
-- **InputSimulationCommand_Drag**: Simulate drag from one object to another by path
-  - Example: `AIBridgeCLI InputSimulationCommand_Drag --path "Canvas/Item" --toPath "Canvas/Slot" --frames 10`
-- **InputSimulationCommand_DragByInstanceId**: Simulate drag from one object to another by instance ID
-  - Example: `AIBridgeCLI InputSimulationCommand_DragByInstanceId --instanceId 12345 --toInstanceId 67890 --frames 10`
-- **InputSimulationCommand_LongPress**: Simulate long press on a GameObject by path
-  - Example: `AIBridgeCLI InputSimulationCommand_LongPress --path "Canvas/Button" --duration 1000`
-- **InputSimulationCommand_LongPressByInstanceId**: Simulate long press on a GameObject by instance ID
-  - Example: `AIBridgeCLI InputSimulationCommand_LongPressByInstanceId --instanceId 12345 --duration 1000`
 
+- **InputSimulationCommand_Click** - 通过路径模拟点击 GameObject (Only Runtime)
+- **InputSimulationCommand_ClickAt** - 在屏幕坐标处模拟点击 (Only Runtime)
+- **InputSimulationCommand_ClickByInstanceId** - 通过实例 ID 模拟点击 GameObject (Only Runtime)
+- **InputSimulationCommand_Drag** - 通过路径模拟从一个对象拖动到另一个对象 (Only Runtime)
+- **InputSimulationCommand_DragByInstanceId** - 通过实例 ID 模拟从一个对象拖动到另一个对象 (Only Runtime)
+- **InputSimulationCommand_LongPress** - 通过路径模拟长按 GameObject (Only Runtime)
+- **InputSimulationCommand_LongPressByInstanceId** - 通过实例 ID 模拟长按 GameObject (Only Runtime)
 
 ### Inspector
-- **InspectorCommand_AddComponent**: Add a component to a GameObject
-  - Example: `AIBridgeCLI InspectorCommand_AddComponent --path "Player" --typeName "Rigidbody"`
-- **InspectorCommand_GetComponents**: Get all components on a GameObject
-  - Example: `AIBridgeCLI InspectorCommand_GetComponents --path "Player"`
-- **InspectorCommand_GetProperties**: Get serialized properties of a component
-  - Example: `AIBridgeCLI InspectorCommand_GetProperties --path "Player" --componentName "Transform"`
-- **InspectorCommand_RemoveComponent**: Remove a component from a GameObject
-  - Example: `AIBridgeCLI InspectorCommand_RemoveComponent --path "Player" --componentName "Rigidbody"`
-- **InspectorCommand_SetProperty**: Set a serialized property on a component
-  - Example: `AIBridgeCLI InspectorCommand_SetProperty --path "Player" --componentName "Rigidbody" --propertyName "mass" --value 10`
 
+- **InspectorCommand_AddComponent** - 向 GameObject 添加组件
+- **InspectorCommand_GetComponents** - 获取 GameObject 上的所有组件
+- **InspectorCommand_GetProperties** - 获取组件的序列化属性
+- **InspectorCommand_RemoveComponent** - 从 GameObject 移除组件
+- **InspectorCommand_SetProperty** - 设置组件上的序列化属性
 
 ### MenuItem
-- **MenuItemCommand_Execute**: Execute a Unity Editor menu item by its path
-  - Example: `AIBridgeCLI MenuItemCommand_Execute --menuPath "GameObject/Create Empty"`
 
+- **MenuItemCommand_Execute** - 通过路径执行 Unity 编辑器菜单项
 
 ### Prefab
-- **PrefabCommand_Apply**: Apply prefab instance overrides back to the prefab asset
-  - Example: `AIBridgeCLI PrefabCommand_Apply --gameObjectPath "Player(Clone)"`
-- **PrefabCommand_GetInfo**: Get prefab info for an asset or instance
-  - Example: `AIBridgeCLI PrefabCommand_GetInfo --prefabPath "Assets/Prefabs/Player.prefab"`
-- **PrefabCommand_Instantiate**: Instantiate a prefab in the scene
-  - Example: `AIBridgeCLI PrefabCommand_Instantiate --prefabPath "Assets/Prefabs/Player.prefab"`
-- **PrefabCommand_Save**: Save a GameObject as a prefab asset
-  - Example: `AIBridgeCLI PrefabCommand_Save --gameObjectPath "Player" --savePath "Assets/Prefabs/Player.prefab"`
-- **PrefabCommand_Unpack**: Unpack a prefab instance
-  - Example: `AIBridgeCLI PrefabCommand_Unpack --gameObjectPath "Player(Clone)"`
 
+- **PrefabCommand_Apply** - 将预制体实例的覆盖应用回预制体资源
+- **PrefabCommand_GetInfo** - 获取资源或实例的预制体信息
+- **PrefabCommand_Instantiate** - 在场景中实例化预制体
+- **PrefabCommand_Save** - 将 GameObject 保存为预制体资源
+- **PrefabCommand_Unpack** - 解包预制体实例
 
 ### Scene
-- **SceneCommand_GetActive**: Get info about the active scene
-  - Example: `AIBridgeCLI SceneCommand_GetActive`
-- **SceneCommand_GetHierarchy**: Get the scene hierarchy as a tree
-  - Example: `AIBridgeCLI SceneCommand_GetHierarchy --depth 3`
-- **SceneCommand_Load**: Load a scene in the Editor
-  - Example: `AIBridgeCLI SceneCommand_Load --scenePath "Assets/Scenes/Main.unity"`
-- **SceneCommand_New**: Create a new empty scene
-  - Example: `AIBridgeCLI SceneCommand_New --setup empty`
-- **SceneCommand_Save**: Save the current open scene(s)
-  - Example: `AIBridgeCLI SceneCommand_Save`
 
+- **SceneCommand_GetActive** - 获取当前激活场景的信息
+- **SceneCommand_GetHierarchy** - 获取场景层级结构树
+- **SceneCommand_Load** - 在编辑器中加载场景
 
 ### Screenshot
-- **ScreenshotCommand_Gif**: Capture multiple screenshots and combine into GIF, need least 15s timeout
-  - Example: `AIBridgeCLI ScreenshotCommand_Gif --frameCount 30 --fps 15`
-- **ScreenshotCommand_Image**: Capture a screenshot of the Game view
-  - Example: `AIBridgeCLI ScreenshotCommand_Image`
 
+- **ScreenshotCommand_Gif** - 捕获多个截图并合成 GIF，至少需要 15 秒超时
+- **ScreenshotCommand_Image** - 捕获 Game 视图的截图
 
 ### Selection
-- **SelectionCommand_Add**: Add an object to the current selection
-  - Example: `AIBridgeCLI SelectionCommand_Add --path "Enemy1"`
-- **SelectionCommand_Clear**: Clear the current selection
-  - Example: `AIBridgeCLI SelectionCommand_Clear`
-- **SelectionCommand_Get**: Get the current selection
-  - Example: `AIBridgeCLI SelectionCommand_Get`
-- **SelectionCommand_Remove**: Remove an object from the current selection
-  - Example: `AIBridgeCLI SelectionCommand_Remove --path "Enemy1"`
-- **SelectionCommand_Set**: Set the current selection
-  - Example: `AIBridgeCLI SelectionCommand_Set --path "Player"`
 
+- **SelectionCommand_Clear** - 清除当前选择
+- **SelectionCommand_Get** - 获取当前选择的GameObject
+- **SelectionCommand_Set** - 设置当前选择的Object，可以同时传递多个参数
 
 ### Transform
-- **TransformCommand_Get**: Get Transform data of a GameObject
-  - Example: `AIBridgeCLI TransformCommand_Get --path "Player"`
-- **TransformCommand_LookAt**: Make a GameObject look at a target position
-  - Example: `AIBridgeCLI TransformCommand_LookAt --path "Player" --targetX 0 --targetY 0 --targetZ 10`
-- **TransformCommand_Reset**: Reset Transform to default values
-  - Example: `AIBridgeCLI TransformCommand_Reset --path "Player"`
-- **TransformCommand_SetParent**: Set parent of a GameObject
-  - Example: `AIBridgeCLI TransformCommand_SetParent --path "Child" --parentPath "Parent"`
-- **TransformCommand_SetPosition**: Set position of a GameObject
-  - Example: `AIBridgeCLI TransformCommand_SetPosition --path "Player" --x 0 --y 1 --z 0`
-- **TransformCommand_SetRotation**: Set rotation of a GameObject (Euler angles)
-  - Example: `AIBridgeCLI TransformCommand_SetRotation --path "Player" --y 90`
-- **TransformCommand_SetScale**: Set scale of a GameObject
-  - Example: `AIBridgeCLI TransformCommand_SetScale --path "Player" --uniform 2`
 
+- **TransformCommand_Get** - 获取 GameObject 的 Transform 数据
+- **TransformCommand_LookAt** - 使 GameObject 朝向目标位置
+- **TransformCommand_Reset** - 重置 Transform 为默认值
+- **TransformCommand_SetParent** - 设置 GameObject 的父级
+- **TransformCommand_SetPosition** - 设置 GameObject 的位置
+- **TransformCommand_SetRotation** - Set rotation of a GameObject (Euler angles)
+- **TransformCommand_SetScale** - 设置 GameObject 的缩放
 
-**Skill Version**: 1.0
+<!-- AUTO-GENERATED-COMMANDS-END -->
+
+## 边界情况和故障排除
+
+- **"NoEventSystem"** - 为 UI 交互添加 EventSystem
+- **长时间操作** - 使用 `--timeout` 参数（例如 GIF 需要 15 秒以上）
+- **路径未找到** - 使用 `SceneCommand_GetHierarchy` 验证路径
+- **代码执行错误** - 检查 using 语句和语法
+
+---

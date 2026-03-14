@@ -12,37 +12,44 @@ namespace AIBridge.Editor
     /// </summary>
     public static class InputSimulationCommand
     {
-        [AIBridge("Simulate click on a GameObject by path",
+        [AIBridge("通过路径模拟点击 GameObject (Only Runtime)",
             "AIBridgeCLI InputSimulationCommand_Click --path \"Canvas/Button\"")]
         public static IEnumerator Click(
-            [Description("Hierarchy path of the GameObject")] string path)
+            [Description("GameObject 的层级路径")] string path)
         {
+            if (!CanUse(out var result))
+            {
+                yield return result;
+            }
+            
             if (string.IsNullOrEmpty(path))
             {
                 yield return CommandResult.Failure("参数 'path' 不能为空");
-                yield break;
             }
 
             var go = GameObject.Find(path);
             if (go == null)
             {
                 yield return CommandResult.Failure($"找不到 GameObject: {path}");
-                yield break;
             }
 
             yield return PerformClick(go);
         }
 
-        [AIBridge("Simulate click on a GameObject by instance ID",
+        [AIBridge("通过实例 ID 模拟点击 GameObject (Only Runtime)",
             "AIBridgeCLI InputSimulationCommand_ClickByInstanceId --instanceId 12345")]
         public static IEnumerator ClickByInstanceId(
-            [Description("Instance ID of the GameObject")] int instanceId)
+            [Description("GameObject 的实例 ID")] int instanceId)
         {
+            if (!CanUse(out var result))
+            {
+                yield return result;
+            }
+            
             var go = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
             if (go == null)
             {
                 yield return CommandResult.Failure($"找不到 GameObject with instanceId: {instanceId}");
-                yield break;
             }
 
             yield return PerformClick(go);
@@ -54,14 +61,12 @@ namespace AIBridge.Editor
             if (!go.activeInHierarchy)
             {
                 yield return CommandResult.Failure($"GameObject 未激活");
-                yield break;
             }
 
             var screenPos = GetScreenPosition(go);
             if (screenPos == null)
             {
                 yield return CommandResult.Failure($"无法获取屏幕坐标");
-                yield break;
             }
 
             var result = SimulateClick(go, screenPos.Value);
@@ -75,16 +80,20 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Simulate click at screen coordinates",
+        [AIBridge("在屏幕坐标处模拟点击 (Only Runtime)",
             "AIBridgeCLI InputSimulationCommand_ClickAt --x 100 --y 200")]
         public static IEnumerator ClickAt(
-            [Description("Screen X coordinate")] float x,
-            [Description("Screen Y coordinate")] float y)
+            [Description("屏幕 X 坐标")] float x,
+            [Description("屏幕 Y 坐标")] float y)
         {
+            if (!CanUse(out var result))
+            {
+                yield return result;
+            }
+            
             if (x < 0 || y < 0)
             {
                 yield return CommandResult.Failure("参数 'x' 和 'y' 必须为非负数");
-                yield break;
             }
 
             var screenPos = new Vector2(x, y);
@@ -105,33 +114,38 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Simulate drag from one object to another by path",
+        [AIBridge("通过路径模拟从一个对象拖动到另一个对象 (Only Runtime)",
             "AIBridgeCLI InputSimulationCommand_Drag --path \"Canvas/Item\" --toPath \"Canvas/Slot\" --frames 10")]
         public static IEnumerator Drag(
-            [Description("Source GameObject path")] string path,
-            [Description("Target GameObject path (optional)")] string toPath = null,
-            [Description("Target screen X coordinate (if toPath not provided)")] float toX = -1,
-            [Description("Target screen Y coordinate (if toPath not provided)")] float toY = -1,
-            [Description("Number of frames for drag animation")] int frames = 10)
+            [Description("源 GameObject 路径")] string path,
+            [Description("目标 GameObject 路径（可选）")] string toPath = null,
+            [Description("目标屏幕 X 坐标（如果未提供 toPath）")]
+            float toX = -1,
+            [Description("目标屏幕 Y 坐标（如果未提供 toPath）")]
+            float toY = -1,
+            [Description("拖动动画的帧数")] int frames = 10)
         {
+            if (!CanUse(out var result))
+            {
+                yield return result;
+            }
+            
             if (string.IsNullOrEmpty(path))
             {
                 yield return CommandResult.Failure("参数 'path' 不能为空");
-                yield break;
             }
 
             var go = GameObject.Find(path);
             if (go == null)
             {
                 yield return CommandResult.Failure($"找不到 GameObject: {path}");
-                yield break;
             }
 
             var startPos = GetScreenPosition(go);
             if (startPos == null)
             {
                 yield return CommandResult.Failure($"无法获取起始屏幕坐标: {path}");
-                yield break;
+
             }
 
             Vector2 endPos;
@@ -141,14 +155,14 @@ namespace AIBridge.Editor
                 if (toGo == null)
                 {
                     yield return CommandResult.Failure($"找不到目标 GameObject: {toPath}");
-                    yield break;
                 }
+
                 var toScreenPos = GetScreenPosition(toGo);
                 if (toScreenPos == null)
                 {
                     yield return CommandResult.Failure($"无法获取目标屏幕坐标: {toPath}");
-                    yield break;
                 }
+
                 endPos = toScreenPos.Value;
             }
             else
@@ -156,35 +170,41 @@ namespace AIBridge.Editor
                 if (toX < 0 || toY < 0)
                 {
                     yield return CommandResult.Failure("拖拽需要 'toPath' 或 'toX'+'toY' 参数");
-                    yield break;
                 }
+
                 endPos = new Vector2(toX, toY);
             }
 
             yield return PerformDrag(go, startPos.Value, endPos, frames);
         }
 
-        [AIBridge("Simulate drag from one object to another by instance ID",
+        [AIBridge("通过实例 ID 模拟从一个对象拖动到另一个对象 (Only Runtime)",
             "AIBridgeCLI InputSimulationCommand_DragByInstanceId --instanceId 12345 --toInstanceId 67890 --frames 10")]
         public static IEnumerator DragByInstanceId(
-            [Description("Source GameObject instance ID")] int instanceId,
-            [Description("Target GameObject instance ID (optional)")] int toInstanceId = 0,
-            [Description("Target screen X coordinate (if toInstanceId not provided)")] float toX = -1,
-            [Description("Target screen Y coordinate (if toInstanceId not provided)")] float toY = -1,
-            [Description("Number of frames for drag animation")] int frames = 10)
+            [Description("源 GameObject 实例 ID")] int instanceId,
+            [Description("目标 GameObject 实例 ID（可选）")]
+            int toInstanceId = 0,
+            [Description("目标屏幕 X 坐标（如果未提供 toInstanceId）")]
+            float toX = -1,
+            [Description("目标屏幕 Y 坐标（如果未提供 toInstanceId）")]
+            float toY = -1,
+            [Description("拖动动画的帧数")] int frames = 10)
         {
+            if (!CanUse(out var result))
+            {
+                yield return result;
+            }
+            
             var go = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
             if (go == null)
             {
                 yield return CommandResult.Failure($"找不到 GameObject with instanceId: {instanceId}");
-                yield break;
             }
 
             var startPos = GetScreenPosition(go);
             if (startPos == null)
             {
                 yield return CommandResult.Failure($"无法获取起始屏幕坐标");
-                yield break;
             }
 
             Vector2 endPos;
@@ -194,14 +214,14 @@ namespace AIBridge.Editor
                 if (toGo == null)
                 {
                     yield return CommandResult.Failure($"找不到目标 GameObject with instanceId: {toInstanceId}");
-                    yield break;
                 }
+
                 var toScreenPos = GetScreenPosition(toGo);
                 if (toScreenPos == null)
                 {
                     yield return CommandResult.Failure($"无法获取目标屏幕坐标");
-                    yield break;
                 }
+
                 endPos = toScreenPos.Value;
             }
             else
@@ -209,8 +229,8 @@ namespace AIBridge.Editor
                 if (toX < 0 || toY < 0)
                 {
                     yield return CommandResult.Failure("拖拽需要 'toInstanceId' 或 'toX'+'toY' 参数");
-                    yield break;
                 }
+
                 endPos = new Vector2(toX, toY);
             }
 
@@ -220,11 +240,15 @@ namespace AIBridge.Editor
         private static IEnumerator PerformDrag(GameObject go, Vector2 startPos, Vector2 endPos, int frames)
         {
 
+            if (!CanUse(out var result))
+            {
+                yield return result;
+            }
+            
             var eventSystem = EventSystem.current;
             if (eventSystem == null)
             {
                 yield return CommandResult.Failure("场景中没有 EventSystem");
-                yield break;
             }
 
             var pointerData = new PointerEventData(eventSystem)
@@ -269,39 +293,46 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Simulate long press on a GameObject by path",
+        [AIBridge("通过路径模拟长按 GameObject (Only Runtime)",
             "AIBridgeCLI InputSimulationCommand_LongPress --path \"Canvas/Button\" --duration 1000")]
         public static IEnumerator LongPress(
-            [Description("Hierarchy path of the GameObject")] string path,
-            [Description("Press duration in milliseconds")] int duration = 1000)
+            [Description("GameObject 的层级路径")] string path,
+            [Description("按压持续时间（毫秒）")] int duration = 1000)
         {
+            if (!CanUse(out var result))
+            {
+                yield return result;
+            }
+            
             if (string.IsNullOrEmpty(path))
             {
                 yield return CommandResult.Failure("参数 'path' 不能为空");
-                yield break;
             }
 
             var go = GameObject.Find(path);
             if (go == null)
             {
                 yield return CommandResult.Failure($"找不到 GameObject: {path}");
-                yield break;
             }
 
             yield return PerformLongPress(go, duration);
         }
 
-        [AIBridge("Simulate long press on a GameObject by instance ID",
+        [AIBridge("通过实例 ID 模拟长按 GameObject (Only Runtime)",
             "AIBridgeCLI InputSimulationCommand_LongPressByInstanceId --instanceId 12345 --duration 1000")]
         public static IEnumerator LongPressByInstanceId(
-            [Description("Instance ID of the GameObject")] int instanceId,
-            [Description("Press duration in milliseconds")] int duration = 1000)
+            [Description("GameObject 的实例 ID")] int instanceId,
+            [Description("按压持续时间（毫秒）")] int duration = 1000)
         {
+            if (!CanUse(out var result))
+            {
+                yield return result;
+            }
+            
             var go = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
             if (go == null)
             {
                 yield return CommandResult.Failure($"找不到 GameObject with instanceId: {instanceId}");
-                yield break;
             }
 
             yield return PerformLongPress(go, duration);
@@ -314,7 +345,6 @@ namespace AIBridge.Editor
             if (screenPos == null)
             {
                 yield return CommandResult.Failure($"无法获取屏幕坐标");
-                yield break;
             }
 
             float durationSec = duration / 1000f;
@@ -323,7 +353,6 @@ namespace AIBridge.Editor
             if (eventSystem == null)
             {
                 yield return CommandResult.Failure("场景中没有 EventSystem");
-                yield break;
             }
 
             var pointerData = new PointerEventData(eventSystem)
@@ -347,8 +376,6 @@ namespace AIBridge.Editor
                 durationMs = duration
             });
         }
-
-        #region Private Helper Methods
 
         private static string SimulateClick(GameObject target, Vector2 screenPos)
         {
@@ -429,6 +456,17 @@ namespace AIBridge.Editor
             return results.Count > 0 ? results[0].gameObject : null;
         }
 
-        #endregion
+        private static bool CanUse(out CommandResult result)
+        {
+            if (!Application.isPlaying)
+            {
+                result = CommandResult.Failure("InputSimulation 只能在运行时使用");
+                return false;
+            }
+
+            result = CommandResult.Success();
+            return true;
+        }
+
     }
 }

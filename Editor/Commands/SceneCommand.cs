@@ -11,11 +11,11 @@ namespace AIBridge.Editor
 {
     public static class SceneCommand
     {
-        [AIBridge("Load a scene in the Editor",
+        [AIBridge("在编辑器中加载场景",
             "AIBridgeCLI SceneCommand_Load --scenePath \"Assets/Scenes/Main.unity\"")]
         public static IEnumerator Load(
-            [Description("Asset path to the scene file")] string scenePath = null,
-            [Description("Load mode: single or additive")] string mode = "single")
+            [Description("场景文件的资源路径")] string scenePath = null,
+            [Description("加载模式：single 或 additive")] string mode = "single")
         {
             if (string.IsNullOrEmpty(scenePath))
             {
@@ -27,26 +27,11 @@ namespace AIBridge.Editor
             yield return CommandResult.Success(new { scenePath, sceneName = scene.name, loaded = scene.isLoaded });
         }
 
-        [AIBridge("Save the current open scene(s)",
-            "AIBridgeCLI SceneCommand_Save")]
-        public static IEnumerator Save(
-            [Description("Save to a new path (save-as)")] string saveAs = null)
-        {
-            bool saved;
-            var scene = SceneManager.GetActiveScene();
-            if (!string.IsNullOrEmpty(saveAs))
-                saved = EditorSceneManager.SaveScene(scene, saveAs);
-            else
-                saved = EditorSceneManager.SaveOpenScenes();
-
-            yield return CommandResult.Success(new { sceneName = scene.name, scenePath = scene.path, saved });
-        }
-
-        [AIBridge("Get the scene hierarchy as a tree",
+        [AIBridge("获取场景层级结构树",
             "AIBridgeCLI SceneCommand_GetHierarchy --depth 3")]
         public static IEnumerator GetHierarchy(
-            [Description("Maximum depth to traverse")] int depth = 3,
-            [Description("Include inactive GameObjects")] bool includeInactive = true)
+            [Description("遍历的最大深度")] int depth = 3,
+            [Description("包含未激活的 GameObject")] bool includeInactive = true)
         {
             var scene = SceneManager.GetActiveScene();
             var rootObjects = scene.GetRootGameObjects();
@@ -67,7 +52,7 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Get info about the active scene",
+        [AIBridge("获取当前激活场景的信息",
             "AIBridgeCLI SceneCommand_GetActive")]
         public static IEnumerator GetActive()
         {
@@ -80,16 +65,6 @@ namespace AIBridge.Editor
                 isDirty = scene.isDirty,
                 rootCount = scene.rootCount
             });
-        }
-
-        [AIBridge("Create a new empty scene",
-            "AIBridgeCLI SceneCommand_New --setup empty")]
-        public static IEnumerator New(
-            [Description("Scene setup: default or empty")] string setup = "default")
-        {
-            var newSceneSetup = setup.ToLower() == "empty" ? NewSceneSetup.EmptyScene : NewSceneSetup.DefaultGameObjects;
-            var scene = EditorSceneManager.NewScene(newSceneSetup, NewSceneMode.Single);
-            yield return CommandResult.Success(new { sceneName = scene.name, created = true });
         }
 
         private static HierarchyNode BuildHierarchyNode(GameObject go, int remainingDepth, bool includeInactive)

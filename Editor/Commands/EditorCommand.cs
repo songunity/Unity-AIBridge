@@ -7,36 +7,7 @@ namespace AIBridge.Editor
 {
     public static class EditorCommand
     {
-        [AIBridge("Perform undo operations",
-            "AIBridgeCLI EditorCommand_Undo --count 3")]
-        public static IEnumerator Undo(
-            [Description("Number of undo steps")] int count = 1)
-        {
-            for (var i = 0; i < count; i++)
-                UnityEditor.Undo.PerformUndo();
-            yield return CommandResult.Success(new { action = "undo", count });
-        }
-
-        [AIBridge("Perform redo operations",
-            "AIBridgeCLI EditorCommand_Redo --count 1")]
-        public static IEnumerator Redo(
-            [Description("Number of redo steps")] int count = 1)
-        {
-            for (var i = 0; i < count; i++)
-                UnityEditor.Undo.PerformRedo();
-            yield return CommandResult.Success(new { action = "redo", count });
-        }
-
-        [AIBridge("Refresh the AssetDatabase",
-            "AIBridgeCLI EditorCommand_Refresh")]
-        public static IEnumerator Refresh(
-            [Description("Force update all assets")] bool forceUpdate = false)
-        {
-            AssetDatabase.Refresh(forceUpdate ? ImportAssetOptions.ForceUpdate : ImportAssetOptions.Default);
-            yield return CommandResult.Success(new { action = "refresh", forceUpdate });
-        }
-
-        [AIBridge("Enter Play mode",
+        [AIBridge("进入播放模式",
             "AIBridgeCLI EditorCommand_Play")]
         public static IEnumerator Play()
         {
@@ -49,7 +20,7 @@ namespace AIBridge.Editor
             }
         }
 
-        [AIBridge("Exit Play mode",
+        [AIBridge("退出播放模式",
             "AIBridgeCLI EditorCommand_Stop")]
         public static IEnumerator Stop()
         {
@@ -62,17 +33,17 @@ namespace AIBridge.Editor
             }
         }
 
-        [AIBridge("Toggle or set pause state",
+        [AIBridge("切换或设置暂停状态",
             "AIBridgeCLI EditorCommand_Pause")]
         public static IEnumerator Pause(
-            [Description("Toggle pause (true) or set specific value (false)")] bool toggle = true,
-            [Description("Pause state to set when toggle is false")] bool pause = true)
+            [Description("切换暂停（true）或设置特定值（false）")] bool toggle = true,
+            [Description("当 toggle 为 false 时要设置的暂停状态")] bool pause = true)
         {
             EditorApplication.isPaused = toggle ? !EditorApplication.isPaused : pause;
             yield return CommandResult.Success(new { action = "pause", isPaused = EditorApplication.isPaused });
         }
 
-        [AIBridge("Get current Editor state (play/pause/compile status)",
+        [AIBridge("获取当前编辑器状态（播放/暂停/编译状态）",
             "AIBridgeCLI EditorCommand_GetState")]
         public static IEnumerator GetState()
         {
@@ -87,11 +58,11 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Log a message to the Unity console",
+        [AIBridge("向 Unity 控制台输出日志消息",
             "AIBridgeCLI EditorCommand_Log --message \"Hello World\"")]
         public static IEnumerator Log(
-            [Description("Message to log")] string message,
-            [Description("Log type: Log, Warning, Error")] string logType = "Log")
+            [Description("要记录的消息")] string message,
+            [Description("日志类型：Log, Warning, Error")] string logType = "Log")
         {
             if (string.IsNullOrEmpty(message))
             {

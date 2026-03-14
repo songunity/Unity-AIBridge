@@ -6,10 +6,10 @@ namespace AIBridge.Editor
 {
     public static class MenuItemCommand
     {
-        [AIBridge("Execute a Unity Editor menu item by its path",
+        [AIBridge("通过路径执行 Unity 编辑器菜单项",
             "AIBridgeCLI MenuItemCommand_Execute --menuPath \"GameObject/Create Empty\"")]
         public static IEnumerator Execute(
-            [Description("Menu item path (e.g. GameObject/Create Empty)")] string menuPath = null)
+            [Description("菜单项路径（例如 GameObject/Create Empty）")] string menuPath = null)
         {
             if (string.IsNullOrEmpty(menuPath))
             {

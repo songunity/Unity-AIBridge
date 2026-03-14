@@ -10,11 +10,11 @@ namespace AIBridge.Editor
 {
     public static class InspectorCommand
     {
-        [AIBridge("Get all components on a GameObject",
+        [AIBridge("获取 GameObject 上的所有组件",
             "AIBridgeCLI InspectorCommand_GetComponents --path \"Player\"")]
         public static IEnumerator GetComponents(
-            [Description("Hierarchy path of the GameObject")] string path = null,
-            [Description("Instance ID of the GameObject")] int instanceId = 0)
+            [Description("GameObject 的层级路径")] string path = null,
+            [Description("GameObject 的实例 ID")] int instanceId = 0)
         {
             var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
@@ -49,13 +49,13 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Get serialized properties of a component",
+        [AIBridge("获取组件的序列化属性",
             "AIBridgeCLI InspectorCommand_GetProperties --path \"Player\" --componentName \"Transform\"")]
         public static IEnumerator GetProperties(
-            [Description("Hierarchy path of the GameObject")] string path = null,
-            [Description("Instance ID of the GameObject")] int instanceId = 0,
-            [Description("Component type name")] string componentName = null,
-            [Description("Component index (alternative to componentName)")] int componentIndex = -1)
+            [Description("GameObject 的层级路径")] string path = null,
+            [Description("GameObject 的实例 ID")] int instanceId = 0,
+            [Description("组件类型名称")] string componentName = null,
+            [Description("组件索引（替代 componentName）")] int componentIndex = -1)
         {
             var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
@@ -99,15 +99,15 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Set a serialized property on a component",
+        [AIBridge("设置组件上的序列化属性",
             "AIBridgeCLI InspectorCommand_SetProperty --path \"Player\" --componentName \"Rigidbody\" --propertyName \"mass\" --value 10")]
         public static IEnumerator SetProperty(
-            [Description("Hierarchy path of the GameObject")] string path = null,
-            [Description("Instance ID of the GameObject")] int instanceId = 0,
-            [Description("Component type name")] string componentName = null,
-            [Description("Component index (alternative to componentName)")] int componentIndex = -1,
-            [Description("Serialized property name")] string propertyName = null,
-            [Description("New value for the property")] string value = null)
+            [Description("GameObject 的层级路径")] string path = null,
+            [Description("GameObject 的实例 ID")] int instanceId = 0,
+            [Description("组件类型名称")] string componentName = null,
+            [Description("组件索引（替代 componentName）")] int componentIndex = -1,
+            [Description("序列化属性名称")] string propertyName = null,
+            [Description("属性的新值")] string value = null)
         {
             var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
@@ -153,12 +153,12 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Add a component to a GameObject",
+        [AIBridge("向 GameObject 添加组件",
             "AIBridgeCLI InspectorCommand_AddComponent --path \"Player\" --typeName \"Rigidbody\"")]
         public static IEnumerator AddComponent(
-            [Description("Hierarchy path of the GameObject")] string path = null,
-            [Description("Instance ID of the GameObject")] int instanceId = 0,
-            [Description("Component type name (e.g. Rigidbody, BoxCollider)")] string typeName = null)
+            [Description("GameObject 的层级路径")] string path = null,
+            [Description("GameObject 的实例 ID")] int instanceId = 0,
+            [Description("组件类型名称（例如 Rigidbody, BoxCollider）")] string typeName = null)
         {
             var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
@@ -206,14 +206,14 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Remove a component from a GameObject",
+        [AIBridge("从 GameObject 移除组件",
             "AIBridgeCLI InspectorCommand_RemoveComponent --path \"Player\" --componentName \"Rigidbody\"")]
         public static IEnumerator RemoveComponent(
-            [Description("Hierarchy path of the GameObject")] string path = null,
-            [Description("Instance ID of the GameObject")] int instanceId = 0,
-            [Description("Component type name")] string componentName = null,
-            [Description("Component index")] int componentIndex = -1,
-            [Description("Instance ID of the component")] int componentInstanceId = 0)
+            [Description("GameObject 的层级路径")] string path = null,
+            [Description("GameObject 的实例 ID")] int instanceId = 0,
+            [Description("组件类型名称")] string componentName = null,
+            [Description("组件索引")] int componentIndex = -1,
+            [Description("组件的实例 ID")] int componentInstanceId = 0)
         {
             var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)

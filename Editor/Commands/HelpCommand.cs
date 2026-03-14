@@ -6,17 +6,18 @@ namespace AIBridge.Editor
 {
     public static class HelpCommand
     {
-        [AIBridge("Get help for all registered commands, or detailed info for a specific one",
-            "AIBridgeCLI Help",
+        [AIBridge("获取特定命令的详细信息",
+            @"
+AIBridgeCLI Help --command GameObjectCommand_Find  # 获取Find命令的详细信息",
             "Help")]
         public static IEnumerator Help(
-            [Description("Command name to get detailed help for (leave empty for all commands)")] string command = "")
+            [Description("要获取详细帮助的命令名称")] string command)
         {
             if (string.IsNullOrEmpty(command))
             {
                 var all = CommandRegistry.GetAll()
                     .OrderBy(e => e.Name)
-                    .Select(e => new { e.Name, e.Description, e.Example });
+                    .Select(e => new { e.Name, e.Description });
                 yield return CommandResult.Success(new { count = CommandRegistry.GetAll().Count(), commands = all });
             }
             else

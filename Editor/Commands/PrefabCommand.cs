@@ -7,13 +7,13 @@ namespace AIBridge.Editor
 {
     public static class PrefabCommand
     {
-        [AIBridge("Instantiate a prefab in the scene",
+        [AIBridge("在场景中实例化预制体",
             "AIBridgeCLI PrefabCommand_Instantiate --prefabPath \"Assets/Prefabs/Player.prefab\"")]
         public static IEnumerator Instantiate(
-            [Description("Asset path to the prefab")] string prefabPath = null,
-            [Description("X position")] float posX = 0f,
-            [Description("Y position")] float posY = 0f,
-            [Description("Z position")] float posZ = 0f)
+            [Description("预制体的资源路径")] string prefabPath = null,
+            [Description("X 位置")] float posX = 0f,
+            [Description("Y 位置")] float posY = 0f,
+            [Description("Z 位置")] float posZ = 0f)
         {
             if (string.IsNullOrEmpty(prefabPath))
             {
@@ -39,11 +39,11 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Save a GameObject as a prefab asset",
+        [AIBridge("将 GameObject 保存为预制体资源",
             "AIBridgeCLI PrefabCommand_Save --gameObjectPath \"Player\" --savePath \"Assets/Prefabs/Player.prefab\"")]
         public static IEnumerator Save(
-            [Description("Hierarchy path of the GameObject (uses selection if omitted)")] string gameObjectPath = null,
-            [Description("Asset path to save the prefab to")] string savePath = null)
+            [Description("GameObject 的层级路径（如果省略则使用选择）")] string gameObjectPath = null,
+            [Description("保存预制体的资源路径")] string savePath = null)
         {
             if (string.IsNullOrEmpty(savePath))
             {
@@ -70,11 +70,11 @@ namespace AIBridge.Editor
             yield return CommandResult.Success(new { gameObjectName = go.name, prefabPath = savePath, saved = savedPrefab != null });
         }
 
-        [AIBridge("Unpack a prefab instance",
+        [AIBridge("解包预制体实例",
             "AIBridgeCLI PrefabCommand_Unpack --gameObjectPath \"Player(Clone)\"")]
         public static IEnumerator Unpack(
-            [Description("Hierarchy path of the prefab instance (uses selection if omitted)")] string gameObjectPath = null,
-            [Description("Unpack completely (all nested prefabs)")] bool completely = false)
+            [Description("预制体实例的层级路径（如果省略则使用选择）")] string gameObjectPath = null,
+            [Description("完全解包（所有嵌套预制体）")] bool completely = false)
         {
             GameObject go;
             if (!string.IsNullOrEmpty(gameObjectPath))
@@ -101,11 +101,11 @@ namespace AIBridge.Editor
             yield return CommandResult.Success(new { gameObjectName = go.name, unpacked = true, completely });
         }
 
-        [AIBridge("Get prefab info for an asset or instance",
+        [AIBridge("获取资源或实例的预制体信息",
             "AIBridgeCLI PrefabCommand_GetInfo --prefabPath \"Assets/Prefabs/Player.prefab\"")]
         public static IEnumerator GetInfo(
-            [Description("Asset path to the prefab")] string prefabPath = null,
-            [Description("Hierarchy path of a prefab instance")] string gameObjectPath = null)
+            [Description("预制体的资源路径")] string prefabPath = null,
+            [Description("预制体实例的层级路径")] string gameObjectPath = null)
         {
             GameObject target;
             if (!string.IsNullOrEmpty(prefabPath))
@@ -135,10 +135,10 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Apply prefab instance overrides back to the prefab asset",
+        [AIBridge("将预制体实例的覆盖应用回预制体资源",
             "AIBridgeCLI PrefabCommand_Apply --gameObjectPath \"Player(Clone)\"")]
         public static IEnumerator Apply(
-            [Description("Hierarchy path of the prefab instance (uses selection if omitted)")] string gameObjectPath = null)
+            [Description("预制体实例的层级路径（如果省略则使用选择）")] string gameObjectPath = null)
         {
             GameObject go;
             if (!string.IsNullOrEmpty(gameObjectPath))

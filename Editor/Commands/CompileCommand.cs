@@ -1,12 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
-using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
-using UnityEngine;
 
 namespace AIBridge.Editor
 {

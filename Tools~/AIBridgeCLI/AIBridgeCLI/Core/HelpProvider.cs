@@ -11,7 +11,6 @@ public static class HelpProvider
         sb.AppendLine();
         sb.AppendLine("Usage:");
         sb.AppendLine("  AIBridgeCLI <CommandName> [options]");
-        sb.AppendLine("  AIBridgeCLI focus");
         sb.AppendLine();
         sb.AppendLine("Global Options:");
         sb.AppendLine("  --timeout <ms>     Timeout in milliseconds (default: 5000)");
@@ -28,7 +27,7 @@ public static class HelpProvider
         sb.AppendLine("  AIBridgeCLI GetLogsCommand_Log --count 10");
         sb.AppendLine("  AIBridgeCLI Help");
         sb.AppendLine();
-        sb.AppendLine("Tip: use the Help command to query all registered Unity-side commands.");
+        sb.AppendLine("Tip: use [AIBridgeCLI Help --command XXX] command to get command detail.");
 
         return sb.ToString();
     }

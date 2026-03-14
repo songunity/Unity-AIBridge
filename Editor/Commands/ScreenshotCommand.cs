@@ -10,7 +10,7 @@ namespace AIBridge.Editor
 {
     public static class ScreenshotCommand
     {
-        [AIBridge("Capture a screenshot of the Game view",
+        [AIBridge("捕获 Game 视图的截图",
             "AIBridgeCLI ScreenshotCommand_Image")]
         public static IEnumerator Image()
         {
@@ -32,17 +32,17 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Capture multiple screenshots and combine into GIF, need least 15s timeout",
+        [AIBridge("捕获多个截图并合成 GIF，至少需要 15 秒超时",
             "AIBridgeCLI ScreenshotCommand_Gif --frameCount 30 --fps 15")]
         public static IEnumerator Gif(
-            [Description("Number of frames to capture (1-200)")]
+            [Description("要捕获的帧数（1-200）")]
             int frameCount = 30,
-            [Description("Delay between frames in seconds (0.1-2.0)")]
+            [Description("帧之间的延迟（秒）（0.1-2.0）")]
             float delay = 0.1f,
-            [Description("Scale factor (0.25-1.0)")]
+            [Description("缩放因子（0.25-1.0）")]
             float scale = 0.5f,
-            [Description("Color count (64-256)")] int colorCount = 128,
-            [Description("FPS for GIF playback (10-30)")]
+            [Description("颜色数量（64-256）")] int colorCount = 128,
+            [Description("GIF 播放的 FPS（10-30）")]
             int fps = 15)
         {
             if (frameCount <= 0)

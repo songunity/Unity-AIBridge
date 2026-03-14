@@ -1,62 +1,76 @@
 # AI Bridge
 
-English | [中文](./README_CN.md)
+[English](./README_EN.md) | 中文
 
-File-based communication framework between AI Code assistants and Unity Editor.
+AI 编码助手与 Unity Editor 之间的文件通信框架。
 
-## Features
+## 功能特性
 
-- **GameObject** - Create, destroy, find, rename, duplicate, toggle active
-- **Transform** - Position, rotation, scale, parent hierarchy, look at
-- **Component/Inspector** - Get/set properties, add/remove components
-- **Scene** - Load, save, get hierarchy, create new
-- **Prefab** - Instantiate, save, unpack, apply overrides
-- **Asset** - Search, import, refresh, find by filter
-- **Editor Control** - Compile, undo/redo, play mode, focus window
-- **Screenshot & GIF** - Capture game view, record animated GIFs
-- **Batch Commands** - Execute multiple commands efficiently
-- **Code Execution** - Execute C# code dynamically in Editor or Runtime
+- **GameObject** - 创建、删除、查找、重命名、复制、切换激活状态
+- **Transform** - 位置、旋转、缩放、父子层级、LookAt
+- **Component/Inspector** - 获取/设置属性、添加/移除组件
+- **Scene** - 加载、保存、获取层级、创建新场景
+- **Prefab** - 实例化、保存、解包、应用覆盖
+- **Asset** - 搜索、导入、刷新、按过滤器查找
+- **编辑器控制** - 编译、撤销/重做、播放模式、聚焦窗口
+- **截图 & GIF** - 捕获游戏视图、录制动画 GIF
+- **批量命令** - 高效执行多个命令
+- **代码执行** - 在编辑器或运行时动态执行 C# 代码
 
-## Why AI Bridge? (vs Unity MCP)
+## 为什么选择 AI Bridge？（对比 Unity MCP）
 
-| Feature               | AI Bridge          | Unity MCP                       |
-| --------------------- | ------------------ | ------------------------------- |
-| Communication         | File-based         | WebSocket                       |
-| During Unity Compile  | **Works normally** | Connection lost                 |
-| Port Conflicts        | None               | May cause reconnection failure  |
-| Multi-Project Support | **Yes**            | No                              |
-| Stability             | **High**           | Affected by compile/restart     |
-| Context Usage         | **Low**            | Higher                          |
-| Extensibility         | Simple interface   | Requires MCP protocol knowledge |
+| 特性         | AI Bridge    | Unity MCP        |
+| ------------ | ------------ | ---------------- |
+| 通信方式     | 文件通信     | WebSocket 长连接 |
+| Unity 编译时 | **正常工作** | 连接断开         |
+| 端口冲突     | 无           | 可能导致重连失败 |
+| 多工程支持   | **支持**     | 不支持           |
+| 稳定性       | **高**       | 受编译/重启影响  |
+| 上下文消耗   | **低**       | 较高             |
+| 扩展性       | 简单接口     | 需了解 MCP 协议  |
 
-**The Problem with MCP**: Unity MCP uses persistent WebSocket connections. When Unity recompiles (which happens frequently during development), the connection breaks. Port conflicts can also prevent reconnection, leading to a frustrating experience.
+**MCP 的问题**：Unity MCP 使用 WebSocket 长连接。当 Unity 重新编译时（开发过程中频繁发生），连接会断开。端口冲突还可能导致无法重连，使用体验较差。
 
-**AI Bridge Solution**: By using file-based communication, AI Bridge completely avoids these issues. Commands are written as JSON files and results are read back - simple, stable, and reliable regardless of Unity's state.
+**AI Bridge 方案**：通过文件通信，AI Bridge 从根源上完美解决了这些问题。命令以 JSON 文件写入，结果以文件读取——简单、稳定、可靠，不受 Unity 状态影响。
 
-## Installation
+## 安装
 
-### Via Unity Package Manager
+### 通过 Unity Package Manager
 
-1. Open Unity Package Manager (Window > Package Manager)
-2. Click "+" > "Add package from git URL"
-3. Enter: `https://github.com/wang-er-s/AIBridge.git`
+1. 打开 Unity Package Manager（Window > Package Manager）
+2. 点击 "+" > "Add package from git URL"
+3. 输入：`https://github.com/wang-er-s/AIBridge.git`
 
-### Manual Installation
+### 手动安装
 
-1. Download or clone this repository
-2. Copy the entire folder to your Unity project's `Packages` folder
+1. 下载或克隆此仓库
+2. 将整个文件夹复制到 Unity 项目的 `Packages` 目录
 
-## Requirements
+## 系统要求
 
-- Unity 2021.3 or later
-- .NET 6.0 Runtime (for CLI tool)
+- Unity 2021.3 或更高版本
+- .NET 6.0 Runtime（用于 CLI 工具）
 - Newtonsoft.Json (com.unity.nuget.newtonsoft-json)
 
-## Quick Start
+## 快速开始
 
-### 1. Add Custom Commands
+### 0. 首次安装配置
 
-Create a static class with methods marked with `[AIBridge]` attribute:
+安装 AI Bridge 后，需要进行以下初始化步骤：
+
+1. **打开设置窗口**：`Window > AIBridge`
+2. **安装 Skill 到 Agent**：切换到 `Tools` 标签，点击 **"Copy To Agent"** 按钮，将 Skill 文档安装到 agent的skills 目录
+3. **配置自动扫描**（可选）：
+   - 切换到 `Commands` 标签
+   - 启用 **"Auto Scan on Startup"** 选项
+   - 在 **"Scan Assemblies"** 文本框中配置要扫描的程序集（默认：`Assembly-CSharp-Editor-firstpass;Assembly-CSharp`）
+   - 如果你的自定义命令在其他程序集中，需要添加到此列表，多个程序集用分号分隔
+
+**注意：** 如果包安装在 `Library/PackageCache`（不可修改），则自动扫描会被强制启用。
+
+### 1. 添加自定义命令
+
+创建一个静态类，使用 `[AIBridge]` 特性标记方法：
 
 ```csharp
 using AIBridge.Editor;
@@ -65,95 +79,120 @@ using System.ComponentModel;
 
 public static class MyCustomCommand
 {
-    [AIBridge("Create a custom cube with specific settings")]
+    [AIBridge("创建一个具有特定设置的自定义立方体")]
     public static IEnumerator CreateCustomCube(
-        [Description("Cube name")] string name = "CustomCube",
-        [Description("Cube size")] float size = 1.0f)
+        [Description("立方体名称")] string name = "CustomCube",
+        [Description("立方体大小")] float size = 1.0f)
     {
         var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
         cube.name = name;
         cube.transform.localScale = Vector3.one * size;
 
-        yield return CommandResult.Success($"Created {name} with size {size}");
+        yield return CommandResult.Success($"创建了 {name}，大小为 {size}");
     }
 }
 ```
 
-**Key Points:**
+**关键要点：**
 
-- Method must be `static` and return `IEnumerator`
-- Use `[AIBridge]` attribute with description
-- Use `[Description]` for parameter documentation
-- Return `CommandResult.Success()` or `CommandResult.Failure()`
+- 方法必须是 `static` 并返回 `IEnumerator`
+- 可以使用yield return new WaitForSeconds或者yield return new WaitUntil
+- 使用 `[AIBridge]` 特性添加描述
+- 使用 `[Description]` 为参数添加文档（可选，不写则的字段名）
+- 返回 `CommandResult.Success()` 或 `CommandResult.Failure()`
 
-### 2. Scan Commands
+### 2. 刷新命令列表
 
-Open `AIBridge/Settings` window (menu: `AIBridge/Settings`) and click **"Scan Commands"** button to register your custom commands.
+添加自定义命令后，需要重新扫描并生成 Skill 文档：
 
-### 3. Generate Skill Documentation
+1. 打开 `Window > AIBridge` 窗口
+2. 切换到 `Commands` 标签
+3. 点击 **"Refresh Command List"** 按钮（如果启用了 Auto Scan，此按钮会隐藏，命令会自动扫描）
 
-In the same settings window, click **"Generate Skill"** to auto-generate `Skill~/SKILL.md` documentation for AI assistants.
+**这个操作会：**
+- 扫描指定程序集中的所有命令
+- 更新命令注册表
+- 自动重新生成 `Skill~/SKILL.md` 文档
+- 自动更新已安装的 Agent Skill 文档
 
-**Important:** When generating the Skill documentation, it automatically scans and includes complete descriptions, parameter details, and usage examples for all registered commands, including both built-in and your custom commands.
+**重要：** 每次添加或修改自定义命令后，都需要点击此按钮来更新 Skill 文档，这样 AI 助手才能识别你的新命令。
 
-### 4. Use Commands
+### 3. 使用命令
 
-Use the CLI tool or let AI assistants call your commands:
+使用 CLI 工具或让 AI 助手调用你的命令：
 
 ```bash
 AIBridgeCLI.exe MyCustomCommand_CreateCustomCube --name "MyCube" --size 2.0
 ```
 
-## Command Registration
+## 命令注册
 
-### Auto-Scan Mode
+### 自动扫描模式
 
-Enable **"Auto Scan on Startup"** in `AIBridge/Settings` to automatically scan and register commands when Unity starts. You can specify which assemblies to scan (default: `Assembly-CSharp-Editor-firstpass;Assembly-CSharp`).
+在 `Window > AIBridge` 的 `Commands` 标签中启用 **"Auto Scan on Startup"**：
 
-**Note:** If the package is installed in `Library/PackageCache` (immutable), auto-scan is forced on.
+- Unity 启动时会自动扫描并注册命令
+- 在 **"Scan Assemblies"** 文本框中指定要扫描的程序集（默认：`Assembly-CSharp-Editor-firstpass;Assembly-CSharp`）
+- 多个程序集用分号（`;`）分隔
+- 如果你的自定义命令在其他程序集中（如 `MyCustomCommands`），需要添加到列表中：`Assembly-CSharp-Editor-firstpass;Assembly-CSharp;MyCustomCommands`
 
-### Manual Registration
+**注意：** 如果包安装在 `Library/PackageCache`（不可修改），则自动扫描会被强制启用。
 
-If auto-scan is disabled, commands are registered from the built-in `CommandRegistry.AutoRegister()` method. After adding new commands, click **"Scan Commands"** in the settings window.
+### 手动刷新模式
 
-## Skill Documentation
+如果禁用自动扫描：
 
-The `Skill~/SKILL.md` file is auto-generated documentation for AI assistants (like Claude, GPT, etc.). It includes:
+1. 命令将从内置的 `CommandRegistry.AutoRegister()` 方法注册
+2. 添加新命令后，需要手动在设置窗口的 `Commands` 标签点击 **"Refresh Command List"** 按钮
+3. 这会重新扫描所有程序集并更新 Skill 文档
 
-- All registered command names and descriptions (built-in + custom)
-- Parameter details for each command (types and descriptions)
-- Usage examples
-- CLI syntax
+## Skill 文档
 
-**To regenerate:** Click **"Generate Skill"** in `AIBridge/Settings` after adding or modifying commands. The system will automatically scan all commands and generate complete documentation.
+`Skill~/SKILL.md` 文件是为 AI 助手（如 Droid、Claude、GPT 等）自动生成的文档。包含：
 
-**Usage:** Share `Skill~/SKILL.md` with your AI assistant to enable Unity Editor control. See the file for detailed command reference and examples.
+- 所有已注册命令的名称和描述（内置 + 自定义）
+- 每个命令的参数详情（类型和描述）
+- 使用示例
+- CLI 语法
 
-## Install Skill to AI Editors
+你可以自己添加需要的内容，但是不要在 <!-- AUTO-GENERATED-COMMANDS-START --> <!-- AUTO-GENERATED-COMMANDS-END -->之中添加
 
-To enable Claude Code or Cursor to automatically recognize the AIBridge Skill, you can install it with one click:
+### 安装 Skill 到 Agent 目录
 
-### Install to Claude Code
+**首次安装（必需）：**
 
-Menu: `AIBridge/Install to Claude Code (Symlink)`
+1. 打开 `Window > AIBridge` 窗口
+2. 切换到 `Tools` 标签
+3. 点击 **"Copy To Agent"** 按钮
 
-This creates a `.claude/skills/aibridge` symlink in the project root, pointing to `Skill~/SKILL.md`.
+**复制逻辑：**
+- 系统会先扫描项目根目录中已存在的 AI 编辑器目录（`.cursor`、`.agent`、`.factory`、`.claude`、`.codex` 等）
+- 如果找到任何已存在的目录，会将 Skill 文档复制到这些目录的 `skills/aibridge/` 子目录中
+- 如果没有找到任何 AI 编辑器目录，会自动创建 `.agent` 目录并复制 Skill 文档
 
-### Install to Cursor
+**示例：**
+- 如果项目中已有 `.factory` 目录，Skill 会被复制到 `.factory/skills/aibridge/SKILL.md`
+- 如果项目中同时有 `.factory` 和 `.cursor` 目录，两个目录都会被更新
+- 如果项目中没有任何 AI 编辑器目录，会创建 `.agent/skills/aibridge/SKILL.md`
 
-Menu: `AIBridge/Install to Cursor (Symlink)`
+### 更新 Skill 文档
 
-This creates a `.cursor/skills/aibridge` symlink in the project root, pointing to `Skill~/SKILL.md`.
+当你添加或修改自定义命令后：
 
-**Notes:**
-- Using symlinks ensures AI editors automatically get the latest version when you regenerate the Skill documentation
-- Creating symlinks on Windows may require administrator privileges
-- If symlink creation fails, it will automatically fall back to file copy mode
+**方法 1：自动更新（推荐）**
+- 在 `Commands` 标签点击 **"Refresh Command List"** 按钮
+- 这会自动重新生成 Skill 文档并更新所有已安装的 Agent 目录
 
-## License
+**方法 2：手动更新**
+- 在 `Tools` 标签点击 **"Generate Skill"** 按钮重新生成文档
+- 然后点击 **"Copy To Agent"** 按钮更新 Agent 目录
+
+**使用方法：** AI 助手会自动读取 `.factory/skills/aibridge/SKILL.md` 文件，从而识别所有可用的 Unity Editor 控制命令。
+
+## 许可证
 
 MIT License
 
-## Contributing
+## 贡献
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+欢迎贡献！请随时提交 Pull Request。

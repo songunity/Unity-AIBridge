@@ -10,10 +10,10 @@ namespace AIBridge.Editor
 {
     public static class SelectionCommand
     {
-        [AIBridge("Get the current selection",
+        [AIBridge("获取当前选择的GameObject",
             "AIBridgeCLI SelectionCommand_Get")]
         public static IEnumerator Get(
-            [Description("Include component list for each selected GameObject")] bool includeComponents = false)
+            [Description("是否返回 GameObject 包含组件列表")] bool includeComponents = false)
         {
             var gameObjects = new List<GameObjectInfo>();
             var assets = new List<AssetInfo>();
@@ -68,13 +68,13 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Set the current selection",
+        [AIBridge("设置当前选择的Object，可以同时传递多个参数",
             "AIBridgeCLI SelectionCommand_Set --path \"Player\"")]
         public static IEnumerator Set(
-            [Description("Hierarchy path of the GameObject to select")] string path = null,
-            [Description("Asset path to select")] string assetPath = null,
-            [Description("Instance ID to select")] int instanceId = 0,
-            [Description("Comma-separated list of instance IDs to select")] string instanceIds = null)
+            [Description("要选择的 GameObject 的层级路径")] string path = null,
+            [Description("要选择的资源路径")] string assetPath = null,
+            [Description("要选择的实例 ID")] int instanceId = 0,
+            [Description("要选择的实例 ID 列表，用逗号分隔")] string instanceIds = null)
         {
             UnityEngine.Object selectedObject = null;
             var selectedObjects = new List<UnityEngine.Object>();
@@ -84,7 +84,7 @@ namespace AIBridge.Editor
                 selectedObject = EditorUtility.InstanceIDToObject(instanceId);
                 if (selectedObject != null) selectedObjects.Add(selectedObject);
             }
-            else if (!string.IsNullOrEmpty(instanceIds))
+            if (!string.IsNullOrEmpty(instanceIds))
             {
                 var ids = instanceIds.Split(',');
                 foreach (var idStr in ids)
@@ -96,12 +96,12 @@ namespace AIBridge.Editor
                     }
                 }
             }
-            else if (!string.IsNullOrEmpty(path))
+            if (!string.IsNullOrEmpty(path))
             {
                 var go = GameObject.Find(path);
                 if (go != null) { selectedObject = go; selectedObjects.Add(go); }
             }
-            else if (!string.IsNullOrEmpty(assetPath))
+            if (!string.IsNullOrEmpty(assetPath))
             {
                 selectedObject = AssetDatabase.LoadMainAssetAtPath(assetPath);
                 if (selectedObject != null) selectedObjects.Add(selectedObject);
@@ -124,82 +124,13 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("Clear the current selection",
+        [AIBridge("清除当前选择",
             "AIBridgeCLI SelectionCommand_Clear")]
         public static IEnumerator Clear()
         {
             Selection.objects = new UnityEngine.Object[0];
             Selection.activeObject = null;
             yield return CommandResult.Success(new { action = "clear", cleared = true });
-        }
-
-        [AIBridge("Add an object to the current selection",
-            "AIBridgeCLI SelectionCommand_Add --path \"Enemy1\"")]
-        public static IEnumerator Add(
-            [Description("Hierarchy path of the GameObject")] string path = null,
-            [Description("Asset path")] string assetPath = null,
-            [Description("Instance ID")] int instanceId = 0)
-        {
-            UnityEngine.Object objectToAdd = null;
-            if (instanceId != 0)
-                objectToAdd = EditorUtility.InstanceIDToObject(instanceId);
-            else if (!string.IsNullOrEmpty(path))
-                objectToAdd = GameObject.Find(path);
-            else if (!string.IsNullOrEmpty(assetPath))
-                objectToAdd = AssetDatabase.LoadMainAssetAtPath(assetPath);
-
-            if (objectToAdd == null)
-            {
-                yield return CommandResult.Failure("Object not found");
-                yield break;
-            }
-
-            var current = new List<UnityEngine.Object>(Selection.objects);
-            if (!current.Contains(objectToAdd))
-            {
-                current.Add(objectToAdd);
-                Selection.objects = current.ToArray();
-            }
-
-            yield return CommandResult.Success(new
-            {
-                action = "add",
-                addedObject = objectToAdd.name,
-                newCount = Selection.objects.Length
-            });
-        }
-
-        [AIBridge("Remove an object from the current selection",
-            "AIBridgeCLI SelectionCommand_Remove --path \"Enemy1\"")]
-        public static IEnumerator Remove(
-            [Description("Hierarchy path of the GameObject")] string path = null,
-            [Description("Asset path")] string assetPath = null,
-            [Description("Instance ID")] int instanceId = 0)
-        {
-            UnityEngine.Object objectToRemove = null;
-            if (instanceId != 0)
-                objectToRemove = EditorUtility.InstanceIDToObject(instanceId);
-            else if (!string.IsNullOrEmpty(path))
-                objectToRemove = GameObject.Find(path);
-            else if (!string.IsNullOrEmpty(assetPath))
-                objectToRemove = AssetDatabase.LoadMainAssetAtPath(assetPath);
-
-            if (objectToRemove == null)
-            {
-                yield return CommandResult.Failure("Object not found");
-                yield break;
-            }
-
-            var current = new List<UnityEngine.Object>(Selection.objects);
-            current.Remove(objectToRemove);
-            Selection.objects = current.ToArray();
-
-            yield return CommandResult.Success(new
-            {
-                action = "remove",
-                removedObject = objectToRemove.name,
-                newCount = Selection.objects.Length
-            });
         }
 
         [Serializable]

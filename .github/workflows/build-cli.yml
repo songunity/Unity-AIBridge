@@ -4,12 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - 'Tools~\AIBridgeCLI\AIBridgeCLI/**'
+      - 'Tools~/AIBridgeCLI/AIBridgeCLI/**'
       - '.github/workflows/build-cli.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'Tools~\AIBridgeCLI\AIBridgeCLI/**'
+      - 'Tools~/AIBridgeCLI/AIBridgeCLI/**'
   workflow_dispatch:
 
 jobs:

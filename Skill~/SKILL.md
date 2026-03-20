@@ -57,14 +57,21 @@ description: 通过 AI Bridge CLI 自动化 Unity Editor 操作 - 管理 GameObj
 2. 加载资源信息：`AssetDatabaseCommand_Load --assetPath "Assets/Prefabs/Player.prefab"`
 3. 根据需要实例化或修改
 
+### 工作流 5：编译验证代码是否有报错
+
+1. 编译unity：`Compile`
+2. 查看返回值是否有报错
+
 ## 如何查询命令详情
 
 ### 查看命令详细用法
+
 ```bash
 AIBridgeCLI Help --command "GameObjectCommand_Find" --raw
 ```
 
 返回包含：
+
 - 命令描述
 - 参数列表（名称、类型、是否必需、描述、默认值）
 - 使用示例
@@ -72,7 +79,10 @@ AIBridgeCLI Help --command "GameObjectCommand_Find" --raw
 通常来说使用一个命令前，你都要查询一下该命令的详细用法（除非你之前查询过）
 
 <!-- AUTO-GENERATED-COMMANDS-START -->
+
 ## 命令分类
+
+-- **Compile** - 编译代码，并返回编译结果
 
 ### AssetDatabase
 

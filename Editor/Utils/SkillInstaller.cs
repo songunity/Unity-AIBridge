@@ -149,6 +149,9 @@ namespace AIBridge.Editor
             sb.AppendLine("## 命令分类");
             sb.AppendLine();
 
+            sb.AppendLine($"-- **Compile** - 编译代码，并返回编译结果");
+            sb.AppendLine();
+
             foreach (var group in commandsByClass)
             {
                 var categoryName = group.Key.Replace("Command", "");

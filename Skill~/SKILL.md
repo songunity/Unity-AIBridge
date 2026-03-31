@@ -20,8 +20,36 @@ description: 通过 AI Bridge CLI 自动化 Unity Editor 操作 - 管理 GameObj
 ## 前置条件
 
 - Unity 项目已安装 AI Bridge 包
-- CLI 位置：`AIBridgeCache\CLI\AIBridgeCLI`
+- CLI 位置：`AIBridgeCache\CLI\AIBridgeCLI.exe`
 - 始终添加 `--raw` 标志以获取 JSON 输出
+- `E:\path\to\AIBridgeCLI.exe Compile --help` 查看全局帮助
+
+常用全局参数：
+
+- `--timeout <ms>` - 超时时间，单位毫秒，默认 `5000`
+- `--no-wait` - 不等待结果，适合只触发命令的场景
+- `--raw` - 输出原始 JSON
+- `--quiet` - 安静模式，减少额外输出
+- `--json <json>` - 透传并合并 JSON 参数，同名字段会覆盖
+- `--stdin` - 从标准输入读取 JSON 参数
+- `--help` - 显示帮助
+
+当命令执行时间可能超过默认 5 秒时，必须显式增加 `--timeout`，例如：
+
+- 编译：`AIBridgeCLI.exe Compile --raw --timeout 300000`
+- 跑测试：`AIBridgeCLI.exe CodeExecuteCommand_Execute --code '...' --raw --timeout 300000`
+- 截图/GIF 等较慢操作：按实际情况设置更大的超时
+
+在 Windows PowerShell 中调用 `AIBridgeCLI.exe` 时注意命令写法：
+
+- 如果可执行文件路径 **不包含空格**，优先直接写：
+  `E:\path\to\AIBridgeCLI.exe Compile --raw`
+- 如果路径 **包含空格**，必须写成：
+  `& "E:\path with spaces\AIBridgeCLI.exe" Compile --raw`
+
+不要写成：
+
+`"E:\path\to\AIBridgeCLI.exe" Compile --raw`
 
 ## 常见工作流
 
@@ -77,12 +105,12 @@ AIBridgeCLI Help --command "GameObjectCommand_Find" --raw
 - 使用示例
 
 通常来说使用一个命令前，你都要查询一下该命令的详细用法（除非你之前查询过）
+Compile没有Help，直接使用即可
 
 <!-- AUTO-GENERATED-COMMANDS-START -->
-
 ## 命令分类
 
--- **Compile** - 编译代码，并返回编译结果
+-- **Compile** - 编译代码，并返回编译结果，如果有报错是会直接返回，不需要再查看Log
 
 ### AssetDatabase
 

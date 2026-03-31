@@ -149,7 +149,7 @@ namespace AIBridge.Editor
             sb.AppendLine("## 命令分类");
             sb.AppendLine();
 
-            sb.AppendLine($"-- **Compile** - 编译代码，并返回编译结果");
+            sb.AppendLine($"-- **Compile** - 编译代码，并返回编译结果，如果有报错是会直接返回，不需要再查看Log");
             sb.AppendLine();
 
             foreach (var group in commandsByClass)

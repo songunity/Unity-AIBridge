@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -14,6 +15,7 @@ using Microsoft.CodeAnalysis.CSharp;
 public sealed class CSharpCodeRunner
 {
     private readonly List<MetadataReference> references;
+    private const string AsyncMethodName = "ExecuteAsync";
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CSharpCodeRunner"/> class.
@@ -56,14 +58,24 @@ public sealed class CSharpCodeRunner
         }
 
         code = Regex.Replace(code, "using.*?;", "");
+        var methodName = code.Contains("await ") ? AsyncMethodName : "Execute";
+        var returnType = methodName == AsyncMethodName ? "async Task<object>" : "object";
         return $@"
 {sb}
-
+using System;
+using System.Threading.Tasks;
 public static class CodeExecutor
 {{
-    public static object Execute()
+    public static {returnType} {methodName}()
     {{
+        try{{
         {code}
+        }}
+        catch (Exception e)
+        {{
+            UnityEngine.Debug.LogError(e.ToString());
+            return e.ToString();
+        }}
         return null;
     }}
 }}
@@ -100,42 +112,110 @@ public static class CodeExecutor
         // Execute the compiled code
         try
         {
-            var assembly = result.CompiledAssembly;
-            if (assembly == null)
+            return ExecuteCompiledAssembly(result.CompiledAssembly);
+        }
+        catch (Exception ex)
+        {
+            return new EvaluationResult
             {
-                return new EvaluationResult
-                {
-                    Success = false,
-                    ErrorMessage = "Failed to compile the code"
-                };
-            }
+                Success = false,
+                ErrorMessage = $"Runtime error: {ex.Message}"
+            };
+        }
+    }
 
-            var type = assembly.GetType("CodeExecutor");
-            if (type == null)
+    private EvaluationResult ExecuteCompiledAssembly(Assembly assembly)
+    {
+        if (assembly == null)
+        {
+            return new EvaluationResult
             {
-                return new EvaluationResult
-                {
-                    Success = false,
-                    ErrorMessage = "Failed to find the CodeExecutor type"
-                };
-            }
+                Success = false,
+                ErrorMessage = "Failed to compile the code"
+            };
+        }
 
-            var method = type.GetMethod("Execute");
-            if (method == null)
+        var type = assembly.GetType("CodeExecutor");
+        if (type == null)
+        {
+            return new EvaluationResult
             {
-                return new EvaluationResult
-                {
-                    Success = false,
-                    ErrorMessage = "Failed to find the Execute method"
-                };
-            }
+                Success = false,
+                ErrorMessage = "Failed to find the CodeExecutor type"
+            };
+        }
 
+        var method = type.GetMethod("Execute") ?? type.GetMethod(AsyncMethodName);
+        if (method == null)
+        {
+            return new EvaluationResult
+            {
+                Success = false,
+                ErrorMessage = "Failed to find the Execute method"
+            };
+        }
+
+        try
+        {
             var returnValue = method.Invoke(null, null);
+            if (returnValue is Task task)
+            {
+                if (!task.IsCompleted)
+                {
+                    return new EvaluationResult
+                    {
+                        Success = false,
+                        IsPending = true,
+                        PendingTask = task
+                    };
+                }
+
+                returnValue = GetTaskResult(task);
+            }
 
             return new EvaluationResult
             {
                 Success = true,
                 ReturnValue = returnValue
+            };
+        }
+        catch (TargetInvocationException ex)
+        {
+            return new EvaluationResult
+            {
+                Success = false,
+                ErrorMessage = $"Runtime error: {ex.InnerException?.Message ?? ex.Message}"
+            };
+        }
+    }
+
+    public EvaluationResult ContinuePendingTask(EvaluationResult pendingResult)
+    {
+        if (pendingResult?.PendingTask == null)
+        {
+            return new EvaluationResult
+            {
+                Success = false,
+                ErrorMessage = "Pending task is missing"
+            };
+        }
+
+        if (!pendingResult.PendingTask.IsCompleted)
+        {
+            return new EvaluationResult
+            {
+                Success = false,
+                IsPending = true,
+                PendingTask = pendingResult.PendingTask
+            };
+        }
+
+        try
+        {
+            return new EvaluationResult
+            {
+                Success = true,
+                ReturnValue = GetTaskResult(pendingResult.PendingTask)
             };
         }
         catch (Exception ex)
@@ -146,6 +226,17 @@ public static class CodeExecutor
                 ErrorMessage = $"Runtime error: {ex.Message}"
             };
         }
+    }
+
+    private object GetTaskResult(Task task)
+    {
+        task.GetAwaiter().GetResult();
+        if (task.GetType().IsGenericType)
+        {
+            return task.GetType().GetProperty("Result")?.GetValue(task);
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -217,8 +308,12 @@ public sealed class EvaluationResult
     /// </summary>
     public string ErrorMessage { get; set; }
 
+    public bool IsPending { get; set; }
+
     /// <summary>
     /// Gets or sets the compiled assembly.
     /// </summary>
     internal Assembly CompiledAssembly { get; set; }
+
+    internal Task PendingTask { get; set; }
 }

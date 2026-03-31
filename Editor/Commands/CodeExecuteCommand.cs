@@ -66,8 +66,12 @@ public static class CodeExecutor
 
         Application.logMessageReceived += logHandler;
 
-        // Execute on main thread
         var result = codeRunner.CompileAndExecute(code);
+        while (result != null && result.IsPending)
+        {
+            result = codeRunner.ContinuePendingTask(result);
+            yield return null;
+        }
         
         // Remove log handler
         Application.logMessageReceived -= logHandler;
@@ -79,7 +83,8 @@ public static class CodeExecutor
         }
         else
         {
-            yield return CommandResult.Success($"Output:\n{output}");
+            var returnValue = result.ReturnValue == null ? "null" : result.ReturnValue.ToString();
+            yield return CommandResult.Success($"ReturnValue:\n{returnValue}\nOutput:\n{output}");
         }
     }
 }

@@ -1,11 +1,11 @@
 {
-  "name": "cn.lys.aibridge",
+  "name": "cn.su.aibridge",
   "displayName": "AI Bridge",
   "version": "1.1.1",
   "unity": "2021.3",
   "description": "File-based communication framework between AI Code assistants and Unity Editor. Provides stable, extensible command execution without MCP dependencies.",
   "author": {
-    "name": "liyingsong"
+    "name": "songunity"
   },
   "keywords": [
     "ai",

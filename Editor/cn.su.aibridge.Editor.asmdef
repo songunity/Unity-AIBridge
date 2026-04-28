@@ -1,5 +1,5 @@
 {
-    "name": "cn.lys.aibridge.Editor",
+    "name": "cn.su.aibridge.Editor",
     "rootNamespace": "AIBridge.Editor",
     "references": [],
     "includePlatforms": [

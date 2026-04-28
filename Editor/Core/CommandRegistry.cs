@@ -190,36 +190,36 @@ namespace AIBridge.Editor
             const BindingFlags flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
             var loadedAssemblies = new Dictionary<string, Assembly>(StringComparer.OrdinalIgnoreCase);
 
-            // cn.lys.aibridge.Editor
-            if (!loadedAssemblies.ContainsKey("cn.lys.aibridge.Editor"))
-                loadedAssemblies["cn.lys.aibridge.Editor"] = Assembly.Load("cn.lys.aibridge.Editor");
-            var assetDatabaseCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.AssetDatabaseCommand");
+            // cn.su.aibridge.Editor
+            if (!loadedAssemblies.ContainsKey("cn.su.aibridge.Editor"))
+                loadedAssemblies["cn.su.aibridge.Editor"] = Assembly.Load("cn.su.aibridge.Editor");
+            var assetDatabaseCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.AssetDatabaseCommand");
             RegisterCommand(assetDatabaseCommandType.GetMethod("Find", flags));
             RegisterCommand(assetDatabaseCommandType.GetMethod("Refresh", flags));
-            var batchCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.BatchCommand");
+            var batchCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.BatchCommand");
             RegisterCommand(batchCommandType.GetMethod("Execute", flags));
-            var compileCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.CompileCommand");
+            var compileCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.CompileCommand");
             RegisterCommand(compileCommandType.GetMethod("Start", flags));
             RegisterCommand(compileCommandType.GetMethod("Status", flags));
-            var editorCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.EditorCommand");
+            var editorCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.EditorCommand");
             RegisterCommand(editorCommandType.GetMethod("GetState", flags));
             RegisterCommand(editorCommandType.GetMethod("Log", flags));
             RegisterCommand(editorCommandType.GetMethod("Pause", flags));
             RegisterCommand(editorCommandType.GetMethod("Play", flags));
             RegisterCommand(editorCommandType.GetMethod("Stop", flags));
-            var gameObjectCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.GameObjectCommand");
+            var gameObjectCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.GameObjectCommand");
             RegisterCommand(gameObjectCommandType.GetMethod("Create", flags));
             RegisterCommand(gameObjectCommandType.GetMethod("Destroy", flags));
             RegisterCommand(gameObjectCommandType.GetMethod("Find", flags));
             RegisterCommand(gameObjectCommandType.GetMethod("GetInfo", flags));
             RegisterCommand(gameObjectCommandType.GetMethod("SetActive", flags));
-            var getLogsCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.GetLogsCommand");
+            var getLogsCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.GetLogsCommand");
             RegisterCommand(getLogsCommandType.GetMethod("Log", flags));
             RegisterCommand(getLogsCommandType.GetMethod("StartCapture", flags));
             RegisterCommand(getLogsCommandType.GetMethod("StopCapture", flags));
-            var helpCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.HelpCommand");
+            var helpCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.HelpCommand");
             RegisterCommand(helpCommandType.GetMethod("Help", flags));
-            var inputSimulationCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.InputSimulationCommand");
+            var inputSimulationCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.InputSimulationCommand");
             RegisterCommand(inputSimulationCommandType.GetMethod("Click", flags));
             RegisterCommand(inputSimulationCommandType.GetMethod("ClickAt", flags));
             RegisterCommand(inputSimulationCommandType.GetMethod("ClickByInstanceId", flags));
@@ -227,32 +227,32 @@ namespace AIBridge.Editor
             RegisterCommand(inputSimulationCommandType.GetMethod("DragByInstanceId", flags));
             RegisterCommand(inputSimulationCommandType.GetMethod("LongPress", flags));
             RegisterCommand(inputSimulationCommandType.GetMethod("LongPressByInstanceId", flags));
-            var inspectorCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.InspectorCommand");
+            var inspectorCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.InspectorCommand");
             RegisterCommand(inspectorCommandType.GetMethod("AddComponent", flags));
             RegisterCommand(inspectorCommandType.GetMethod("GetComponents", flags));
             RegisterCommand(inspectorCommandType.GetMethod("GetProperties", flags));
             RegisterCommand(inspectorCommandType.GetMethod("RemoveComponent", flags));
             RegisterCommand(inspectorCommandType.GetMethod("SetProperty", flags));
-            var menuItemCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.MenuItemCommand");
+            var menuItemCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.MenuItemCommand");
             RegisterCommand(menuItemCommandType.GetMethod("Execute", flags));
-            var prefabCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.PrefabCommand");
+            var prefabCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.PrefabCommand");
             RegisterCommand(prefabCommandType.GetMethod("Apply", flags));
             RegisterCommand(prefabCommandType.GetMethod("GetInfo", flags));
             RegisterCommand(prefabCommandType.GetMethod("Instantiate", flags));
             RegisterCommand(prefabCommandType.GetMethod("Save", flags));
             RegisterCommand(prefabCommandType.GetMethod("Unpack", flags));
-            var sceneCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.SceneCommand");
+            var sceneCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.SceneCommand");
             RegisterCommand(sceneCommandType.GetMethod("GetActive", flags));
             RegisterCommand(sceneCommandType.GetMethod("GetHierarchy", flags));
             RegisterCommand(sceneCommandType.GetMethod("Load", flags));
-            var screenshotCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.ScreenshotCommand");
+            var screenshotCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.ScreenshotCommand");
             RegisterCommand(screenshotCommandType.GetMethod("Gif", flags));
             RegisterCommand(screenshotCommandType.GetMethod("Image", flags));
-            var selectionCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.SelectionCommand");
+            var selectionCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.SelectionCommand");
             RegisterCommand(selectionCommandType.GetMethod("Clear", flags));
             RegisterCommand(selectionCommandType.GetMethod("Get", flags));
             RegisterCommand(selectionCommandType.GetMethod("Set", flags));
-            var transformCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("AIBridge.Editor.TransformCommand");
+            var transformCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("AIBridge.Editor.TransformCommand");
             RegisterCommand(transformCommandType.GetMethod("Get", flags));
             RegisterCommand(transformCommandType.GetMethod("LookAt", flags));
             RegisterCommand(transformCommandType.GetMethod("Reset", flags));
@@ -260,7 +260,7 @@ namespace AIBridge.Editor
             RegisterCommand(transformCommandType.GetMethod("SetPosition", flags));
             RegisterCommand(transformCommandType.GetMethod("SetRotation", flags));
             RegisterCommand(transformCommandType.GetMethod("SetScale", flags));
-            var codeExecuteCommandType = loadedAssemblies["cn.lys.aibridge.Editor"].GetType("CodeExecuteCommand");
+            var codeExecuteCommandType = loadedAssemblies["cn.su.aibridge.Editor"].GetType("CodeExecuteCommand");
             RegisterCommand(codeExecuteCommandType.GetMethod("Execute", flags));
 
             AIBridgeLogger.LogInfo($"[CommandRegistry] Registered {_registry.Count} commands.");

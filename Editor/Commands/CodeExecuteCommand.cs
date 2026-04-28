@@ -67,17 +67,33 @@ public static class CodeExecutor
         Application.logMessageReceived += logHandler;
 
         var result = codeRunner.CompileAndExecute(code);
-        while (result != null && result.IsPending)
+        var elapsed = 0f;
+        const float maxExecutionTime = 120f;
+        try
         {
-            result = codeRunner.ContinuePendingTask(result);
-            yield return null;
+            while (result != null && result.IsPending)
+            {
+                elapsed += UnityEngine.Time.unscaledDeltaTime;
+                if (elapsed > maxExecutionTime)
+                {
+                    result = null;
+                    break;
+                }
+                result = codeRunner.ContinuePendingTask(result);
+                yield return null;
+            }
         }
-        
-        // Remove log handler
-        Application.logMessageReceived -= logHandler;
+        finally
+        {
+            Application.logMessageReceived -= logHandler;
+        }
         var output = string.Join("\n", logMessages);
-        
-        if (!result.Success)
+
+        if (result == null)
+        {
+            yield return CommandResult.Failure($"Execution timed out after {maxExecutionTime}s\nOutput:\n{output}");
+        }
+        else if (!result.Success)
         {
             yield return CommandResult.Failure($"Execution Failed:\n{result.ErrorMessage}\nOutput:\n{output}");
         }

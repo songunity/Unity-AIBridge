@@ -18,7 +18,7 @@ public static class HelpProvider
         sb.AppendLine("  --raw              Output raw JSON");
         sb.AppendLine("  --quiet            Quiet mode");
         sb.AppendLine("  --json <json>      Merge JSON object into forwarded params (overrides same keys)");
-        sb.AppendLine("  --stdin            Read params JSON from stdin");
+        sb.AppendLine("  --stdin            Read params JSON from stdin (CLI args take precedence)");
         sb.AppendLine("  --help             Show this help");
         sb.AppendLine();
         sb.AppendLine("Examples:");

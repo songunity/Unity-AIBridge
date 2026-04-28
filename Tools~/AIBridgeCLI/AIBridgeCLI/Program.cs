@@ -71,7 +71,7 @@ internal class Program
             }
         }
 
-        // Handle --json merge
+        // Handle --json merge (overrides same keys per help contract)
         if (parsed.Options.TryGetValue("json", out var jsonStr) && !string.IsNullOrWhiteSpace(jsonStr))
         {
             try
@@ -81,7 +81,7 @@ internal class Program
                 {
                     foreach (var prop in doc.RootElement.EnumerateObject())
                     {
-                        if (!CliConstants.GlobalOptions.Contains(prop.Name) && !parsed.Options.ContainsKey(prop.Name))
+                        if (!CliConstants.GlobalOptions.Contains(prop.Name))
                         {
                             parsed.Options[prop.Name] = prop.Value.ValueKind == JsonValueKind.String
                                 ? prop.Value.GetString()

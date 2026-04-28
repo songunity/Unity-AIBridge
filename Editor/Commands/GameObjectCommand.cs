@@ -133,7 +133,7 @@ AIBridgeCLI GameObjectCommand_Find --name ""Player"" --withComponent ""Character
             {
                 var allObjects = includeInactive
                     ? Resources.FindObjectsOfTypeAll<GameObject>()
-                    : UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+                    : UnityEngine.Object.FindObjectsOfType<GameObject>();
 
                 foreach (var obj in allObjects)
                 {
@@ -186,7 +186,7 @@ AIBridgeCLI GameObjectCommand_Find --name ""Player"" --withComponent ""Character
             {
                 var allObjects = includeInactive
                     ? Resources.FindObjectsOfTypeAll<GameObject>()
-                    : UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+                    : UnityEngine.Object.FindObjectsOfType<GameObject>();
 
                 foreach (var obj in allObjects)
                 {
@@ -210,7 +210,7 @@ AIBridgeCLI GameObjectCommand_Find --name ""Player"" --withComponent ""Character
             {
                 var allObjects = includeInactive
                     ? Resources.FindObjectsOfTypeAll<GameObject>()
-                    : UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+                    : UnityEngine.Object.FindObjectsOfType<GameObject>();
 
                 foreach (var obj in allObjects)
                 {

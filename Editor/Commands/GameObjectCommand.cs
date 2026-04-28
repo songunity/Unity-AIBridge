@@ -104,11 +104,23 @@ AIBridgeCLI GameObjectCommand_Find --name ""Player"" --withComponent ""Character
         {
             var results = new List<GameObjectInfo>();
 
-            // 优先级1: 精确路径查找（最快，立即返回）
+            // 优先级1: 精确路径查找
             if (!string.IsNullOrEmpty(path))
             {
                 var go = GameObject.Find(path);
-                if (go != null && (includeInactive || go.activeInHierarchy))
+                if (go == null && includeInactive)
+                {
+                    foreach (var obj in Resources.FindObjectsOfTypeAll<GameObject>())
+                    {
+                        if (!IsSceneObject(obj)) continue;
+                        if (GameObjectHelper.GetGameObjectPath(obj) == path)
+                        {
+                            go = obj;
+                            break;
+                        }
+                    }
+                }
+                if (go != null)
                 {
                     results.Add(GameObjectHelper.CreateGameObjectInfo(go));
                 }
@@ -144,7 +156,16 @@ AIBridgeCLI GameObjectCommand_Find --name ""Player"" --withComponent ""Character
             // 优先级3: 按标签查找
             if (!string.IsNullOrEmpty(tag))
             {
-                var objects = GameObject.FindGameObjectsWithTag(tag);
+                GameObject[] objects;
+                try
+                {
+                    objects = GameObject.FindGameObjectsWithTag(tag);
+                }
+                catch (UnityException)
+                {
+                    yield return CommandResult.Failure($"Tag '{tag}' is not defined in the Tag Manager");
+                    yield break;
+                }
                 foreach (var obj in objects)
                 {
                     if (results.Count >= maxResults) break;

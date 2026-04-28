@@ -9,4 +9,8 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="AIBridge.Test" />
+  </ItemGroup>
+
 </Project>

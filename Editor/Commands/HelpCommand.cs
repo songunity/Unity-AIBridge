@@ -11,7 +11,7 @@ namespace AIBridge.Editor
 AIBridgeCLI Help --command GameObjectCommand_Find  # 获取Find命令的详细信息",
             "Help")]
         public static IEnumerator Help(
-            [Description("要获取详细帮助的命令名称")] string command)
+            [Description("要获取详细帮助的命令名称")] string command = null)
         {
             if (string.IsNullOrEmpty(command))
             {

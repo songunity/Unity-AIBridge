@@ -41,3 +41,4 @@ Thumbs.db
 *.mdb.meta
 sysinfo.txt
 *.unitypackage
+.claude/settings.local.json

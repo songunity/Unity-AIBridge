@@ -36,7 +36,7 @@ internal class Program
 
         if (parsed.CommandName == "Compile")
         {
-            var compileResult = CompileUnityCommand.Compile();
+            var compileResult = CompileUnityCommand.Compile(parsed.Timeout);
             OutputFormatter.PrintResult(compileResult, parsed.OutputMode);
             return compileResult.success ? 0 : 1;
         }
@@ -49,17 +49,51 @@ internal class Program
             {
                 try
                 {
-                    var stdinParams = JsonSerializer.Deserialize(stdinJson, JsonContext.Default.DictionaryStringString);
-                    foreach (var kvp in stdinParams)
+                    using var doc = JsonDocument.Parse(stdinJson);
+                    if (doc.RootElement.ValueKind == JsonValueKind.Object)
                     {
-                        if (!parsed.Options.ContainsKey(kvp.Key))
-                            parsed.Options[kvp.Key] = kvp.Value;
+                        foreach (var prop in doc.RootElement.EnumerateObject())
+                        {
+                            if (!parsed.Options.ContainsKey(prop.Name))
+                            {
+                                parsed.Options[prop.Name] = prop.Value.ValueKind == JsonValueKind.String
+                                    ? prop.Value.GetString()
+                                    : prop.Value.GetRawText();
+                            }
+                        }
                     }
                 }
-                catch
+                catch (JsonException)
                 {
-                    parsed.Options["json"] = stdinJson;
+                    OutputFormatter.PrintError("Invalid JSON from stdin");
+                    return 1;
                 }
+            }
+        }
+
+        // Handle --json merge
+        if (parsed.Options.TryGetValue("json", out var jsonStr) && !string.IsNullOrWhiteSpace(jsonStr))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(jsonStr);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var prop in doc.RootElement.EnumerateObject())
+                    {
+                        if (!CliConstants.GlobalOptions.Contains(prop.Name) && !parsed.Options.ContainsKey(prop.Name))
+                        {
+                            parsed.Options[prop.Name] = prop.Value.ValueKind == JsonValueKind.String
+                                ? prop.Value.GetString()
+                                : prop.Value.GetRawText();
+                        }
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+                OutputFormatter.PrintError("Invalid JSON in --json argument");
+                return 1;
             }
         }
 

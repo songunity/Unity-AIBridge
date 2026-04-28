@@ -9,7 +9,7 @@ namespace AIBridge.Editor
     public static class GameObjectHelper
     {
         /// <summary>
-        /// 获取目标 GameObject，优先级：instanceId > path > Selection
+        /// 获取目标 GameObject，优先级：instanceId > path
         /// </summary>
         /// <param name="path">层级路径</param>
         /// <param name="instanceId">实例ID</param>
@@ -18,10 +18,10 @@ namespace AIBridge.Editor
         {
             if (instanceId != 0)
                 return EditorUtility.InstanceIDToObject(instanceId) as GameObject;
-            
+
             if (!string.IsNullOrEmpty(path))
                 return GameObject.Find(path);
-            
+
             return null;
         }
 

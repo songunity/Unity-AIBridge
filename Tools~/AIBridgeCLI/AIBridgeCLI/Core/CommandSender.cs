@@ -67,9 +67,9 @@ public class CommandSender
 
                     return result;
                 }
-                catch (IOException)
+                catch (Exception ex) when (ex is IOException || ex is JsonException)
                 {
-                    // File might still be locked, retry
+                    // File might still be locked or partially written, retry
                     Thread.Sleep(_pollInterval);
                     continue;
                 }

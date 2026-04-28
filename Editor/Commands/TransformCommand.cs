@@ -44,7 +44,8 @@ namespace AIBridge.Editor
             [Description("Z 坐标（省略则保持当前值）")] float z = float.NaN,
             [Description("使用本地空间")] bool local = false)
         {
-            var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
+            var t = go?.transform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");
@@ -85,7 +86,8 @@ namespace AIBridge.Editor
             [Description("Z euler angle (omit to keep current)")] float z = float.NaN,
             [Description("Use local space")] bool local = false)
         {
-            var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
+            var t = go?.transform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");
@@ -125,7 +127,8 @@ namespace AIBridge.Editor
             [Description("Z 缩放（省略则保持当前值）")] float z = float.NaN,
             [Description("统一缩放所有轴")] float uniform = float.NaN)
         {
-            var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
+            var t = go?.transform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");
@@ -161,7 +164,8 @@ namespace AIBridge.Editor
             [Description("新父级的实例 ID")] int parentInstanceId = 0,
             [Description("重新设置父级后保持世界位置")] bool worldPositionStays = true)
         {
-            var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
+            var t = go?.transform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");
@@ -199,7 +203,8 @@ namespace AIBridge.Editor
             [Description("目标 Y 坐标")] float targetY = float.NaN,
             [Description("目标 Z 坐标")] float targetZ = float.NaN)
         {
-            var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
+            var t = go?.transform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");
@@ -230,7 +235,8 @@ namespace AIBridge.Editor
             [Description("重置旋转")] bool rotation = true,
             [Description("重置缩放")] bool scale = true)
         {
-            var t = GameObjectHelper.GetTargetGameObject(path, instanceId).transform;
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
+            var t = go?.transform;
             if (t == null)
             {
                 yield return CommandResult.Failure("Transform not found");

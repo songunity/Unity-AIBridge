@@ -219,7 +219,9 @@ namespace AIBridge.Editor
                     NullValueHandling = NullValueHandling.Ignore,
                     ReferenceLoopHandling = ReferenceLoopHandling.Ignore
                 });
-                File.WriteAllText(filePath, json, System.Text.Encoding.UTF8);
+                var tmpPath = filePath + ".tmp";
+                File.WriteAllText(tmpPath, json, System.Text.Encoding.UTF8);
+                File.Move(tmpPath, filePath);
             }
             catch (Exception ex)
             {

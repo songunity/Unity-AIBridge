@@ -4,9 +4,9 @@ namespace AIBridgeCLI.Commands;
 
 public static class CompileUnityCommand
 {
-    public static CommandResult Compile()
+    public static CommandResult Compile(int timeout = 120000)
     {
-        var sender = new CommandSender(timeout: 120000);
+        var sender = new CommandSender(timeout: timeout);
         var startResult = sender.SendCommand(new CommandRequest()
         {
             id = PathHelper.GenerateCommandId(),
@@ -17,8 +17,8 @@ public static class CompileUnityCommand
             return startResult;
         }
 
-
-        while (true)
+        var startTime = DateTime.Now;
+        while ((DateTime.Now - startTime).TotalMilliseconds < timeout)
         {
             try
             {
@@ -49,5 +49,12 @@ public static class CompileUnityCommand
                 };
             }
         }
+
+        return new CommandResult()
+        {
+            id = startResult.id,
+            success = false,
+            error = $"Compile timed out after {timeout}ms",
+        };
     }
 }

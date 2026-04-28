@@ -23,7 +23,7 @@ public static class HelpProvider
         sb.AppendLine();
         sb.AppendLine("Examples:");
         sb.AppendLine("  AIBridgeCLI GameObjectCommand_Find --name \"Main Camera\"");
-        sb.AppendLine("  AIBridgeCLI ScreenshotCommand_Game");
+        sb.AppendLine("  AIBridgeCLI ScreenshotCommand_Image");
         sb.AppendLine("  AIBridgeCLI GetLogsCommand_Log --count 10");
         sb.AppendLine("  AIBridgeCLI Help");
         sb.AppendLine();

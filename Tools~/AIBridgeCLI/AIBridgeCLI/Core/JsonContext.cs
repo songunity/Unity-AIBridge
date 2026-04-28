@@ -9,6 +9,7 @@ namespace AIBridgeCLI;
 [JsonSerializable(typeof(Dictionary<string, string>))]
 [JsonSerializable(typeof(object))]
 [JsonSerializable(typeof(object[]), TypeInfoPropertyName = "ObjectArray")]
+[JsonSerializable(typeof(JsonElement))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(bool))]
 [JsonSerializable(typeof(long))]

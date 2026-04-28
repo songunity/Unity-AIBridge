@@ -74,6 +74,11 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Clean old binaries
+        run: |
+          git rm -rf Tools~/CLI/ || true
+          mkdir -p Tools~/CLI
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:

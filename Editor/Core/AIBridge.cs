@@ -101,11 +101,11 @@ namespace AIBridge.Editor
                 return localPath;
             }
 
-            // Try PackageCache: Library/PackageCache/cn.su.aibridge@*
+            // Try PackageCache: Library/PackageCache/com.sh.aibridge@*
             var packageCachePath = Path.Combine(ProjectRoot, "Library", "PackageCache");
             if (Directory.Exists(packageCachePath))
             {
-                var dirs = Directory.GetDirectories(packageCachePath, "cn.su.aibridge@*");
+                var dirs = Directory.GetDirectories(packageCachePath, "com.sh.aibridge@*");
                 if (dirs.Length > 0)
                 {
                     return dirs[0];

@@ -38,7 +38,7 @@ namespace AIBridge.Editor
             // Load UXML - try multiple possible paths
             var paths = new[]
             {
-                "Packages/cn.su.aibridge/Editor/UI/AIBridgeSettingsWindow.uxml",
+                "Packages/com.sh.aibridge/Editor/UI/AIBridgeSettingsWindow.uxml",
                 "Packages/AIBridge/Editor/UI/AIBridgeSettingsWindow.uxml"
             };
 

@@ -1,5 +1,5 @@
 {
-    "name": "cn.su.aibridge.Editor",
+    "name": "com.sh.aibridge.Editor",
     "rootNamespace": "AIBridge.Editor",
     "references": [],
     "includePlatforms": [

@@ -38,8 +38,8 @@ public static class PathHelper
         if (string.IsNullOrEmpty(projectRoot))
         {
             var exeDir = AppDomain.CurrentDomain.BaseDirectory;
-            var toolsDir = Path.GetDirectoryName(exeDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            _exchangeDir = Path.Combine(toolsDir, "Exchange");
+            var cliDir = exeDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            _exchangeDir = Path.GetDirectoryName(cliDir);
             return _exchangeDir;
         }
 

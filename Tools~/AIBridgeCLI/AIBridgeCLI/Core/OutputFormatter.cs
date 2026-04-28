@@ -1,38 +1,17 @@
 using System;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using System.Text.Json;
 
 namespace AIBridgeCLI;
 
-/// <summary>
-/// Output formatting options
-/// </summary>
 public enum OutputMode
 {
-    /// <summary>
-    /// Human-readable formatted output
-    /// </summary>
     Pretty,
-
-    /// <summary>
-    /// Raw JSON output (single line)
-    /// </summary>
     Raw,
-
-    /// <summary>
-    /// Quiet mode - only output essential info
-    /// </summary>
     Quiet
 }
 
-/// <summary>
-/// Handles output formatting
-/// </summary>
 public static class OutputFormatter
 {
-    /// <summary>
-    /// Format and print a command result
-    /// </summary>
     public static void PrintResult(CommandResult result, OutputMode mode)
     {
         switch (mode)
@@ -52,7 +31,7 @@ public static class OutputFormatter
 
     private static void PrintRaw(CommandResult result)
     {
-        var json = JsonConvert.SerializeObject(result, Formatting.None);
+        var json = JsonSerializer.Serialize(result, JsonContext.Default.CommandResult);
         Console.WriteLine(json);
     }
 
@@ -62,7 +41,7 @@ public static class OutputFormatter
         {
             if (result.data != null)
             {
-                var json = JsonConvert.SerializeObject(result.data, Formatting.None);
+                var json = JsonSerializer.Serialize(result.data, JsonContext.Default.Object);
                 Console.WriteLine(json);
             }
         }
@@ -103,32 +82,31 @@ public static class OutputFormatter
     {
         if (data == null) return;
 
-        // Convert to JToken for easier traversal
-        JToken token;
-        if (data is JToken jt)
+        JsonElement element;
+        if (data is JsonElement je)
         {
-            token = jt;
+            element = je;
         }
         else
         {
-            var json = JsonConvert.SerializeObject(data);
-            token = JToken.Parse(json);
+            var json = JsonSerializer.Serialize(data, JsonContext.Default.Object);
+            element = JsonDocument.Parse(json).RootElement;
         }
 
-        PrintJToken(token, indent);
+        PrintElement(element, indent);
     }
 
-    private static void PrintJToken(JToken token, string indent)
+    private static void PrintElement(JsonElement element, string indent)
     {
-        switch (token.Type)
+        switch (element.ValueKind)
         {
-            case JTokenType.Object:
-                foreach (var prop in ((JObject)token).Properties())
+            case JsonValueKind.Object:
+                foreach (var prop in element.EnumerateObject())
                 {
-                    if (prop.Value.Type == JTokenType.Object || prop.Value.Type == JTokenType.Array)
+                    if (prop.Value.ValueKind == JsonValueKind.Object || prop.Value.ValueKind == JsonValueKind.Array)
                     {
                         Console.WriteLine($"{indent}{prop.Name}:");
-                        PrintJToken(prop.Value, indent + "  ");
+                        PrintElement(prop.Value, indent + "  ");
                     }
                     else
                     {
@@ -140,14 +118,14 @@ public static class OutputFormatter
                 }
                 break;
 
-            case JTokenType.Array:
+            case JsonValueKind.Array:
                 var index = 0;
-                foreach (var item in (JArray)token)
+                foreach (var item in element.EnumerateArray())
                 {
-                    if (item.Type == JTokenType.Object || item.Type == JTokenType.Array)
+                    if (item.ValueKind == JsonValueKind.Object || item.ValueKind == JsonValueKind.Array)
                     {
                         Console.WriteLine($"{indent}[{index}]:");
-                        PrintJToken(item, indent + "  ");
+                        PrintElement(item, indent + "  ");
                     }
                     else
                     {
@@ -160,49 +138,51 @@ public static class OutputFormatter
 
             default:
                 Console.Write(indent);
-                PrintValue(token);
+                PrintValue(element);
                 break;
         }
     }
 
-    private static void PrintValue(JToken token)
+    private static void PrintValue(JsonElement element)
     {
-        switch (token.Type)
+        switch (element.ValueKind)
         {
-            case JTokenType.Boolean:
-                Console.ForegroundColor = token.Value<bool>() ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.WriteLine(token.ToString().ToLower());
+            case JsonValueKind.True:
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("true");
                 Console.ResetColor();
                 break;
 
-            case JTokenType.Null:
+            case JsonValueKind.False:
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("false");
+                Console.ResetColor();
+                break;
+
+            case JsonValueKind.Null:
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.WriteLine("null");
                 Console.ResetColor();
                 break;
 
-            case JTokenType.Integer:
-            case JTokenType.Float:
+            case JsonValueKind.Number:
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine(token.ToString());
+                Console.WriteLine(element.ToString());
                 Console.ResetColor();
                 break;
 
-            case JTokenType.String:
+            case JsonValueKind.String:
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine(token.ToString());
+                Console.WriteLine(element.GetString());
                 Console.ResetColor();
                 break;
 
             default:
-                Console.WriteLine(token.ToString());
+                Console.WriteLine(element.ToString());
                 break;
         }
     }
 
-    /// <summary>
-    /// Print an error message
-    /// </summary>
     public static void PrintError(string message)
     {
         Console.ForegroundColor = ConsoleColor.Red;
@@ -210,9 +190,6 @@ public static class OutputFormatter
         Console.ResetColor();
     }
 
-    /// <summary>
-    /// Print a warning message
-    /// </summary>
     public static void PrintWarning(string message)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
@@ -220,9 +197,6 @@ public static class OutputFormatter
         Console.ResetColor();
     }
 
-    /// <summary>
-    /// Print an info message
-    /// </summary>
     public static void PrintInfo(string message)
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -230,9 +204,6 @@ public static class OutputFormatter
         Console.ResetColor();
     }
 
-    /// <summary>
-    /// Print a success message
-    /// </summary>
     public static void PrintSuccess(string message)
     {
         Console.ForegroundColor = ConsoleColor.Green;

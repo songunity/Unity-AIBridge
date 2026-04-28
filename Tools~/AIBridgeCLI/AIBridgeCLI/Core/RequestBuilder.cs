@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace AIBridgeCLI;
 
@@ -51,7 +51,7 @@ public static class RequestBuilder
         {
             try
             {
-                var array = JsonConvert.DeserializeObject<object[]>(value);
+                var array = JsonSerializer.Deserialize(value, JsonContext.Default.ObjectArray);
                 if (array != null)
                 {
                     return array;

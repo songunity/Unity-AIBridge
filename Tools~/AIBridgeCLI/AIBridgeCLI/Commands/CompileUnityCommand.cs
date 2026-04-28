@@ -1,4 +1,4 @@
-using Newtonsoft.Json.Linq;
+using System.Text.Json;
 
 namespace AIBridgeCLI.Commands;
 
@@ -32,8 +32,8 @@ public static class CompileUnityCommand
                     return stateResult;
                 }
 
-                var state = (stateResult.data as JObject)["status"];
-                if (state.ToString() != "compiling")
+                var state = ((JsonElement)stateResult.data).GetProperty("status").GetString();
+                if (state != "compiling")
                 {
                     return stateResult;
                 }

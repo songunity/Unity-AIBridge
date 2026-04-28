@@ -1,8 +1,8 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
-using Newtonsoft.Json;
 
 namespace AIBridgeCLI;
 
@@ -45,7 +45,7 @@ public class CommandSender
         var resultFile = Path.Combine(_resultsDir, $"{request.id}.json");
 
         // Write command file with UTF-8 encoding (no BOM)
-        var json = JsonConvert.SerializeObject(request, Formatting.None);
+        var json = JsonSerializer.Serialize(request, JsonContext.Default.CommandRequest);
         File.WriteAllText(commandFile, json, new UTF8Encoding(false));
 
         // Wait for result
@@ -60,7 +60,7 @@ public class CommandSender
                 try
                 {
                     var resultJson = File.ReadAllText(resultFile, Encoding.UTF8);
-                    var result = JsonConvert.DeserializeObject<CommandResult>(resultJson);
+                    var result = JsonSerializer.Deserialize(resultJson, JsonContext.Default.CommandResult);
 
                     // Clean up result file
                     try { File.Delete(resultFile); } catch { }
@@ -102,7 +102,7 @@ public class CommandSender
         var commandFile = Path.Combine(_commandsDir, $"{request.id}.json");
 
         // Write command file with UTF-8 encoding (no BOM)
-        var json = JsonConvert.SerializeObject(request, Formatting.None);
+        var json = JsonSerializer.Serialize(request, JsonContext.Default.CommandRequest);
         File.WriteAllText(commandFile, json, new UTF8Encoding(false));
 
         return request.id;
@@ -123,7 +123,7 @@ public class CommandSender
         try
         {
             var resultJson = File.ReadAllText(resultFile, Encoding.UTF8);
-            var result = JsonConvert.DeserializeObject<CommandResult>(resultJson);
+            var result = JsonSerializer.Deserialize(resultJson, JsonContext.Default.CommandResult);
 
             // Clean up result file
             try { File.Delete(resultFile); } catch { }

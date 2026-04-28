@@ -1,6 +1,6 @@
 using System.Text;
+using System.Text.Json;
 using AIBridgeCLI.Commands;
-using Newtonsoft.Json;
 
 namespace AIBridgeCLI;
 
@@ -49,7 +49,7 @@ internal class Program
             {
                 try
                 {
-                    var stdinParams = JsonConvert.DeserializeObject<Dictionary<string, string>>(stdinJson);
+                    var stdinParams = JsonSerializer.Deserialize(stdinJson, JsonContext.Default.DictionaryStringString);
                     foreach (var kvp in stdinParams)
                     {
                         if (!parsed.Options.ContainsKey(kvp.Key))
@@ -83,7 +83,7 @@ internal class Program
             if (parsed.OutputMode == OutputMode.Pretty)
                 OutputFormatter.PrintInfo($"Command sent with ID: {commandId}");
             else
-                Console.WriteLine(JsonConvert.SerializeObject(new { id = commandId, status = "sent" }));
+                Console.WriteLine(JsonSerializer.Serialize(new { id = commandId, status = "sent" }, JsonContext.Default.Object));
             return 0;
         }
 

@@ -156,14 +156,19 @@ AIBridgeCLI GameObjectCommand_Find --name ""Player"" --withComponent ""Character
             // 优先级3: 按标签查找
             if (!string.IsNullOrEmpty(tag))
             {
-                GameObject[] objects;
+                GameObject[] objects = null;
+                string tagError = null;
                 try
                 {
                     objects = GameObject.FindGameObjectsWithTag(tag);
                 }
                 catch (UnityException)
                 {
-                    yield return CommandResult.Failure($"Tag '{tag}' is not defined in the Tag Manager");
+                    tagError = $"Tag '{tag}' is not defined in the Tag Manager";
+                }
+                if (tagError != null)
+                {
+                    yield return CommandResult.Failure(tagError);
                     yield break;
                 }
                 foreach (var obj in objects)

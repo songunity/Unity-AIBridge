@@ -36,6 +36,18 @@ public class CommandSender
     /// </summary>
     public CommandResult SendCommand(CommandRequest request)
     {
+        // Pre-check: is Unity Editor alive?
+        var (alive, checkError) = EditorInstanceChecker.Check();
+        if (!alive)
+        {
+            return new CommandResult
+            {
+                id = request.id ?? PathHelper.GenerateCommandId(),
+                success = false,
+                error = checkError
+            };
+        }
+
         if (string.IsNullOrEmpty(request.id))
         {
             request.id = PathHelper.GenerateCommandId();

@@ -79,10 +79,15 @@ namespace AIBridge.Editor
 
             // Initialize components
             _watcher = new CommandWatcher(BridgeDirectory);
+            EditorInstanceTracker.Initialize(BridgeDirectory);
 
             // Subscribe to editor update
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.update += OnEditorUpdate;
+
+            // Cleanup heartbeat on editor quit
+            EditorApplication.quitting -= EditorInstanceTracker.Cleanup;
+            EditorApplication.quitting += EditorInstanceTracker.Cleanup;
 
             AIBridgeLogger.LogInfo($"AI Bridge initialized. Directory: {BridgeDirectory}");
             AIBridgeLogger.LogInfo(
@@ -121,6 +126,8 @@ namespace AIBridge.Editor
         /// </summary>
         private static void OnEditorUpdate()
         {
+            EditorInstanceTracker.UpdateHeartbeat();
+
             if (!_enabled)
             {
                 return;

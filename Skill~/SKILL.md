@@ -20,9 +20,10 @@ description: 通过 AI Bridge CLI 自动化 Unity Editor 操作 - 管理 GameObj
 ## 前置条件
 
 - Unity 项目已安装 AI Bridge 包
-- CLI 位置：`AIBridgeCache\CLI\AIBridgeCLI.exe`
+- CLI 位置：`<UnityProjectRoot>/AIBridgeCache/CLI/AIBridgeCLI`（Windows 为 `AIBridgeCLI.exe`）
+- 如果工作目录不在 Unity 项目根目录（如 monorepo），需要先定位 Unity 项目路径再拼接 CLI 路径
 - 始终添加 `--raw` 标志以获取 JSON 输出
-- `E:\path\to\AIBridgeCLI.exe Compile --help` 查看全局帮助
+- `<CLI路径> Compile --help` 查看全局帮助
 
 常用全局参数：
 
@@ -36,15 +37,28 @@ description: 通过 AI Bridge CLI 自动化 Unity Editor 操作 - 管理 GameObj
 
 当命令执行时间可能超过默认 5 秒时，必须显式增加 `--timeout`，例如：
 
-- 编译：`AIBridgeCLI.exe Compile --raw --timeout 300000`
-- 跑测试：`AIBridgeCLI.exe CodeExecuteCommand_Execute --code '...' --raw --timeout 300000`
+- 编译：`AIBridgeCLI Compile --raw --timeout 300000`
+- 跑测试：`AIBridgeCLI CodeExecuteCommand_Execute --code '...' --raw --timeout 300000`
 - 截图/GIF 等较慢操作：按实际情况设置更大的超时
 
-在 Windows PowerShell 中调用 `AIBridgeCLI.exe` 时注意命令写法：
+### 路径定位策略
 
-- 如果可执行文件路径 **不包含空格**，优先直接写：
+CLI 可执行文件位于 Unity 项目根目录下的 `AIBridgeCache/CLI/` 中。定位方式：
+
+1. **工作目录就是 Unity 项目根** — 直接用 `./AIBridgeCache/CLI/AIBridgeCLI`
+2. **Monorepo 结构（工作目录在 Unity 项目上层）** — 找到包含 `Assets` 目录的子文件夹即为 Unity 项目根，拼接路径如 `<子目录>/AIBridgeCache/CLI/AIBridgeCLI`
+
+平台差异：
+- macOS/Linux：`AIBridgeCLI`（无后缀）
+- Windows：`AIBridgeCLI.exe`
+
+### Windows PowerShell 注意事项
+
+在 Windows PowerShell 中调用时：
+
+- 路径 **不包含空格**，直接写：
   `E:\path\to\AIBridgeCLI.exe Compile --raw`
-- 如果路径 **包含空格**，必须写成：
+- 路径 **包含空格**，必须写成：
   `& "E:\path with spaces\AIBridgeCLI.exe" Compile --raw`
 
 不要写成：

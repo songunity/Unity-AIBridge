@@ -72,7 +72,8 @@ namespace AIBridge.Editor
             
             // Get the exchange directory
             BridgeDirectory = GetExchangeDirectory();
-            BridgeCLI = Path.Combine(BridgeDirectory, "CLI", "AIBridgeCLI.exe");
+            var cliName = Application.platform == RuntimePlatform.WindowsEditor ? "AIBridgeCLI.exe" : "AIBridgeCLI";
+            BridgeCLI = Path.Combine(BridgeDirectory, "CLI", cliName);
 
             // Copy CLI to AIBridgeCache if needed
             CopyCLIIfNeeded();

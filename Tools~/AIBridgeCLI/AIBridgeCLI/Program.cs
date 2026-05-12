@@ -4,7 +4,7 @@ using AIBridgeCLI.Commands;
 
 namespace AIBridgeCLI;
 
-internal class Program
+public class Program
 {
     public static int Main(string[] args)
     {

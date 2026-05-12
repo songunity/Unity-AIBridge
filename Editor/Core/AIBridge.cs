@@ -189,11 +189,22 @@ namespace AIBridge.Editor
         {
             try
             {
+                // Ensure .gitignore exists in AIBridgeCache
+                if (!Directory.Exists(BridgeDirectory))
+                {
+                    Directory.CreateDirectory(BridgeDirectory);
+                }
+                var gitignorePath = Path.Combine(BridgeDirectory, ".gitignore");
+                if (!File.Exists(gitignorePath))
+                {
+                    File.WriteAllText(gitignorePath, "*\n!.gitignore\n");
+                }
+
                 var platformFolder = GetPlatformCliFolder();
-                
+
                 // Source: {PackageRoot}/Tools~/CLI/{platform}/
                 var sourcePath = Path.Combine(PackageRoot, "Tools~", "CLI", platformFolder);
-                
+
                 // Target: AIBridgeCache/CLI/
                 var targetPath = Path.Combine(BridgeDirectory, "CLI");
 

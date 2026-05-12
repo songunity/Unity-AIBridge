@@ -14,10 +14,25 @@ namespace AIBridge.Editor
     public static class SkillInstaller
     {
         private const string SkillFileName = "SKILL.md";
-        private static readonly string[] AIDirectories = { ".agents", ".cursor", ".factory", ".claude", ".codex" };
+        private static readonly string[] AIDirectories = { ".agents", ".claude", ".cursor", ".factory", ".codex" };
+        private static readonly string[] DefaultCreateDirs = { ".agents", ".claude" };
         private static string SkillSourceFile => Path.Combine(AIBridge.PackageRoot, "Skill~", SkillFileName);
-        private static string AgentSkillDir(string agentName) => Path.Combine(AIBridge.ProjectRoot, agentName, "skills", "aibridge");
-        private static string AgentSkillFilePath(string agentName) => Path.Combine(AgentSkillDir(agentName), SkillFileName);
+        private static string AgentSkillDir(string root, string agentName) => Path.Combine(root, agentName, "skills", "aibridge");
+        private static string AgentSkillFilePath(string root, string agentName) => Path.Combine(AgentSkillDir(root, agentName), SkillFileName);
+
+        private static string GetInstallRoot()
+        {
+            var parent = Directory.GetParent(AIBridge.ProjectRoot)?.FullName;
+            if (parent != null)
+            {
+                foreach (var dirName in AIDirectories)
+                {
+                    if (Directory.Exists(Path.Combine(parent, dirName)))
+                        return parent;
+                }
+            }
+            return AIBridge.ProjectRoot;
+        }
 
         /// <summary>
         /// Install skill to AI assistant directories
@@ -29,33 +44,37 @@ namespace AIBridge.Editor
                 throw new FileNotFoundException($"Source SKILL.md not found at: {SkillSourceFile}");
             }
 
+            var root = GetInstallRoot();
             bool foundAnyDir = false;
 
             foreach (var dirName in AIDirectories)
             {
-                if (!Directory.Exists(Path.Combine(AIBridge.ProjectRoot, dirName))) continue;
+                if (!Directory.Exists(Path.Combine(root, dirName))) continue;
                 foundAnyDir = true;
-                
-                var targetDir = AgentSkillDir(dirName);
+
+                var targetDir = AgentSkillDir(root, dirName);
                 if (!Directory.Exists(targetDir))
                 {
                     Directory.CreateDirectory(targetDir);
                 }
 
-                File.Copy(SkillSourceFile, AgentSkillFilePath(dirName), true);
+                File.Copy(SkillSourceFile, AgentSkillFilePath(root, dirName), true);
                 Debug.Log($"[AIBridge] Skill file copied to {targetDir}");
             }
 
             if (!foundAnyDir)
             {
-                var targetDir = AgentSkillDir(AIDirectories[0]);
-                if (!Directory.Exists(targetDir))
+                foreach (var dirName in DefaultCreateDirs)
                 {
-                    Directory.CreateDirectory(targetDir);
-                }
+                    var targetDir = AgentSkillDir(root, dirName);
+                    if (!Directory.Exists(targetDir))
+                    {
+                        Directory.CreateDirectory(targetDir);
+                    }
 
-                File.Copy(SkillSourceFile, AgentSkillFilePath(AIDirectories[0]), true);
-                Debug.Log($"[AIBridge] No AI directories found, created {AIDirectories[0]} and copied skill file: {targetDir}");
+                    File.Copy(SkillSourceFile, AgentSkillFilePath(root, dirName), true);
+                    Debug.Log($"[AIBridge] Created {dirName} and copied skill file: {targetDir}");
+                }
             }
         }
         
@@ -70,16 +89,23 @@ namespace AIBridge.Editor
             }
 
             bool foundAny = false;
+            var searchRoots = new[] { AIBridge.ProjectRoot };
+            var parent = Directory.GetParent(AIBridge.ProjectRoot)?.FullName;
+            if (parent != null)
+                searchRoots = new[] { AIBridge.ProjectRoot, parent };
 
-            foreach (var dirName in AIDirectories)
+            foreach (var root in searchRoots)
             {
-                var targetSkillPath = AgentSkillFilePath(dirName);
-                
-                if (!File.Exists(targetSkillPath)) continue;
-                
-                File.Copy(SkillSourceFile, targetSkillPath, true);
-                Debug.Log($"[AIBridge] Skill file updated in: {AgentSkillDir(dirName)}");
-                foundAny = true;
+                foreach (var dirName in AIDirectories)
+                {
+                    var targetSkillPath = AgentSkillFilePath(root, dirName);
+
+                    if (!File.Exists(targetSkillPath)) continue;
+
+                    File.Copy(SkillSourceFile, targetSkillPath, true);
+                    Debug.Log($"[AIBridge] Skill file updated in: {AgentSkillDir(root, dirName)}");
+                    foundAny = true;
+                }
             }
 
             if (!foundAny)

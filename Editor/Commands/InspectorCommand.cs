@@ -301,6 +301,7 @@ namespace AIBridge.Editor
             }
 
             Dictionary<string, object> valueDict;
+            string parseError = null;
             try
             {
                 var jObj = JObject.Parse(values);
@@ -310,7 +311,13 @@ namespace AIBridge.Editor
             }
             catch (Exception ex)
             {
-                yield return CommandResult.Failure($"Failed to parse 'values' JSON: {ex.Message}");
+                valueDict = null;
+                parseError = ex.Message;
+            }
+
+            if (parseError != null)
+            {
+                yield return CommandResult.Failure($"Failed to parse 'values' JSON: {parseError}");
                 yield break;
             }
 

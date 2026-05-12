@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
+using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 using Component = UnityEngine.Component;
@@ -55,7 +56,8 @@ namespace AIBridge.Editor
             [Description("GameObject 的层级路径")] string path = null,
             [Description("GameObject 的实例 ID")] int instanceId = 0,
             [Description("组件类型名称")] string componentName = null,
-            [Description("组件索引（替代 componentName）")] int componentIndex = -1)
+            [Description("组件索引（替代 componentName）")] int componentIndex = -1,
+            [Description("是否展开子属性")] bool includeChildren = false)
         {
             var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
             if (go == null)
@@ -77,7 +79,7 @@ namespace AIBridge.Editor
             var enterChildren = true;
             while (iterator.NextVisible(enterChildren))
             {
-                enterChildren = false;
+                enterChildren = includeChildren;
                 properties.Add(new PropInfo
                 {
                     name = iterator.name,
@@ -96,6 +98,113 @@ namespace AIBridge.Editor
                 gameObjectName = go.name,
                 componentName = component.GetType().Name,
                 properties
+            });
+        }
+
+        [AIBridge("获取组件的单个序列化属性值",
+            "AIBridgeCLI InspectorCommand_GetProperty --path \"Player\" --componentName \"Rigidbody\" --propertyName \"mass\"")]
+        public static IEnumerator GetProperty(
+            [Description("GameObject 的层级路径")] string path = null,
+            [Description("GameObject 的实例 ID")] int instanceId = 0,
+            [Description("组件类型名称")] string componentName = null,
+            [Description("组件索引（替代 componentName）")] int componentIndex = -1,
+            [Description("序列化属性名称")] string propertyName = null)
+        {
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
+            if (go == null)
+            {
+                yield return CommandResult.Failure("GameObject not found");
+                yield break;
+            }
+            if (string.IsNullOrEmpty(propertyName))
+            {
+                yield return CommandResult.Failure("Missing 'propertyName' parameter");
+                yield break;
+            }
+
+            var component = FindComponent(go, componentName, componentIndex);
+            if (component == null)
+            {
+                yield return CommandResult.Failure("Component not found");
+                yield break;
+            }
+
+            var so = new SerializedObject(component);
+            var prop = so.FindProperty(propertyName);
+            if (prop == null)
+            {
+                yield return CommandResult.Failure($"Property not found: {propertyName}");
+                yield break;
+            }
+
+            yield return CommandResult.Success(new
+            {
+                gameObjectName = go.name,
+                componentName = component.GetType().Name,
+                propertyName,
+                propertyType = prop.propertyType.ToString(),
+                value = GetPropertyValue(prop),
+                editable = prop.editable
+            });
+        }
+
+        [AIBridge("按关键字搜索组件的序列化属性",
+            "AIBridgeCLI InspectorCommand_FindProperty --path \"Player\" --componentName \"Rigidbody\" --keyword \"mass\"")]
+        public static IEnumerator FindProperty(
+            [Description("GameObject 的层级路径")] string path = null,
+            [Description("GameObject 的实例 ID")] int instanceId = 0,
+            [Description("组件类型名称")] string componentName = null,
+            [Description("组件索引（替代 componentName）")] int componentIndex = -1,
+            [Description("搜索关键字")] string keyword = null)
+        {
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
+            if (go == null)
+            {
+                yield return CommandResult.Failure("GameObject not found");
+                yield break;
+            }
+            if (string.IsNullOrEmpty(keyword))
+            {
+                yield return CommandResult.Failure("Missing 'keyword' parameter");
+                yield break;
+            }
+
+            var component = FindComponent(go, componentName, componentIndex);
+            if (component == null)
+            {
+                yield return CommandResult.Failure("Component not found");
+                yield break;
+            }
+
+            var matches = new List<PropInfo>();
+            var so = new SerializedObject(component);
+            var iterator = so.GetIterator();
+            while (iterator.NextVisible(true))
+            {
+                if (iterator.propertyPath.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) < 0
+                    && iterator.name.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) < 0
+                    && iterator.displayName.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+
+                matches.Add(new PropInfo
+                {
+                    name = iterator.propertyPath,
+                    displayName = iterator.displayName,
+                    propertyType = iterator.propertyType.ToString(),
+                    value = GetPropertyValue(iterator),
+                    editable = iterator.editable,
+                    hasChildren = iterator.hasChildren,
+                    depth = iterator.depth
+                });
+            }
+
+            yield return CommandResult.Success(new
+            {
+                gameObjectName = go.name,
+                componentName = component.GetType().Name,
+                keyword,
+                count = matches.Count,
+                matches
             });
         }
 
@@ -150,6 +259,89 @@ namespace AIBridge.Editor
                 componentName = component.GetType().Name,
                 propertyName,
                 newValue = GetPropertyValue(prop)
+            });
+        }
+
+        [AIBridge("批量设置组件上的多个序列化属性",
+            "AIBridgeCLI InspectorCommand_SetProperties --path \"Player\" --componentName \"Transform\" --json \"{\\\"values\\\":{\\\"m_LocalPosition.x\\\":1,\\\"m_LocalPosition.y\\\":2}}\"")]
+        public static IEnumerator SetProperties(
+            [Description("GameObject 的层级路径")] string path = null,
+            [Description("GameObject 的实例 ID")] int instanceId = 0,
+            [Description("组件类型名称")] string componentName = null,
+            [Description("组件索引（替代 componentName）")] int componentIndex = -1,
+            [Description("属性名到值的映射 JSON 字符串")] string values = null)
+        {
+            var go = GameObjectHelper.GetTargetGameObject(path, instanceId);
+            if (go == null)
+            {
+                yield return CommandResult.Failure("GameObject not found");
+                yield break;
+            }
+            if (string.IsNullOrEmpty(values))
+            {
+                yield return CommandResult.Failure("Missing 'values' parameter");
+                yield break;
+            }
+
+            var component = FindComponent(go, componentName, componentIndex);
+            if (component == null)
+            {
+                yield return CommandResult.Failure("Component not found");
+                yield break;
+            }
+
+            Dictionary<string, object> valueDict;
+            try
+            {
+                var jObj = JObject.Parse(values);
+                valueDict = new Dictionary<string, object>();
+                foreach (var pair in jObj)
+                {
+                    valueDict[pair.Key] = pair.Value.Type == JTokenType.Null ? null : ((JValue)pair.Value).Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                yield return CommandResult.Failure($"Failed to parse 'values' JSON: {ex.Message}");
+                yield break;
+            }
+
+            var so = new SerializedObject(component);
+            so.Update();
+            UnityEditor.Undo.RecordObject(component, "Set Properties");
+
+            var changes = new List<object>();
+            foreach (var pair in valueDict)
+            {
+                var prop = so.FindProperty(pair.Key);
+                if (prop == null)
+                {
+                    yield return CommandResult.Failure($"Property not found: {pair.Key}");
+                    yield break;
+                }
+                if (!prop.editable)
+                {
+                    yield return CommandResult.Failure($"Property is not editable: {pair.Key}");
+                    yield break;
+                }
+
+                var oldValue = GetPropertyValue(prop);
+                if (!SetPropertyValue(prop, pair.Value))
+                {
+                    yield return CommandResult.Failure($"Failed to set property '{pair.Key}' of type: {prop.propertyType}");
+                    yield break;
+                }
+                changes.Add(new { propertyName = pair.Key, oldValue, newValue = GetPropertyValue(prop) });
+            }
+
+            so.ApplyModifiedProperties();
+
+            yield return CommandResult.Success(new
+            {
+                gameObjectName = go.name,
+                componentName = component.GetType().Name,
+                changed = changes.Count > 0,
+                changes
             });
         }
 

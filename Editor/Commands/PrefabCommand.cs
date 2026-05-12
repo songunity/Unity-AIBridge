@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel;
 using UnityEditor;
 using UnityEngine;
@@ -133,6 +134,105 @@ namespace AIBridge.Editor
                 prefabType = PrefabUtility.GetPrefabAssetType(target).ToString(),
                 prefabStatus = PrefabUtility.GetPrefabInstanceStatus(target).ToString()
             });
+        }
+
+        [AIBridge("获取预制体层级结构树",
+            "AIBridgeCLI PrefabCommand_GetHierarchy --prefabPath \"Assets/Prefabs/Player.prefab\"")]
+        public static IEnumerator GetHierarchy(
+            [Description("预制体的资源路径")] string prefabPath = null,
+            [Description("最大遍历深度")] int depth = 5,
+            [Description("是否包含未激活的子对象")] bool includeInactive = true,
+            [Description("是否包含组件类型名")] bool includeComponents = true)
+        {
+            if (string.IsNullOrEmpty(prefabPath))
+            {
+                yield return CommandResult.Failure("Missing 'prefabPath' parameter");
+                yield break;
+            }
+
+            var prefabRoot = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefabRoot == null)
+            {
+                yield return CommandResult.Failure($"Prefab not found at path: {prefabPath}");
+                yield break;
+            }
+
+            depth = Mathf.Max(0, depth);
+            var hierarchy = new List<PrefabTreeNode>();
+            var truncated = false;
+
+            if (includeInactive || prefabRoot.activeSelf)
+            {
+                hierarchy.Add(BuildTreeNode(prefabRoot, prefabRoot.name, depth, includeInactive, includeComponents, ref truncated));
+            }
+
+            yield return CommandResult.Success(new
+            {
+                prefabPath,
+                prefabName = prefabRoot.name,
+                depth,
+                includeInactive,
+                includeComponents,
+                truncated,
+                hierarchy
+            });
+        }
+
+        private static PrefabTreeNode BuildTreeNode(GameObject go, string path, int remainingDepth,
+            bool includeInactive, bool includeComponents, ref bool truncated)
+        {
+            var node = new PrefabTreeNode
+            {
+                name = go.name,
+                path = path,
+                active = go.activeSelf,
+                childCount = go.transform.childCount,
+                components = new List<string>(),
+                children = new List<PrefabTreeNode>()
+            };
+
+            if (includeComponents)
+            {
+                foreach (var component in go.GetComponents<Component>())
+                {
+                    if (component != null)
+                        node.components.Add(component.GetType().Name);
+                }
+            }
+
+            if (remainingDepth <= 0)
+            {
+                if (go.transform.childCount > 0)
+                    truncated = true;
+                return node;
+            }
+
+            foreach (Transform child in go.transform)
+            {
+                if (!includeInactive && !child.gameObject.activeSelf)
+                    continue;
+
+                node.children.Add(BuildTreeNode(
+                    child.gameObject,
+                    path + "/" + child.gameObject.name,
+                    remainingDepth - 1,
+                    includeInactive,
+                    includeComponents,
+                    ref truncated));
+            }
+
+            return node;
+        }
+
+        [System.Serializable]
+        private class PrefabTreeNode
+        {
+            public string name;
+            public string path;
+            public bool active;
+            public List<string> components;
+            public int childCount;
+            public List<PrefabTreeNode> children;
         }
 
         [AIBridge("将预制体实例的覆盖应用回预制体资源",

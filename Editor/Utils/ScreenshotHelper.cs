@@ -248,8 +248,8 @@ namespace AIBridge.Editor
 
         /// <summary>
         /// Capture a single frame for streaming GIF recording.
-        /// Uses Game View's render texture instead of CaptureScreenshotAsTexture
-        /// to avoid frame timing issues and resolution mismatch.
+        /// Uses Camera.main.Render() to a temporary RT for reliable capture
+        /// regardless of Game View state or window size.
         /// </summary>
         public static FrameCaptureResult CaptureFrame(float scale = 1f)
         {
@@ -260,30 +260,34 @@ namespace AIBridge.Editor
 
             try
             {
-                var gameView = GetGameView();
-                if (gameView == null)
+                var cam = Camera.main;
+                if (cam == null)
                 {
-                    return new FrameCaptureResult { Success = false, Error = "Cannot find Game View window." };
+                    return new FrameCaptureResult { Success = false, Error = "No Camera.main found in scene." };
                 }
 
-                // Get the render texture from Game View via reflection
-                var renderTexture = GetGameViewRenderTexture(gameView);
-                if (renderTexture == null)
-                {
-                    return new FrameCaptureResult { Success = false, Error = "Cannot access Game View render texture." };
-                }
+                int srcWidth = cam.pixelWidth;
+                int srcHeight = cam.pixelHeight;
 
-                int width = renderTexture.width;
-                int height = renderTexture.height;
+                // Render camera to temporary RT
+                var rt = RenderTexture.GetTemporary(srcWidth, srcHeight, 24);
+                var prevTarget = cam.targetTexture;
+                cam.targetTexture = rt;
+                cam.Render();
+                cam.targetTexture = prevTarget;
+
+                int width = srcWidth;
+                int height = srcHeight;
 
                 if (scale < 1f)
                 {
                     scale = Mathf.Clamp(scale, 0.25f, 1f);
-                    int scaledWidth = Mathf.Max(1, (int)(width * scale));
-                    int scaledHeight = Mathf.Max(1, (int)(height * scale));
+                    int scaledWidth = Mathf.Max(1, (int)(srcWidth * scale));
+                    int scaledHeight = Mathf.Max(1, (int)(srcHeight * scale));
 
                     var scaledRt = RenderTexture.GetTemporary(scaledWidth, scaledHeight);
-                    Graphics.Blit(renderTexture, scaledRt);
+                    Graphics.Blit(rt, scaledRt);
+                    RenderTexture.ReleaseTemporary(rt);
 
                     var texture2D = new Texture2D(scaledWidth, scaledHeight, TextureFormat.RGBA32, false);
                     RenderTexture.active = scaledRt;
@@ -308,10 +312,11 @@ namespace AIBridge.Editor
                 else
                 {
                     var texture2D = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                    RenderTexture.active = renderTexture;
+                    RenderTexture.active = rt;
                     texture2D.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                     texture2D.Apply();
                     RenderTexture.active = null;
+                    RenderTexture.ReleaseTemporary(rt);
 
                     var pixels = texture2D.GetRawTextureData();
                     int rowSize = width * 4;
@@ -333,38 +338,6 @@ namespace AIBridge.Editor
             {
                 return new FrameCaptureResult { Success = false, Error = $"Failed to capture frame: {ex.Message}" };
             }
-        }
-
-        /// <summary>
-        /// Get the render texture from Game View window.
-        /// </summary>
-        private static RenderTexture GetGameViewRenderTexture(EditorWindow gameView)
-        {
-            // Try "targetTexture" property on the Game View
-            var targetTextureProp = gameView.GetType().GetProperty("targetTexture",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (targetTextureProp != null)
-            {
-                var rt = targetTextureProp.GetValue(gameView) as RenderTexture;
-                if (rt != null) return rt;
-            }
-
-            // Try "m_TargetTexture" field
-            var field = gameView.GetType().GetField("m_TargetTexture",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            if (field != null)
-            {
-                var rt = field.GetValue(gameView) as RenderTexture;
-                if (rt != null) return rt;
-            }
-
-            // Fallback: use Camera.main's targetTexture or active render texture
-            if (Camera.main != null && Camera.main.targetTexture != null)
-            {
-                return Camera.main.targetTexture;
-            }
-
-            return null;
         }
 
         /// <summary>

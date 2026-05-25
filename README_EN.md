@@ -79,7 +79,7 @@ Menu path: `Tools > AIBridge`
 
 1. Open Unity Package Manager (Window > Package Manager)
 2. Click "+" > "Add package from git URL"
-3. Enter: `https://github.com/wang-er-s/AIBridge.git`
+3. Enter: `https://github.com/songunity/Unity-AIBridge.git`
 
 ### Manual Installation
 
@@ -89,8 +89,8 @@ Menu path: `Tools > AIBridge`
 ## Requirements
 
 - Unity 2021.3 or later
-- .NET 6.0 Runtime (for CLI tool)
-- Newtonsoft.Json (com.unity.nuget.newtonsoft-json)
+
+> **No external dependencies**: The CLI is compiled with Native AOT as a standalone executable — no .NET Runtime required. JSON serialization uses a bundled Newtonsoft.Json, which won't conflict with any DLLs in your project.
 
 ## Quick Start
 

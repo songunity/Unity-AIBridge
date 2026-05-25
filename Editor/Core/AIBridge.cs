@@ -73,9 +73,9 @@ namespace AIBridge.Editor
             // Get the exchange directory
             BridgeDirectory = GetExchangeDirectory();
             var cliName = Application.platform == RuntimePlatform.WindowsEditor ? "AIBridgeCLI.exe" : "AIBridgeCLI";
-            BridgeCLI = Path.Combine(BridgeDirectory, "CLI", cliName);
+            BridgeCLI = Path.Combine(BridgeDirectory, "cli", cliName);
 
-            // Copy CLI to AIBridgeCache if needed
+            // Copy CLI to .aibridge if needed
             CopyCLIIfNeeded();
 
             // Initialize components
@@ -158,8 +158,8 @@ namespace AIBridge.Editor
         /// </summary>
         private static string GetExchangeDirectory()
         {
-            // Use AIBridgeCache in Unity project root for better compatibility with git/UPM installation
-            return Path.Combine(ProjectRoot, "AIBridgeCache");
+            // Use .aibridge in Unity project root for better compatibility with git/UPM installation
+            return Path.Combine(ProjectRoot, ".aibridge");
         }
 
         /// <summary>
@@ -184,13 +184,13 @@ namespace AIBridge.Editor
         }
 
         /// <summary>
-        /// Copy CLI executables to AIBridgeCache if needed
+        /// Copy CLI executables to .aibridge if needed
         /// </summary>
         private static void CopyCLIIfNeeded()
         {
             try
             {
-                // Ensure .gitignore exists in AIBridgeCache
+                // Ensure .gitignore exists in .aibridge
                 if (!Directory.Exists(BridgeDirectory))
                 {
                     Directory.CreateDirectory(BridgeDirectory);
@@ -206,8 +206,8 @@ namespace AIBridge.Editor
                 // Source: {PackageRoot}/Tools~/CLI/{platform}/
                 var sourcePath = Path.Combine(PackageRoot, "Tools~", "CLI", platformFolder);
 
-                // Target: AIBridgeCache/CLI/
-                var targetPath = Path.Combine(BridgeDirectory, "CLI");
+                // Target: .aibridge/cli/
+                var targetPath = Path.Combine(BridgeDirectory, "cli");
 
                 if (!Directory.Exists(sourcePath))
                 {

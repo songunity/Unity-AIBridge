@@ -7,7 +7,7 @@ using UnityEngine;
 
 public static class CodeExecuteCommand
 {
-    [AIBridge("执行C#代码片段或脚本文件，支持编辑器或运行时。如果脚本内容过多更建议写入文件来运行，脚本文件放到AIBridgeCache/code中", 
+    [AIBridge("执行C#代码片段或脚本文件，支持编辑器或运行时。如果脚本内容过多更建议写入文件来运行，脚本文件放到.aibridge/code中",
         example:@"
 Windows CMD 必须使用单引号包裹代码：
 AIBridgeCLI CodeExecuteCommand_Execute --code 'using UnityEngine; Debug.Log(""Hello"");' --raw

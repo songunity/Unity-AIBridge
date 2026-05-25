@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Threading;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -38,6 +40,18 @@ namespace AIBridge.Editor
         // Async readback state
         private static bool _waitingForReadback;
         private static int _pendingFrameDelay;
+
+        // Background encoding
+        private static ConcurrentQueue<FrameData> _encodeQueue;
+        private static Thread _encodeThread;
+        private static volatile bool _encodingDone;
+        private static volatile string _encodeError;
+
+        private struct FrameData
+        {
+            public byte[] Pixels;
+            public int FrameDelay;
+        }
 
         public static void StartRecording(
             int frameCount,
@@ -85,6 +99,10 @@ namespace AIBridge.Editor
 
             _outputStream = null;
             _encoder = null;
+            _encodeQueue = new ConcurrentQueue<FrameData>();
+            _encodingDone = false;
+            _encodeError = null;
+            _encodeThread = null;
 
             IsRecording = true;
             EditorApplication.update += OnUpdate;
@@ -100,13 +118,19 @@ namespace AIBridge.Editor
         {
             if (!IsRecording) return;
 
+            // Check for encoding errors from background thread
+            if (_encodeError != null)
+            {
+                FinishRecording(_encodeError);
+                return;
+            }
+
             if (_stopRequested || !EditorApplication.isPlaying)
             {
                 FinishRecording(_stopRequested ? "Recording stopped by user." : "Play mode ended.");
                 return;
             }
 
-            // Still waiting for previous async readback
             if (_waitingForReadback) return;
 
             double currentTime = EditorApplication.timeSinceStartup;
@@ -124,7 +148,6 @@ namespace AIBridge.Editor
             _pendingFrameDelay = Mathf.Max(1, Mathf.RoundToInt((float)(actualInterval * 100)));
             _lastCaptureTime = currentTime;
 
-            // Get Game View RT and request async readback
             var sourceRt = ScreenshotHelper.GetScaledRenderTexture(_scale);
             if (sourceRt == null)
             {
@@ -162,47 +185,81 @@ namespace AIBridge.Editor
                 Unity.Collections.NativeArray<byte>.Copy(data, srcOffset, pixels, dstOffset, rowSize);
             }
 
-            if (_encoder == null)
+            if (_frameWidth == 0)
             {
                 _frameWidth = width;
                 _frameHeight = height;
-                try
-                {
-                    _outputStream = new FileStream(_outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
-                    _encoder = new GifEncoder(_outputStream, _frameWidth, _frameHeight, _fps, _colorCount);
-                    _encoder.Initialize(pixels);
-                }
-                catch (Exception ex)
-                {
-                    FinishRecording($"Failed to create encoder: {ex.Message}");
-                    return;
-                }
+                StartEncodeThread();
             }
 
             if (width != _frameWidth || height != _frameHeight) return;
 
-            try
-            {
-                _encoder.AddFrame(pixels, _pendingFrameDelay);
-                _capturedFrames++;
-                _onProgress?.Invoke(_capturedFrames, _targetFrameCount);
+            _encodeQueue.Enqueue(new FrameData { Pixels = pixels, FrameDelay = _pendingFrameDelay });
+            _capturedFrames++;
+            _onProgress?.Invoke(_capturedFrames, _targetFrameCount);
 
-                if (_capturedFrames % 5 == 0)
-                {
-                    EditorUtility.DisplayProgressBar("Recording GIF",
-                        $"Frame {_capturedFrames}/{_targetFrameCount}",
-                        (float)_capturedFrames / _targetFrameCount);
-                }
-            }
-            catch (Exception ex)
+            if (_capturedFrames % 5 == 0)
             {
-                FinishRecording($"Failed to encode frame: {ex.Message}");
-                return;
+                EditorUtility.DisplayProgressBar("Recording GIF",
+                    $"Frame {_capturedFrames}/{_targetFrameCount}",
+                    (float)_capturedFrames / _targetFrameCount);
             }
 
             if (_capturedFrames >= _targetFrameCount)
             {
                 FinishRecording(null);
+            }
+        }
+
+        private static void StartEncodeThread()
+        {
+            _encodeThread = new Thread(EncodeThreadLoop)
+            {
+                IsBackground = true,
+                Name = "AIBridge-GifEncoder"
+            };
+            _encodeThread.Start();
+        }
+
+        private static void EncodeThreadLoop()
+        {
+            try
+            {
+                _outputStream = new FileStream(_outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+                _encoder = new GifEncoder(_outputStream, _frameWidth, _frameHeight, _fps, _colorCount);
+
+                bool initialized = false;
+
+                while (!_encodingDone || !_encodeQueue.IsEmpty)
+                {
+                    if (_encodeQueue.TryDequeue(out var frame))
+                    {
+                        if (!initialized)
+                        {
+                            _encoder.Initialize(frame.Pixels);
+                            initialized = true;
+                        }
+                        _encoder.AddFrame(frame.Pixels, frame.FrameDelay);
+                    }
+                    else
+                    {
+                        Thread.Sleep(1);
+                    }
+                }
+
+                _encoder.Dispose();
+                _outputStream.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _encodeError = $"Encoding failed: {ex.Message}";
+                try { _encoder?.Dispose(); } catch { }
+                try { _outputStream?.Dispose(); } catch { }
+            }
+            finally
+            {
+                _encoder = null;
+                _outputStream = null;
             }
         }
 
@@ -214,22 +271,21 @@ namespace AIBridge.Editor
             EditorUtility.ClearProgressBar();
             ScreenshotHelper.ReleaseCachedResources();
 
-            bool success = string.IsNullOrEmpty(error) && _capturedFrames > 0;
+            // Signal encode thread to finish and wait
+            _encodingDone = true;
+            if (_encodeThread != null && _encodeThread.IsAlive)
+            {
+                _encodeThread.Join(5000);
+            }
+            _encodeThread = null;
 
-            try
+            // Check for encoding error
+            if (_encodeError != null && string.IsNullOrEmpty(error))
             {
-                _encoder?.Dispose();
-                _outputStream?.Dispose();
+                error = _encodeError;
             }
-            catch (Exception ex)
-            {
-                if (success) { error = $"Failed to finalize GIF: {ex.Message}"; success = false; }
-            }
-            finally
-            {
-                _encoder = null;
-                _outputStream = null;
-            }
+
+            bool success = string.IsNullOrEmpty(error) && _capturedFrames > 0;
 
             if (!success)
             {
@@ -269,6 +325,7 @@ namespace AIBridge.Editor
             _onProgress = null;
             _outputPath = null;
             _outputFilename = null;
+            _encodeQueue = null;
         }
     }
 }

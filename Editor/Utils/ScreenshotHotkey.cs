@@ -15,24 +15,11 @@ namespace AIBridge.Editor
                 return;
             }
 
-            var result = ScreenshotHelper.CaptureFrame(1f);
-            if (!result.Success)
-            {
-                Debug.LogWarning($"[AIBridge] Screenshot failed: {result.Error}");
-                return;
-            }
-
             ScreenshotHelper.EnsureScreenshotsDirectory();
             var filename = $"game_{System.DateTime.Now:yyyyMMdd_HHmmss}_{System.Guid.NewGuid().ToString("N").Substring(0, 8)}.png";
             var fullPath = System.IO.Path.Combine(ScreenshotHelper.ScreenshotsDir, filename);
 
-            var tex = new Texture2D(result.Width, result.Height, TextureFormat.RGBA32, false);
-            tex.LoadRawTextureData(result.Pixels);
-            tex.Apply();
-            var pngData = tex.EncodeToPNG();
-            Object.DestroyImmediate(tex);
-
-            System.IO.File.WriteAllBytes(fullPath, pngData);
+            ScreenCapture.CaptureScreenshot(fullPath);
             Debug.Log($"[AIBridge] Screenshot saved: {fullPath}");
         }
 

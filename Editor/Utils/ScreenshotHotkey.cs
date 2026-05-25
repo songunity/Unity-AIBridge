@@ -1,12 +1,11 @@
 using UnityEditor;
-using UnityEditor.ShortcutManagement;
 using UnityEngine;
 
 namespace AIBridge.Editor
 {
     public static class ScreenshotHotkey
     {
-        [Shortcut("AIBridge/Screenshot Game View", KeyCode.F12)]
+        [MenuItem("Tools/AIBridge/Screenshot Game View _F12", false, 100)]
         private static void CaptureScreenshot()
         {
             if (!EditorApplication.isPlaying)
@@ -23,19 +22,25 @@ namespace AIBridge.Editor
             Debug.Log($"[AIBridge] Screenshot saved: {fullPath}");
         }
 
-        [Shortcut("AIBridge/Record GIF", KeyCode.F11)]
+        [MenuItem("Tools/AIBridge/Screenshot Game View _F12", true)]
+        private static bool ValidateCaptureScreenshot()
+        {
+            return EditorApplication.isPlaying;
+        }
+
+        [MenuItem("Tools/AIBridge/Record GIF _F11", false, 101)]
         private static void RecordGif()
         {
-            if (!EditorApplication.isPlaying)
-            {
-                Debug.LogWarning("[AIBridge] Record GIF requires Play mode.");
-                return;
-            }
-
             if (GifRecorder.IsRecording)
             {
                 Debug.Log("[AIBridge] Stopping GIF recording...");
                 GifRecorder.StopRecording();
+                return;
+            }
+
+            if (!EditorApplication.isPlaying)
+            {
+                Debug.LogWarning("[AIBridge] Record GIF requires Play mode.");
                 return;
             }
 
@@ -60,6 +65,12 @@ namespace AIBridge.Editor
                 {
                     EditorUtility.DisplayProgressBar("Recording GIF", $"Frame {current}/{total}", (float)current / total);
                 });
+        }
+
+        [MenuItem("Tools/AIBridge/Record GIF _F11", true)]
+        private static bool ValidateRecordGif()
+        {
+            return EditorApplication.isPlaying || GifRecorder.IsRecording;
         }
     }
 }

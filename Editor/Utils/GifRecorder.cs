@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace AIBridge.Editor
 {
@@ -33,6 +34,10 @@ namespace AIBridge.Editor
         private static string _outputPath;
         private static string _outputFilename;
         private static DateTime _recordingStartTime;
+
+        // Async readback state
+        private static bool _waitingForReadback;
+        private static int _pendingFrameDelay;
 
         public static void StartRecording(
             int frameCount,
@@ -70,6 +75,7 @@ namespace AIBridge.Editor
             _capturedFrames = 0;
             _stopRequested = false;
             _captureStarted = false;
+            _waitingForReadback = false;
             _captureStartTime = EditorApplication.timeSinceStartup + _startDelay;
             _recordingStartTime = DateTime.Now;
 
@@ -100,6 +106,9 @@ namespace AIBridge.Editor
                 return;
             }
 
+            // Still waiting for previous async readback
+            if (_waitingForReadback) return;
+
             double currentTime = EditorApplication.timeSinceStartup;
 
             if (!_captureStarted)
@@ -112,25 +121,56 @@ namespace AIBridge.Editor
             double actualInterval = currentTime - _lastCaptureTime;
             if (actualInterval < _frameInterval) return;
 
-            int actualFrameDelay = Mathf.Max(1, Mathf.RoundToInt((float)(actualInterval * 100)));
+            _pendingFrameDelay = Mathf.Max(1, Mathf.RoundToInt((float)(actualInterval * 100)));
             _lastCaptureTime = currentTime;
 
-            var result = ScreenshotHelper.CaptureFrame(_scale);
-            if (!result.Success)
+            // Get Game View RT and request async readback
+            var sourceRt = ScreenshotHelper.GetScaledRenderTexture(_scale);
+            if (sourceRt == null)
             {
-                FinishRecording(result.Error);
+                FinishRecording("Cannot access Game View render texture.");
                 return;
+            }
+
+            _waitingForReadback = true;
+            AsyncGPUReadback.Request(sourceRt, 0, TextureFormat.RGBA32, OnReadbackComplete);
+        }
+
+        private static void OnReadbackComplete(AsyncGPUReadbackRequest request)
+        {
+            _waitingForReadback = false;
+
+            if (!IsRecording) return;
+
+            if (request.hasError)
+            {
+                FinishRecording("AsyncGPUReadback failed.");
+                return;
+            }
+
+            var data = request.GetData<byte>();
+            int width = request.width;
+            int height = request.height;
+
+            // Flip vertically
+            int rowSize = width * 4;
+            var pixels = new byte[data.Length];
+            for (int y = 0; y < height; y++)
+            {
+                int srcOffset = y * rowSize;
+                int dstOffset = (height - 1 - y) * rowSize;
+                Unity.Collections.NativeArray<byte>.Copy(data, srcOffset, pixels, dstOffset, rowSize);
             }
 
             if (_encoder == null)
             {
-                _frameWidth = result.Width;
-                _frameHeight = result.Height;
+                _frameWidth = width;
+                _frameHeight = height;
                 try
                 {
                     _outputStream = new FileStream(_outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
                     _encoder = new GifEncoder(_outputStream, _frameWidth, _frameHeight, _fps, _colorCount);
-                    _encoder.Initialize(result.Pixels);
+                    _encoder.Initialize(pixels);
                 }
                 catch (Exception ex)
                 {
@@ -139,11 +179,11 @@ namespace AIBridge.Editor
                 }
             }
 
-            if (result.Width != _frameWidth || result.Height != _frameHeight) return;
+            if (width != _frameWidth || height != _frameHeight) return;
 
             try
             {
-                _encoder.AddFrame(result.Pixels, actualFrameDelay);
+                _encoder.AddFrame(pixels, _pendingFrameDelay);
                 _capturedFrames++;
                 _onProgress?.Invoke(_capturedFrames, _targetFrameCount);
 
@@ -170,6 +210,7 @@ namespace AIBridge.Editor
         {
             EditorApplication.update -= OnUpdate;
             IsRecording = false;
+            _waitingForReadback = false;
             EditorUtility.ClearProgressBar();
             ScreenshotHelper.ReleaseCachedResources();
 

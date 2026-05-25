@@ -18,12 +18,14 @@ namespace AIBridge.Editor
 
         private readonly string _commandsDir;
         private readonly string _resultsDir;
+        private readonly string _codeDir;
         private readonly CommandQueue _queue;
 
         public CommandWatcher(string baseDir)
         {
             _commandsDir = Path.Combine(baseDir, "commands");
             _resultsDir = Path.Combine(baseDir, "results");
+            _codeDir = Path.Combine(baseDir, "code");
             _queue = new CommandQueue();
 
             EnsureDirectoriesExist();
@@ -244,6 +246,11 @@ namespace AIBridge.Editor
                 if (!Directory.Exists(_resultsDir))
                 {
                     Directory.CreateDirectory(_resultsDir);
+                }
+
+                if (!Directory.Exists(_codeDir))
+                {
+                    Directory.CreateDirectory(_codeDir);
                 }
             }
             catch (Exception ex)

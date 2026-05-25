@@ -214,3 +214,8 @@
 .secondary-button:hover {
     background-color: rgb(80, 80, 80);
 }
+
+.agent-toggles-row {
+    flex-direction: row;
+    margin-top: 10px;
+}

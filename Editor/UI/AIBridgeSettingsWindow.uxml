@@ -20,11 +20,22 @@
             <!-- General Tab -->
             <ui:VisualElement name="content-general" class="tab-content">
                 <ui:VisualElement class="section">
+                    <ui:Label text="Quick Skill Install" class="section-title" />
+                    <ui:Label text="Generate SKILL.md and copy to selected agent directories" class="help-text" />
+                    <ui:Button name="one-click-skill" text="Generate &amp; Install Skill" class="action-button" />
+                    <ui:VisualElement class="agent-toggles-row">
+                        <ui:Toggle name="agent-codex" label="Codex (.agents)" class="setting-item" />
+                        <ui:Toggle name="agent-claude" label="Claude Code (.claude)" class="setting-item" />
+                        <ui:Toggle name="agent-kiro" label="Kiro (.kiro)" class="setting-item" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement class="section">
                     <ui:Label text="Bridge Settings" class="section-title" />
                     <ui:Toggle name="bridge-enabled" label="Enable AI Bridge" class="setting-item" />
                     <ui:Toggle name="debug-logging" label="Debug Logging" class="setting-item" />
                 </ui:VisualElement>
-                
+
                 <ui:VisualElement class="section">
                     <ui:Label text="Directory Information" class="section-title" />
                     <ui:VisualElement class="info-row">
@@ -42,15 +53,6 @@
                         <ui:TextField name="cli-path" readonly="true" class="info-value" />
                         <ui:Button name="open-cli-dir" text="Open" class="small-button" />
                     </ui:VisualElement>
-                </ui:VisualElement>
-
-                <ui:VisualElement class="section">
-                    <ui:Label text="Quick Skill Install" class="section-title" />
-                    <ui:Label text="Generate SKILL.md and copy to selected agent directories" class="help-text" />
-                    <ui:Toggle name="agent-codex" label="Codex (.agents)" class="setting-item" />
-                    <ui:Toggle name="agent-claude" label="Claude Code (.claude)" class="setting-item" />
-                    <ui:Toggle name="agent-kiro" label="Kiro (.kiro)" class="setting-item" />
-                    <ui:Button name="one-click-skill" text="Generate &amp; Install Skill" class="action-button" />
                 </ui:VisualElement>
             </ui:VisualElement>
 

@@ -1,7 +1,7 @@
 {
   "name": "com.sh.aibridge",
   "displayName": "AI Bridge",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "unity": "2021.3",
   "description": "File-based communication framework between AI Code assistants and Unity Editor. Provides stable, extensible command execution without MCP dependencies.",
   "author": {

@@ -8,14 +8,54 @@ File-based communication framework between AI Code assistants and Unity Editor.
 
 - **GameObject** - Create, destroy, find, rename, duplicate, toggle active
 - **Transform** - Position, rotation, scale, parent hierarchy, look at
-- **Component/Inspector** - Get/set properties, add/remove components
-- **Scene** - Load, save, get hierarchy, create new
-- **Prefab** - Instantiate, save, unpack, apply overrides
-- **Asset** - Search, import, refresh, find by filter
-- **Editor Control** - Compile, undo/redo, play mode, focus window
-- **Screenshot & GIF** - Capture game view, record animated GIFs
-- **Batch Commands** - Execute multiple commands efficiently
-- **Code Execution** - Execute C# code dynamically in Editor or Runtime
+- **Component/Inspector** - Get/set properties, add/remove components, search properties
+- **Scene** - Load, get hierarchy tree, get active scene
+- **Prefab** - Instantiate, save, unpack, apply overrides, get hierarchy
+- **Asset** - Search, refresh, find by filter
+- **Editor Control** - Play/pause/stop, compile, get state, log output
+- **Screenshot & GIF** - Capture game view (F12), record animated GIFs (F11), AsyncGPUReadback + background thread encoding
+- **Input Simulation** - Click, drag, long press GameObjects (runtime)
+- **Log Capture** - Get console logs, precise timestamp capture mode
+- **Code Execution** - Execute C# code snippets dynamically in Editor or Runtime
+- **Batch Commands** - Execute multiple commands in a single call
+- **Menu Items** - Execute any Unity editor menu item
+- **Test Runner** - Integrated Unity TestRunner API
+
+## Architecture
+
+```
+┌─────────────────┐         ┌──────────────────────────────────────┐
+│   AI Assistant  │         │           Unity Editor               │
+│  (Claude, etc.) │         │                                      │
+└────────┬────────┘         │  ┌─────────────┐  ┌──────────────┐  │
+         │                  │  │ CommandWatch │  │ CommandRegistry│ │
+         │ invoke           │  │  (polling)   │  │  ([AIBridge]) │  │
+         ▼                  │  └──────┬──────┘  └──────────────┘  │
+┌─────────────────┐         │         │                            │
+│   AIBridgeCLI   │         │         ▼                            │
+│  (CLI tool)     │         │  ┌─────────────┐                    │
+└────────┬────────┘         │  │ Execute cmd  │                    │
+         │                  │  │ & write result│                   │
+         │ write JSON       │  └─────────────┘                    │
+         ▼                  └──────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                    .aibridge/ (exchange directory)                │
+│  ├── commands/    ← CLI writes command JSON                      │
+│  ├── results/     ← Unity writes result JSON                     │
+│  ├── code/        ← C# script files                              │
+│  ├── screenshots/ ← Screenshots and GIFs                         │
+│  └── cli/         ← CLI executables                              │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+## Shortcuts
+
+| Key | Function | Condition |
+|-----|----------|-----------|
+| F12 | Screenshot Game View | Play mode |
+| F11 | Start/Stop GIF recording | Play mode |
+
+Menu path: `Tools > AIBridge`
 
 ## Why AI Bridge? (vs Unity MCP)
 

@@ -43,8 +43,17 @@
                         <ui:Button name="open-cli-dir" text="Open" class="small-button" />
                     </ui:VisualElement>
                 </ui:VisualElement>
+
+                <ui:VisualElement class="section">
+                    <ui:Label text="Quick Skill Install" class="section-title" />
+                    <ui:Label text="Generate SKILL.md and copy to selected agent directories" class="help-text" />
+                    <ui:Toggle name="agent-codex" label="Codex (.agents)" class="setting-item" />
+                    <ui:Toggle name="agent-claude" label="Claude Code (.claude)" class="setting-item" />
+                    <ui:Toggle name="agent-kiro" label="Kiro (.kiro)" class="setting-item" />
+                    <ui:Button name="one-click-skill" text="Generate &amp; Install Skill" class="action-button" />
+                </ui:VisualElement>
             </ui:VisualElement>
-            
+
             <!-- GIF Recorder Tab -->
             <ui:VisualElement name="content-gif" class="tab-content" style="display: none;">
                 <ui:VisualElement class="section">

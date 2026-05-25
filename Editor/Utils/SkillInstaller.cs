@@ -14,7 +14,7 @@ namespace AIBridge.Editor
     public static class SkillInstaller
     {
         private const string SkillFileName = "SKILL.md";
-        private static readonly string[] AIDirectories = { ".agents", ".claude", ".cursor", ".factory", ".codex" };
+        private static readonly string[] AIDirectories = { ".agents", ".claude", ".cursor", ".factory", ".codex", ".kiro" };
         private static readonly string[] DefaultCreateDirs = { ".agents", ".claude" };
         private static string SkillSourceFile => Path.Combine(AIBridge.PackageRoot, "Skill~", SkillFileName);
         private static string AgentSkillDir(string root, string agentName) => Path.Combine(root, agentName, "skills", "aibridge");
@@ -32,6 +32,31 @@ namespace AIBridge.Editor
                 }
             }
             return AIBridge.ProjectRoot;
+        }
+
+        /// <summary>
+        /// Install skill to specific agent directories only.
+        /// </summary>
+        public static void CopyToAgent(string[] targetDirNames)
+        {
+            if (!File.Exists(SkillSourceFile))
+            {
+                throw new FileNotFoundException($"Source SKILL.md not found at: {SkillSourceFile}");
+            }
+
+            var root = GetInstallRoot();
+
+            foreach (var dirName in targetDirNames)
+            {
+                var targetDir = AgentSkillDir(root, dirName);
+                if (!Directory.Exists(targetDir))
+                {
+                    Directory.CreateDirectory(targetDir);
+                }
+
+                File.Copy(SkillSourceFile, AgentSkillFilePath(root, dirName), true);
+                Debug.Log($"[AIBridge] Skill file copied to {targetDir}");
+            }
         }
 
         /// <summary>

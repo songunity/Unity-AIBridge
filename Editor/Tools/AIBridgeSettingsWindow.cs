@@ -24,6 +24,15 @@ namespace AIBridge.Editor
         private Toggle _autoScan;
         private TextField _scanAssemblies;
 
+        // Agent selection
+        private Toggle _agentCodex;
+        private Toggle _agentClaude;
+        private Toggle _agentKiro;
+
+        private const string PrefKeyAgentCodex = "AIBridge.SkillAgent.Codex";
+        private const string PrefKeyAgentClaude = "AIBridge.SkillAgent.Claude";
+        private const string PrefKeyAgentKiro = "AIBridge.SkillAgent.Kiro";
+
         [MenuItem("Window/AIBridge")]
         private static void OpenWindow()
         {
@@ -92,6 +101,11 @@ namespace AIBridge.Editor
             // Commands tab
             _autoScan = rootVisualElement.Q<Toggle>("auto-scan");
             _scanAssemblies = rootVisualElement.Q<TextField>("scan-assemblies");
+
+            // Agent selection toggles
+            _agentCodex = rootVisualElement.Q<Toggle>("agent-codex");
+            _agentClaude = rootVisualElement.Q<Toggle>("agent-claude");
+            _agentKiro = rootVisualElement.Q<Toggle>("agent-kiro");
             
             // Setup auto-scan toggle listener
             _autoScan.RegisterValueChangedCallback(evt => UpdateRefreshButtonVisibility());
@@ -122,7 +136,11 @@ namespace AIBridge.Editor
             {
                 _autoScan.value = EditorPrefs.GetBool(CommandRegistry.PrefKeyAutoScan, false);
             }
-            
+
+            _agentCodex.value = EditorPrefs.GetBool(PrefKeyAgentCodex, true);
+            _agentClaude.value = EditorPrefs.GetBool(PrefKeyAgentClaude, true);
+            _agentKiro.value = EditorPrefs.GetBool(PrefKeyAgentKiro, true);
+
             UpdateRefreshButtonVisibility();
         }
 
@@ -188,6 +206,27 @@ namespace AIBridge.Editor
                 SkillInstaller.OverrideSkill();
             };
             rootVisualElement.Q<Button>("install-skill-agent").clicked += SkillInstaller.CopyToAgent;
+
+            rootVisualElement.Q<Button>("one-click-skill").clicked += () =>
+            {
+                var targets = new System.Collections.Generic.List<string>();
+                if (_agentCodex.value) targets.Add(".agents");
+                if (_agentClaude.value) targets.Add(".claude");
+                if (_agentKiro.value) targets.Add(".kiro");
+
+                if (targets.Count == 0)
+                {
+                    EditorUtility.DisplayDialog("Warning", "Please select at least one agent.", "OK");
+                    return;
+                }
+
+                SkillInstaller.GenerateSkillFile();
+                SkillInstaller.CopyToAgent(targets.ToArray());
+
+                EditorUtility.DisplayDialog("Success",
+                    $"Skill generated and installed to: {string.Join(", ", targets)}",
+                    "OK");
+            };
             rootVisualElement.Q<Button>("clear-cache").clicked += ClearCache;
             rootVisualElement.Q<Button>("reset-settings").clicked += ResetSettings;
         }
@@ -209,6 +248,10 @@ namespace AIBridge.Editor
 
             EditorPrefs.SetBool(CommandRegistry.PrefKeyAutoScan, _autoScan.value);
             EditorPrefs.SetString(CommandRegistry.PrefKeyScanAssemblies, _scanAssemblies.value);
+
+            EditorPrefs.SetBool(PrefKeyAgentCodex, _agentCodex.value);
+            EditorPrefs.SetBool(PrefKeyAgentClaude, _agentClaude.value);
+            EditorPrefs.SetBool(PrefKeyAgentKiro, _agentKiro.value);
 
             if (_autoScan.value)
             {
@@ -247,11 +290,14 @@ namespace AIBridge.Editor
 
         private void ResetSettings()
         {
-            if (EditorUtility.DisplayDialog("Reset Settings", 
+            if (EditorUtility.DisplayDialog("Reset Settings",
                 "Are you sure you want to reset all settings to default?", "Yes", "No"))
             {
                 EditorPrefs.DeleteKey(CommandRegistry.PrefKeyAutoScan);
                 EditorPrefs.DeleteKey(CommandRegistry.PrefKeyScanAssemblies);
+                EditorPrefs.DeleteKey(PrefKeyAgentCodex);
+                EditorPrefs.DeleteKey(PrefKeyAgentClaude);
+                EditorPrefs.DeleteKey(PrefKeyAgentKiro);
                 
                 LoadSettings();
                 Debug.Log("[AIBridge] Settings reset to default.");

@@ -70,7 +70,7 @@ AI 编码助手与 Unity Editor 之间的文件通信框架。
 
 1. 打开 Unity Package Manager（Window > Package Manager）
 2. 点击 "+" > "Add package from git URL"
-3. 输入：`https://github.com/wang-er-s/AIBridge.git`
+3. 输入：`https://github.com/songunity/Unity-AIBridge.git`
 
 ### 手动安装
 
@@ -80,8 +80,8 @@ AI 编码助手与 Unity Editor 之间的文件通信框架。
 ## 系统要求
 
 - Unity 2021.3 或更高版本
-- .NET 6.0 Runtime（用于 CLI 工具）
-- Newtonsoft.Json (com.unity.nuget.newtonsoft-json)
+
+> **无外部依赖**：CLI 使用 AOT（Native AOT）编译为独立可执行文件，不需要 .NET Runtime。JSON 序列化使用内置的 Newtonsoft.Json（随 CLI 打包），不会与项目中的 DLL 冲突。
 
 ## 快捷键
 

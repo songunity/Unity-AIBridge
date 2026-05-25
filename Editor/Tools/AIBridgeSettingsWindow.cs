@@ -270,11 +270,10 @@ namespace AIBridge.Editor
             var listView = rootVisualElement.Q<ScrollView>("command-list");
             listView.Clear();
 
-            var groups = entries.GroupBy(e => e.Method.DeclaringType.Name).OrderBy(g => g.Key);
+            var groups = entries.GroupBy(e => e.Method.DeclaringType.Assembly.GetName().Name).OrderBy(g => g.Key);
             foreach (var group in groups)
             {
-                var categoryName = group.Key.Replace("Command", "");
-                var categoryLabel = new Label(categoryName);
+                var categoryLabel = new Label(group.Key);
                 categoryLabel.AddToClassList("command-category");
                 listView.Add(categoryLabel);
 

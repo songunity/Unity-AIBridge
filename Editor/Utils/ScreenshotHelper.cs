@@ -66,6 +66,11 @@ namespace AIBridge.Editor
         private static int _cachedHeight;
         private static byte[] _cachedFlipBuffer;
 
+        // Cached reflection handles for Game View render texture
+        private static bool _reflectionInitialized;
+        private static System.Type _gameViewType;
+        private static FieldInfo _renderTextureField;
+
         // Cached GameView size (avoid reflection every frame)
         private static Vector2 _cachedGameViewSize;
         private static double _lastGameViewSizeCheck;
@@ -248,8 +253,8 @@ namespace AIBridge.Editor
 
         /// <summary>
         /// Capture a single frame for streaming GIF recording.
-        /// Uses Camera.main.Render() to a temporary RT for reliable capture
-        /// regardless of Game View state or window size.
+        /// Reads Game View's internal RenderTexture to capture full composited output
+        /// including Screen Space - Overlay Canvas.
         /// </summary>
         public static FrameCaptureResult CaptureFrame(float scale = 1f)
         {
@@ -260,74 +265,46 @@ namespace AIBridge.Editor
 
             try
             {
-                var cam = Camera.main;
-                if (cam == null)
+                var texture2D = CaptureGameViewTexture();
+                if (texture2D == null)
                 {
-                    return new FrameCaptureResult { Success = false, Error = "No Camera.main found in scene." };
+                    return new FrameCaptureResult { Success = false, Error = "Failed to capture Game view." };
                 }
 
-                int srcWidth = cam.pixelWidth;
-                int srcHeight = cam.pixelHeight;
-
-                // Render camera to temporary RT
-                var rt = RenderTexture.GetTemporary(srcWidth, srcHeight, 24);
-                var prevTarget = cam.targetTexture;
-                cam.targetTexture = rt;
-                cam.Render();
-                cam.targetTexture = prevTarget;
-
-                int width = srcWidth;
-                int height = srcHeight;
+                int width = texture2D.width;
+                int height = texture2D.height;
 
                 if (scale < 1f)
                 {
                     scale = Mathf.Clamp(scale, 0.25f, 1f);
-                    int scaledWidth = Mathf.Max(1, (int)(srcWidth * scale));
-                    int scaledHeight = Mathf.Max(1, (int)(srcHeight * scale));
+                    int scaledWidth = Mathf.Max(1, (int)(width * scale));
+                    int scaledHeight = Mathf.Max(1, (int)(height * scale));
 
-                    var scaledRt = RenderTexture.GetTemporary(scaledWidth, scaledHeight);
-                    Graphics.Blit(rt, scaledRt);
+                    var rt = RenderTexture.GetTemporary(scaledWidth, scaledHeight);
+                    Graphics.Blit(texture2D, rt);
+
+                    var scaledTexture = new Texture2D(scaledWidth, scaledHeight, TextureFormat.RGBA32, false);
+                    RenderTexture.active = rt;
+                    scaledTexture.ReadPixels(new Rect(0, 0, scaledWidth, scaledHeight), 0, 0);
+                    scaledTexture.Apply();
+                    RenderTexture.active = null;
                     RenderTexture.ReleaseTemporary(rt);
 
-                    var texture2D = new Texture2D(scaledWidth, scaledHeight, TextureFormat.RGBA32, false);
-                    RenderTexture.active = scaledRt;
-                    texture2D.ReadPixels(new Rect(0, 0, scaledWidth, scaledHeight), 0, 0);
-                    texture2D.Apply();
-                    RenderTexture.active = null;
-                    RenderTexture.ReleaseTemporary(scaledRt);
-
+                    UnityEngine.Object.DestroyImmediate(texture2D);
+                    texture2D = scaledTexture;
                     width = scaledWidth;
                     height = scaledHeight;
-
-                    var pixels = texture2D.GetRawTextureData();
-                    int rowSize = width * 4;
-                    EnsureFlipBuffer(width, height);
-                    for (int y = 0; y < height; y++)
-                    {
-                        Buffer.BlockCopy(pixels, y * rowSize, _cachedFlipBuffer, (height - 1 - y) * rowSize, rowSize);
-                    }
-
-                    UnityEngine.Object.DestroyImmediate(texture2D);
                 }
-                else
+
+                var pixels = texture2D.GetRawTextureData();
+                EnsureFlipBuffer(width, height);
+                int rowSize = width * 4;
+                for (int y = 0; y < height; y++)
                 {
-                    var texture2D = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                    RenderTexture.active = rt;
-                    texture2D.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-                    texture2D.Apply();
-                    RenderTexture.active = null;
-                    RenderTexture.ReleaseTemporary(rt);
-
-                    var pixels = texture2D.GetRawTextureData();
-                    int rowSize = width * 4;
-                    EnsureFlipBuffer(width, height);
-                    for (int y = 0; y < height; y++)
-                    {
-                        Buffer.BlockCopy(pixels, y * rowSize, _cachedFlipBuffer, (height - 1 - y) * rowSize, rowSize);
-                    }
-
-                    UnityEngine.Object.DestroyImmediate(texture2D);
+                    Buffer.BlockCopy(pixels, y * rowSize, _cachedFlipBuffer, (height - 1 - y) * rowSize, rowSize);
                 }
+
+                UnityEngine.Object.DestroyImmediate(texture2D);
 
                 var result = new byte[_cachedFlipBuffer.Length];
                 Buffer.BlockCopy(_cachedFlipBuffer, 0, result, 0, result.Length);
@@ -338,6 +315,90 @@ namespace AIBridge.Editor
             {
                 return new FrameCaptureResult { Success = false, Error = $"Failed to capture frame: {ex.Message}" };
             }
+        }
+
+        /// <summary>
+        /// Capture the Game View content by reading its internal RenderTexture directly.
+        /// Captures everything including Screen Space - Overlay Canvas.
+        /// Returns a new Texture2D that the caller must destroy.
+        /// </summary>
+        private static Texture2D CaptureGameViewTexture()
+        {
+            var rt = GetGameViewRenderTexture();
+            if (rt != null)
+            {
+                var flipped = RenderTexture.GetTemporary(rt.width, rt.height, 0, rt.graphicsFormat);
+                if (SystemInfo.graphicsUVStartsAtTop)
+                    Graphics.Blit(rt, flipped, new Vector2(1, -1), new Vector2(0, 1));
+                else
+                    Graphics.Blit(rt, flipped);
+
+                var texture2D = new Texture2D(flipped.width, flipped.height, TextureFormat.RGBA32, false);
+                var prev = RenderTexture.active;
+                RenderTexture.active = flipped;
+                texture2D.ReadPixels(new Rect(0, 0, flipped.width, flipped.height), 0, 0);
+                texture2D.Apply();
+                RenderTexture.active = prev;
+                RenderTexture.ReleaseTemporary(flipped);
+
+                return texture2D;
+            }
+
+            // Fallback: ScreenCapture (requires Game view to be focused)
+            return ScreenCapture.CaptureScreenshotAsTexture();
+        }
+
+        /// <summary>
+        /// Get the Game View's internal RenderTexture via reflection.
+        /// Searches GameView and its base class PlayModeView for the m_RenderTexture field.
+        /// </summary>
+        private static RenderTexture GetGameViewRenderTexture()
+        {
+            InitReflection();
+            if (_gameViewType == null) return null;
+
+            var gameView = GetGameViewWindow();
+            if (gameView == null) return null;
+
+            if (_renderTextureField != null)
+            {
+                return _renderTextureField.GetValue(gameView) as RenderTexture;
+            }
+
+            return null;
+        }
+
+        private static void InitReflection()
+        {
+            if (_reflectionInitialized) return;
+            _reflectionInitialized = true;
+
+            var editorAssembly = typeof(EditorWindow).Assembly;
+            _gameViewType = editorAssembly.GetType("UnityEditor.GameView");
+            if (_gameViewType == null) return;
+
+            const BindingFlags kInstance = BindingFlags.NonPublic | BindingFlags.Instance;
+
+            var type = _gameViewType;
+            while (type != null && type != typeof(object))
+            {
+                _renderTextureField = type.GetField("m_RenderTexture", kInstance);
+                if (_renderTextureField != null) break;
+                type = type.BaseType;
+            }
+        }
+
+        private static EditorWindow GetGameViewWindow()
+        {
+            if (_gameViewType == null) return null;
+
+            var allWindows = Resources.FindObjectsOfTypeAll(_gameViewType);
+            if (allWindows.Length > 0)
+            {
+                return allWindows[0] as EditorWindow;
+            }
+
+            return null;
         }
 
         /// <summary>

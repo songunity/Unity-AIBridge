@@ -248,6 +248,8 @@ namespace AIBridge.Editor
 
         /// <summary>
         /// Capture a single frame for streaming GIF recording.
+        /// Uses Game View's render texture instead of CaptureScreenshotAsTexture
+        /// to avoid frame timing issues and resolution mismatch.
         /// </summary>
         public static FrameCaptureResult CaptureFrame(float scale = 1f)
         {
@@ -258,14 +260,21 @@ namespace AIBridge.Editor
 
             try
             {
-                var texture2D = ScreenCapture.CaptureScreenshotAsTexture();
-                if (texture2D == null)
+                var gameView = GetGameView();
+                if (gameView == null)
                 {
-                    return new FrameCaptureResult { Success = false, Error = "Failed to capture Game view." };
+                    return new FrameCaptureResult { Success = false, Error = "Cannot find Game View window." };
                 }
 
-                int width = texture2D.width;
-                int height = texture2D.height;
+                // Get the render texture from Game View via reflection
+                var renderTexture = GetGameViewRenderTexture(gameView);
+                if (renderTexture == null)
+                {
+                    return new FrameCaptureResult { Success = false, Error = "Cannot access Game View render texture." };
+                }
+
+                int width = renderTexture.width;
+                int height = renderTexture.height;
 
                 if (scale < 1f)
                 {
@@ -273,31 +282,47 @@ namespace AIBridge.Editor
                     int scaledWidth = Mathf.Max(1, (int)(width * scale));
                     int scaledHeight = Mathf.Max(1, (int)(height * scale));
 
-                    var rt = RenderTexture.GetTemporary(scaledWidth, scaledHeight);
-                    Graphics.Blit(texture2D, rt);
+                    var scaledRt = RenderTexture.GetTemporary(scaledWidth, scaledHeight);
+                    Graphics.Blit(renderTexture, scaledRt);
 
-                    var scaledTexture = new Texture2D(scaledWidth, scaledHeight, TextureFormat.RGBA32, false);
-                    RenderTexture.active = rt;
-                    scaledTexture.ReadPixels(new Rect(0, 0, scaledWidth, scaledHeight), 0, 0);
-                    scaledTexture.Apply();
+                    var texture2D = new Texture2D(scaledWidth, scaledHeight, TextureFormat.RGBA32, false);
+                    RenderTexture.active = scaledRt;
+                    texture2D.ReadPixels(new Rect(0, 0, scaledWidth, scaledHeight), 0, 0);
+                    texture2D.Apply();
                     RenderTexture.active = null;
-                    RenderTexture.ReleaseTemporary(rt);
+                    RenderTexture.ReleaseTemporary(scaledRt);
 
-                    UnityEngine.Object.DestroyImmediate(texture2D);
-                    texture2D = scaledTexture;
                     width = scaledWidth;
                     height = scaledHeight;
-                }
 
-                var pixels = texture2D.GetRawTextureData();
-                int rowSize = width * 4;
-                EnsureFlipBuffer(width, height);
-                for (int y = 0; y < height; y++)
+                    var pixels = texture2D.GetRawTextureData();
+                    int rowSize = width * 4;
+                    EnsureFlipBuffer(width, height);
+                    for (int y = 0; y < height; y++)
+                    {
+                        Buffer.BlockCopy(pixels, y * rowSize, _cachedFlipBuffer, (height - 1 - y) * rowSize, rowSize);
+                    }
+
+                    UnityEngine.Object.DestroyImmediate(texture2D);
+                }
+                else
                 {
-                    Buffer.BlockCopy(pixels, y * rowSize, _cachedFlipBuffer, (height - 1 - y) * rowSize, rowSize);
-                }
+                    var texture2D = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                    RenderTexture.active = renderTexture;
+                    texture2D.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                    texture2D.Apply();
+                    RenderTexture.active = null;
 
-                UnityEngine.Object.DestroyImmediate(texture2D);
+                    var pixels = texture2D.GetRawTextureData();
+                    int rowSize = width * 4;
+                    EnsureFlipBuffer(width, height);
+                    for (int y = 0; y < height; y++)
+                    {
+                        Buffer.BlockCopy(pixels, y * rowSize, _cachedFlipBuffer, (height - 1 - y) * rowSize, rowSize);
+                    }
+
+                    UnityEngine.Object.DestroyImmediate(texture2D);
+                }
 
                 var result = new byte[_cachedFlipBuffer.Length];
                 Buffer.BlockCopy(_cachedFlipBuffer, 0, result, 0, result.Length);
@@ -308,6 +333,38 @@ namespace AIBridge.Editor
             {
                 return new FrameCaptureResult { Success = false, Error = $"Failed to capture frame: {ex.Message}" };
             }
+        }
+
+        /// <summary>
+        /// Get the render texture from Game View window.
+        /// </summary>
+        private static RenderTexture GetGameViewRenderTexture(EditorWindow gameView)
+        {
+            // Try "targetTexture" property on the Game View
+            var targetTextureProp = gameView.GetType().GetProperty("targetTexture",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (targetTextureProp != null)
+            {
+                var rt = targetTextureProp.GetValue(gameView) as RenderTexture;
+                if (rt != null) return rt;
+            }
+
+            // Try "m_TargetTexture" field
+            var field = gameView.GetType().GetField("m_TargetTexture",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            if (field != null)
+            {
+                var rt = field.GetValue(gameView) as RenderTexture;
+                if (rt != null) return rt;
+            }
+
+            // Fallback: use Camera.main's targetTexture or active render texture
+            if (Camera.main != null && Camera.main.targetTexture != null)
+            {
+                return Camera.main.targetTexture;
+            }
+
+            return null;
         }
 
         /// <summary>

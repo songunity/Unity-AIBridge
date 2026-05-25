@@ -38,7 +38,7 @@ For longer code, save to `.aibridge/code/` and use the `--file` parameter.
 - **Screenshot & GIF** - Capture game view (F12), record animated GIFs (F11), AsyncGPUReadback + background thread encoding
 - **Input Simulation** - Click, drag, long press GameObjects (runtime)
 - **Log Capture** - Get console logs, precise timestamp capture mode
-- **Code Execution** - Execute C# code snippets dynamically in Editor or Runtime
+- **Code Execution** - Execute C# code snippets dynamically in Editor or Runtime (even without built-in commands, any Unity API operation is possible via code)
 - **Batch Commands** - Execute multiple commands in a single call
 - **Menu Items** - Execute any Unity editor menu item
 - **Test Runner** - Integrated Unity TestRunner API

@@ -2,17 +2,14 @@ using UnityEditor;
 
 namespace AIBridge.Editor
 {
-    /// <summary>
-    /// Persistent settings for GIF recording.
-    /// </summary>
     public static class GifRecorderSettings
     {
         private const string KeyPrefix = "AIBridge_GifRecorder_";
 
-        public static int DefaultFrameCount
+        public static float DefaultDuration
         {
-            get => EditorPrefs.GetInt(KeyPrefix + "FrameCount", 50);
-            set => EditorPrefs.SetInt(KeyPrefix + "FrameCount", value);
+            get => EditorPrefs.GetFloat(KeyPrefix + "Duration", 2.5f);
+            set => EditorPrefs.SetFloat(KeyPrefix + "Duration", value);
         }
 
         public static int DefaultFps
@@ -39,9 +36,14 @@ namespace AIBridge.Editor
             set => EditorPrefs.SetFloat(KeyPrefix + "StartDelay", value);
         }
 
+        public static int CalculateFrameCount()
+        {
+            return UnityEngine.Mathf.Max(1, UnityEngine.Mathf.RoundToInt(DefaultDuration * DefaultFps));
+        }
+
         public static void ResetToDefaults()
         {
-            DefaultFrameCount = 50;
+            DefaultDuration = 2.5f;
             DefaultFps = 20;
             DefaultScale = 0.5f;
             DefaultColorCount = 128;

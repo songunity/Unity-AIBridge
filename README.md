@@ -4,6 +4,28 @@
 
 AI 编码助手与 Unity Editor 之间的文件通信框架。
 
+## 核心亮点：动态执行 C# 代码
+
+AI Bridge 最强大的能力是让 AI 助手**直接在 Unity 中执行任意 C# 代码**——不需要创建脚本文件、不需要等待编译、不需要重启 Play 模式。
+
+```bash
+# AI 助手可以直接执行任何 Unity API
+AIBridgeCLI CodeExecuteCommand_Execute --code '
+using UnityEngine;
+var go = GameObject.Find("Player");
+go.GetComponent<Rigidbody>().mass = 5f;
+return go.transform.position;
+'
+```
+
+这意味着：
+- **无限扩展性** — 即使没有预置命令，AI 也能通过代码完成任何操作
+- **快速原型验证** — 无需创建 MonoBehaviour，直接执行逻辑片段
+- **运行时调试** — Play 模式下实时查询和修改游戏状态
+- **复杂操作** — 批量修改材质、生成程序化内容、调用项目自定义 API
+
+较长的代码可以保存到 `.aibridge/code/` 目录，通过 `--file` 参数执行。
+
 ## 功能特性
 
 - **GameObject** - 创建、删除、查找、重命名、复制、切换激活状态

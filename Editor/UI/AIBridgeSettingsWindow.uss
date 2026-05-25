@@ -219,3 +219,14 @@
     flex-direction: row;
     margin-top: 10px;
 }
+
+.agent-toggles-row .setting-item {
+    flex-direction: row-reverse;
+    margin-right: 20px;
+    margin-bottom: 0;
+}
+
+.agent-toggles-row .setting-item Label {
+    min-width: 0;
+    margin-left: 4px;
+}

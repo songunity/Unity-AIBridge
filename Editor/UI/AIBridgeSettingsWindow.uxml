@@ -86,6 +86,7 @@
                 <ui:VisualElement class="section">
                     <ui:Label text="Registered Commands" class="section-title" />
                     <ui:Label name="command-count" text="Loading..." class="info-text" />
+                    <ui:ScrollView name="command-list" class="command-list" />
                     <ui:Button name="refresh-commands" text="Refresh Command List" class="action-button" />
                 </ui:VisualElement>
             </ui:VisualElement>

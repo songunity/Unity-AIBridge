@@ -230,3 +230,29 @@
     min-width: 0;
     margin-left: 4px;
 }
+
+.command-list {
+    max-height: 300px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    background-color: rgb(42, 42, 42);
+    border-radius: 3px;
+    border-width: 1px;
+    border-color: rgb(30, 30, 30);
+    padding: 8px;
+}
+
+.command-category {
+    font-size: 12px;
+    -unity-font-style: bold;
+    color: rgb(58, 150, 221);
+    margin-top: 8px;
+    margin-bottom: 4px;
+}
+
+.command-item {
+    font-size: 11px;
+    color: rgb(180, 180, 180);
+    margin-left: 10px;
+    margin-bottom: 2px;
+}

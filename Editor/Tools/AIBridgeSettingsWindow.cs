@@ -263,9 +263,29 @@ namespace AIBridge.Editor
 
         private void UpdateCommandCount()
         {
-            var count = CommandRegistry.GetAll().Count();
+            var entries = CommandRegistry.GetAll().ToList();
             var label = rootVisualElement.Q<Label>("command-count");
-            label.text = $"Total registered commands: {count}";
+            label.text = $"Total registered commands: {entries.Count}";
+
+            var listView = rootVisualElement.Q<ScrollView>("command-list");
+            listView.Clear();
+
+            var groups = entries.GroupBy(e => e.Method.DeclaringType.Name).OrderBy(g => g.Key);
+            foreach (var group in groups)
+            {
+                var categoryName = group.Key.Replace("Command", "");
+                var categoryLabel = new Label(categoryName);
+                categoryLabel.AddToClassList("command-category");
+                listView.Add(categoryLabel);
+
+                foreach (var entry in group.OrderBy(e => e.Name))
+                {
+                    var desc = entry.Description ?? "";
+                    var itemLabel = new Label($"{entry.Name}  —  {desc}");
+                    itemLabel.AddToClassList("command-item");
+                    listView.Add(itemLabel);
+                }
+            }
         }
 
         private void UpdateRefreshButtonVisibility()

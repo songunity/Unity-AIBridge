@@ -318,6 +318,62 @@ namespace AIBridge.Editor
         }
 
         /// <summary>
+        /// Get a scaled RenderTexture from Game View for async readback.
+        /// The returned RT is temporary and should NOT be released by the caller
+        /// (it is cached and reused across frames).
+        /// </summary>
+        public static RenderTexture GetScaledRenderTexture(float scale = 1f)
+        {
+            var sourceRt = GetGameViewRenderTexture();
+            if (sourceRt == null) return null;
+
+            int width = sourceRt.width;
+            int height = sourceRt.height;
+
+            // Apply flip
+            if (_cachedRenderTexture == null || _cachedRenderTexture.width != width || _cachedRenderTexture.height != height)
+            {
+                if (_cachedRenderTexture != null)
+                    RenderTexture.ReleaseTemporary(_cachedRenderTexture);
+                _cachedRenderTexture = null;
+            }
+
+            RenderTexture flipped;
+            if (SystemInfo.graphicsUVStartsAtTop)
+            {
+                flipped = RenderTexture.GetTemporary(width, height, 0, sourceRt.graphicsFormat);
+                Graphics.Blit(sourceRt, flipped, new Vector2(1, -1), new Vector2(0, 1));
+            }
+            else
+            {
+                flipped = RenderTexture.GetTemporary(width, height, 0, sourceRt.graphicsFormat);
+                Graphics.Blit(sourceRt, flipped);
+            }
+
+            if (scale >= 1f)
+            {
+                // Return flipped directly (caller uses it for async readback, released next frame)
+                if (_cachedRenderTexture != null && _cachedRenderTexture != flipped)
+                    RenderTexture.ReleaseTemporary(_cachedRenderTexture);
+                _cachedRenderTexture = flipped;
+                return flipped;
+            }
+
+            scale = Mathf.Clamp(scale, 0.25f, 1f);
+            int scaledWidth = Mathf.Max(1, (int)(width * scale));
+            int scaledHeight = Mathf.Max(1, (int)(height * scale));
+
+            var scaledRt = RenderTexture.GetTemporary(scaledWidth, scaledHeight);
+            Graphics.Blit(flipped, scaledRt);
+            RenderTexture.ReleaseTemporary(flipped);
+
+            if (_cachedRenderTexture != null && _cachedRenderTexture != scaledRt)
+                RenderTexture.ReleaseTemporary(_cachedRenderTexture);
+            _cachedRenderTexture = scaledRt;
+            return scaledRt;
+        }
+
+        /// <summary>
         /// Capture the Game View content by reading its internal RenderTexture directly.
         /// Captures everything including Screen Space - Overlay Canvas.
         /// Returns a new Texture2D that the caller must destroy.
@@ -409,6 +465,11 @@ namespace AIBridge.Editor
             _cachedFlipBuffer = null;
             _cachedWidth = 0;
             _cachedHeight = 0;
+            if (_cachedRenderTexture != null)
+            {
+                RenderTexture.ReleaseTemporary(_cachedRenderTexture);
+                _cachedRenderTexture = null;
+            }
         }
 
         private static void EnsureFlipBuffer(int width, int height)

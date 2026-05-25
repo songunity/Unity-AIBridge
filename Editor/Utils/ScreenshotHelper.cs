@@ -23,6 +23,35 @@ namespace AIBridge.Editor
     }
 
     /// <summary>
+    /// Frame capture result for GIF recording.
+    /// </summary>
+    public class FrameCaptureResult
+    {
+        public bool Success;
+        public byte[] Pixels;
+        public int Width;
+        public int Height;
+        public string Error;
+    }
+
+    /// <summary>
+    /// GIF recording result data.
+    /// </summary>
+    public class GifRecordResult
+    {
+        public bool Success;
+        public string GifPath;
+        public string Filename;
+        public int FrameCount;
+        public int Width;
+        public int Height;
+        public float Duration;
+        public long FileSize;
+        public string Timestamp;
+        public string Error;
+    }
+
+    /// <summary>
     /// Shared screenshot capture logic for CLI and hotkey.
     /// Optimized with cached resources for GIF recording.
     /// </summary>
@@ -216,6 +245,89 @@ namespace AIBridge.Editor
                 Directory.CreateDirectory(ScreenshotsDir);
             }
         }
+
+        /// <summary>
+        /// Capture a single frame for streaming GIF recording.
+        /// </summary>
+        public static FrameCaptureResult CaptureFrame(float scale = 1f)
+        {
+            if (!EditorApplication.isPlaying)
+            {
+                return new FrameCaptureResult { Success = false, Error = "Frame capture requires Play mode." };
+            }
+
+            try
+            {
+                var texture2D = ScreenCapture.CaptureScreenshotAsTexture();
+                if (texture2D == null)
+                {
+                    return new FrameCaptureResult { Success = false, Error = "Failed to capture Game view." };
+                }
+
+                int width = texture2D.width;
+                int height = texture2D.height;
+
+                if (scale < 1f)
+                {
+                    scale = Mathf.Clamp(scale, 0.25f, 1f);
+                    int scaledWidth = Mathf.Max(1, (int)(width * scale));
+                    int scaledHeight = Mathf.Max(1, (int)(height * scale));
+
+                    var rt = RenderTexture.GetTemporary(scaledWidth, scaledHeight);
+                    Graphics.Blit(texture2D, rt);
+
+                    var scaledTexture = new Texture2D(scaledWidth, scaledHeight, TextureFormat.RGBA32, false);
+                    RenderTexture.active = rt;
+                    scaledTexture.ReadPixels(new Rect(0, 0, scaledWidth, scaledHeight), 0, 0);
+                    scaledTexture.Apply();
+                    RenderTexture.active = null;
+                    RenderTexture.ReleaseTemporary(rt);
+
+                    UnityEngine.Object.DestroyImmediate(texture2D);
+                    texture2D = scaledTexture;
+                    width = scaledWidth;
+                    height = scaledHeight;
+                }
+
+                var pixels = texture2D.GetRawTextureData();
+                int rowSize = width * 4;
+                EnsureFlipBuffer(width, height);
+                for (int y = 0; y < height; y++)
+                {
+                    Buffer.BlockCopy(pixels, y * rowSize, _cachedFlipBuffer, (height - 1 - y) * rowSize, rowSize);
+                }
+
+                UnityEngine.Object.DestroyImmediate(texture2D);
+
+                var result = new byte[_cachedFlipBuffer.Length];
+                Buffer.BlockCopy(_cachedFlipBuffer, 0, result, 0, result.Length);
+
+                return new FrameCaptureResult { Success = true, Pixels = result, Width = width, Height = height };
+            }
+            catch (Exception ex)
+            {
+                return new FrameCaptureResult { Success = false, Error = $"Failed to capture frame: {ex.Message}" };
+            }
+        }
+
+        /// <summary>
+        /// Release cached resources after recording ends.
+        /// </summary>
+        public static void ReleaseCachedResources()
+        {
+            _cachedFlipBuffer = null;
+            _cachedWidth = 0;
+            _cachedHeight = 0;
+        }
+
+        private static void EnsureFlipBuffer(int width, int height)
+        {
+            if (_cachedWidth == width && _cachedHeight == height && _cachedFlipBuffer != null)
+                return;
+            _cachedFlipBuffer = new byte[width * height * 4];
+            _cachedWidth = width;
+            _cachedHeight = height;
+        }
         
         public static GifRecordResult ConvertFramesToGif(List<string> framePaths, float scale, int fps, int colorCount)
         {
@@ -363,18 +475,5 @@ namespace AIBridge.Editor
             return result;
         }
 
-        public class GifRecordResult
-        {
-            public bool Success;
-            public string GifPath;
-            public string Filename;
-            public int FrameCount;
-            public int Width;
-            public int Height;
-            public float Duration;
-            public long FileSize;
-            public string Timestamp;
-            public string Error;
-        }
     }
 }

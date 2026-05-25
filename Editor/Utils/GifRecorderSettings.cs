@@ -33,6 +33,12 @@ namespace AIBridge.Editor
             set => EditorPrefs.SetInt(KeyPrefix + "ColorCount", value);
         }
 
+        public static float DefaultStartDelay
+        {
+            get => EditorPrefs.GetFloat(KeyPrefix + "StartDelay", 0.1f);
+            set => EditorPrefs.SetFloat(KeyPrefix + "StartDelay", value);
+        }
+
         public static void ResetToDefaults()
         {
             DefaultFrameCount = 50;

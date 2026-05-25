@@ -1,11 +1,12 @@
 using UnityEditor;
+using UnityEditor.ShortcutManagement;
 using UnityEngine;
 
 namespace AIBridge.Editor
 {
     public static class ScreenshotHotkey
     {
-        [MenuItem("AIBridge/Screenshot Game View _F12")]
+        [Shortcut("AIBridge/Screenshot Game View", KeyCode.F12)]
         private static void CaptureScreenshot()
         {
             if (!EditorApplication.isPlaying)
@@ -35,15 +36,15 @@ namespace AIBridge.Editor
             Debug.Log($"[AIBridge] Screenshot saved: {fullPath}");
         }
 
-        [MenuItem("AIBridge/Screenshot Game View _F12", true)]
-        private static bool ValidateCaptureScreenshot()
-        {
-            return EditorApplication.isPlaying;
-        }
-
-        [MenuItem("AIBridge/Record GIF _F11")]
+        [Shortcut("AIBridge/Record GIF", KeyCode.F11)]
         private static void RecordGif()
         {
+            if (!EditorApplication.isPlaying)
+            {
+                Debug.LogWarning("[AIBridge] Record GIF requires Play mode.");
+                return;
+            }
+
             if (GifRecorder.IsRecording)
             {
                 Debug.Log("[AIBridge] Stopping GIF recording...");
@@ -72,12 +73,6 @@ namespace AIBridge.Editor
                 {
                     EditorUtility.DisplayProgressBar("Recording GIF", $"Frame {current}/{total}", (float)current / total);
                 });
-        }
-
-        [MenuItem("AIBridge/Record GIF _F11", true)]
-        private static bool ValidateRecordGif()
-        {
-            return EditorApplication.isPlaying;
         }
     }
 }

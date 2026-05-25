@@ -62,6 +62,30 @@ namespace AIBridge.Editor
                     };
                 case SerializedPropertyType.Quaternion:
                     return new { x = prop.quaternionValue.x, y = prop.quaternionValue.y, z = prop.quaternionValue.z, w = prop.quaternionValue.w };
+                case SerializedPropertyType.AnimationCurve:
+                    var curve = prop.animationCurveValue;
+                    var curveKeys = new object[curve.length];
+                    for (var i = 0; i < curve.length; i++)
+                    {
+                        var k = curve[i];
+                        curveKeys[i] = new { time = k.time, value = k.value, inTangent = k.inTangent, outTangent = k.outTangent, inWeight = k.inWeight, outWeight = k.outWeight, weightedMode = k.weightedMode.ToString() };
+                    }
+                    return new { keys = curveKeys, preWrapMode = curve.preWrapMode.ToString(), postWrapMode = curve.postWrapMode.ToString() };
+                case SerializedPropertyType.Gradient:
+                    var grad = prop.gradientValue;
+                    var colorKeys = new object[grad.colorKeys.Length];
+                    for (var i = 0; i < grad.colorKeys.Length; i++)
+                    {
+                        var ck = grad.colorKeys[i];
+                        colorKeys[i] = new { time = ck.time, color = new { r = ck.color.r, g = ck.color.g, b = ck.color.b, a = ck.color.a } };
+                    }
+                    var alphaKeys = new object[grad.alphaKeys.Length];
+                    for (var i = 0; i < grad.alphaKeys.Length; i++)
+                    {
+                        var ak = grad.alphaKeys[i];
+                        alphaKeys[i] = new { time = ak.time, alpha = ak.alpha };
+                    }
+                    return new { colorKeys, alphaKeys, mode = grad.mode.ToString() };
                 default: return prop.propertyType.ToString();
             }
         }
@@ -122,6 +146,14 @@ namespace AIBridge.Editor
                     case SerializedPropertyType.Quaternion:
                         if (!TryGetQuaternion(value, out var quat)) return false;
                         prop.quaternionValue = quat;
+                        return true;
+                    case SerializedPropertyType.AnimationCurve:
+                        if (!TryGetAnimationCurve(value, out var animCurve)) return false;
+                        prop.animationCurveValue = animCurve;
+                        return true;
+                    case SerializedPropertyType.Gradient:
+                        if (!TryGetGradient(value, out var gradient)) return false;
+                        prop.gradientValue = gradient;
                         return true;
                     default: return false;
                 }

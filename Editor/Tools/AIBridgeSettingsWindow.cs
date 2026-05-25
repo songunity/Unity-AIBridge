@@ -139,7 +139,7 @@ namespace AIBridge.Editor
 
             _agentCodex.value = EditorPrefs.GetBool(PrefKeyAgentCodex, true);
             _agentClaude.value = EditorPrefs.GetBool(PrefKeyAgentClaude, true);
-            _agentKiro.value = EditorPrefs.GetBool(PrefKeyAgentKiro, true);
+            _agentKiro.value = EditorPrefs.GetBool(PrefKeyAgentKiro, false);
 
             UpdateRefreshButtonVisibility();
         }

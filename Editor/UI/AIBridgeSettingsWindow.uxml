@@ -55,10 +55,10 @@
                 <ui:VisualElement class="section">
                     <ui:Label text="GIF Recording Settings" class="section-title" />
                     <ui:Label text="Uses streaming encoding: frames are encoded and written to disk immediately, minimizing memory usage." class="help-text" />
-                    <ui:SliderInt name="gif-frame-count" label="Frame Count" low-value="10" high-value="300" class="setting-item" />
-                    <ui:SliderInt name="gif-fps" label="FPS" low-value="5" high-value="60" class="setting-item" />
-                    <ui:Slider name="gif-scale" label="Scale" low-value="0.1" high-value="1.0" class="setting-item" />
-                    <ui:SliderInt name="gif-color-count" label="Color Count" low-value="16" high-value="256" class="setting-item" />
+                    <ui:SliderInt name="gif-frame-count" label="Frame Count" low-value="10" high-value="300" show-input-field="true" class="setting-item" />
+                    <ui:SliderInt name="gif-fps" label="FPS" low-value="5" high-value="60" show-input-field="true" class="setting-item" />
+                    <ui:Slider name="gif-scale" label="Scale" low-value="0.1" high-value="1.0" show-input-field="true" class="setting-item" />
+                    <ui:SliderInt name="gif-color-count" label="Color Count" low-value="16" high-value="256" show-input-field="true" class="setting-item" />
                 </ui:VisualElement>
             </ui:VisualElement>
             

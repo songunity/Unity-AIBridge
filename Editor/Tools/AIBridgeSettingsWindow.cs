@@ -17,7 +17,7 @@ namespace AIBridge.Editor
         // Settings fields
         private Toggle _bridgeEnabled;
         private Toggle _debugLogging;
-        private SliderInt _gifFrameCount;
+        private Slider _gifDuration;
         private SliderInt _gifFps;
         private Slider _gifScale;
         private SliderInt _gifColorCount;
@@ -84,7 +84,7 @@ namespace AIBridge.Editor
             cliPath.value = AIBridge.BridgeCLI;
 
             // GIF tab
-            _gifFrameCount = rootVisualElement.Q<SliderInt>("gif-frame-count");
+            _gifDuration = rootVisualElement.Q<Slider>("gif-duration");
             _gifFps = rootVisualElement.Q<SliderInt>("gif-fps");
             _gifScale = rootVisualElement.Q<Slider>("gif-scale");
             _gifColorCount = rootVisualElement.Q<SliderInt>("gif-color-count");
@@ -104,7 +104,7 @@ namespace AIBridge.Editor
             _bridgeEnabled.value = AIBridge.Enabled;
             _debugLogging.value = AIBridgeLogger.DebugEnabled;
 
-            _gifFrameCount.value = GifRecorderSettings.DefaultFrameCount;
+            _gifDuration.value = GifRecorderSettings.DefaultDuration;
             _gifFps.value = GifRecorderSettings.DefaultFps;
             _gifScale.value = GifRecorderSettings.DefaultScale;
             _gifColorCount.value = GifRecorderSettings.DefaultColorCount;
@@ -202,7 +202,7 @@ namespace AIBridge.Editor
             AIBridge.Enabled = _bridgeEnabled.value;
             AIBridgeLogger.DebugEnabled = _debugLogging.value;
 
-            GifRecorderSettings.DefaultFrameCount = _gifFrameCount.value;
+            GifRecorderSettings.DefaultDuration = _gifDuration.value;
             GifRecorderSettings.DefaultFps = _gifFps.value;
             GifRecorderSettings.DefaultScale = _gifScale.value;
             GifRecorderSettings.DefaultColorCount = _gifColorCount.value;

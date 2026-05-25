@@ -44,13 +44,13 @@ namespace AIBridge.Editor
                 return;
             }
 
-            int frameCount = GifRecorderSettings.DefaultFrameCount;
+            int frameCount = GifRecorderSettings.CalculateFrameCount();
             int fps = GifRecorderSettings.DefaultFps;
             float scale = GifRecorderSettings.DefaultScale;
             int colorCount = GifRecorderSettings.DefaultColorCount;
             float startDelay = GifRecorderSettings.DefaultStartDelay;
 
-            Debug.Log($"[AIBridge] Starting GIF recording: {frameCount} frames @ {fps} fps...");
+            Debug.Log($"[AIBridge] Starting GIF recording: {GifRecorderSettings.DefaultDuration}s ({frameCount} frames) @ {fps} fps...");
 
             GifRecorder.StartRecording(frameCount, fps, scale, colorCount, startDelay,
                 onComplete: result =>

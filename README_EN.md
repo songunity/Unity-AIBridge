@@ -4,6 +4,28 @@ English | [中文](./README.md)
 
 File-based communication framework between AI Code assistants and Unity Editor.
 
+## Core Highlight: Dynamic C# Code Execution
+
+The most powerful capability of AI Bridge is letting AI assistants **execute arbitrary C# code directly inside Unity** — no script files, no compilation wait, no Play mode restart.
+
+```bash
+# AI assistants can execute any Unity API directly
+AIBridgeCLI CodeExecuteCommand_Execute --code '
+using UnityEngine;
+var go = GameObject.Find("Player");
+go.GetComponent<Rigidbody>().mass = 5f;
+return go.transform.position;
+'
+```
+
+This means:
+- **Unlimited extensibility** — even without built-in commands, AI can accomplish anything via code
+- **Rapid prototyping** — execute logic snippets without creating MonoBehaviours
+- **Runtime debugging** — query and modify game state in real-time during Play mode
+- **Complex operations** — batch-modify materials, generate procedural content, call project-specific APIs
+
+For longer code, save to `.aibridge/code/` and use the `--file` parameter.
+
 ## Features
 
 - **GameObject** - Create, destroy, find, rename, duplicate, toggle active

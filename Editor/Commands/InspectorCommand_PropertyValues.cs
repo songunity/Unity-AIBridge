@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
@@ -72,7 +73,8 @@ namespace AIBridge.Editor
                     }
                     return new { keys = curveKeys, preWrapMode = curve.preWrapMode.ToString(), postWrapMode = curve.postWrapMode.ToString() };
                 case SerializedPropertyType.Gradient:
-                    var grad = prop.gradientValue;
+                    var grad = GetGradientValue(prop);
+                    if (grad == null) return "Gradient (unavailable)";
                     var colorKeys = new object[grad.colorKeys.Length];
                     for (var i = 0; i < grad.colorKeys.Length; i++)
                     {
@@ -153,8 +155,7 @@ namespace AIBridge.Editor
                         return true;
                     case SerializedPropertyType.Gradient:
                         if (!TryGetGradient(value, out var gradient)) return false;
-                        prop.gradientValue = gradient;
-                        return true;
+                        return SetGradientValue(prop, gradient);
                     default: return false;
                 }
             }
@@ -237,6 +238,22 @@ namespace AIBridge.Editor
                 if (type != null) return type;
             }
             return null;
+        }
+
+        private static Gradient GetGradientValue(SerializedProperty prop)
+        {
+            var pi = typeof(SerializedProperty).GetProperty("gradientValue",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            return pi?.GetValue(prop) as Gradient;
+        }
+
+        private static bool SetGradientValue(SerializedProperty prop, Gradient gradient)
+        {
+            var pi = typeof(SerializedProperty).GetProperty("gradientValue",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (pi == null) return false;
+            pi.SetValue(prop, gradient);
+            return true;
         }
 
         #endregion

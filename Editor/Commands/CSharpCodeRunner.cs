@@ -24,10 +24,24 @@ public sealed class CSharpCodeRunner
     {
         this.references = new List<MetadataReference>();
 
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(x => !x.IsDynamic && !string.IsNullOrEmpty(x.Location));
+        var allAssemblies = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(x => !x.IsDynamic && !string.IsNullOrEmpty(x.Location))
+            .ToList();
 
-        foreach (var assembly in assemblies)
+        var assemblyNames = new HashSet<string>(allAssemblies.Select(a => a.GetName().Name));
+
+        var filtered = allAssemblies.Where(x =>
+        {
+            var name = x.GetName().Name;
+            if (name.EndsWith("_AIBridge"))
+            {
+                var baseName = name.Substring(0, name.Length - "_AIBridge".Length);
+                return !assemblyNames.Contains(baseName);
+            }
+            return true;
+        });
+
+        foreach (var assembly in filtered)
         {
             try
             {
@@ -35,7 +49,6 @@ public sealed class CSharpCodeRunner
             }
             catch (Exception)
             {
-                // Skip assemblies that cannot be referenced
             }
         }
     }

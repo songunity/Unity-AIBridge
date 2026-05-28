@@ -8,7 +8,6 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using AIBridge.Editor;
-using AIBridge.Internal.Json;
 using UnityEngine;
 
 public static class CodeExecuteCommand
@@ -165,7 +164,7 @@ AIBridgeCLI CodeExecuteCommand_RuntimeExecute --file .aibridge/code/probe.csx --
             sha256 = sb.ToString();
         }
 
-        var commandPayload = AIBridgeJson.Serialize(new Dictionary<string, object>
+        var commandPayload = AIBridge.Internal.Json.AIBridgeJson.Serialize(new Dictionary<string, object>
         {
             ["Id"] = "rte_" + Guid.NewGuid().ToString("N"),
             ["Action"] = "runtime.code.execute",

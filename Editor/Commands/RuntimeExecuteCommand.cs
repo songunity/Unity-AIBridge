@@ -1,3 +1,4 @@
+#if AIBRIDGE_RUNTIME_ENABLED
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -161,3 +162,4 @@ AIBridgeCLI RuntimeExecuteCommand_Execute --file .aibridge/code/probe.csx --url 
         yield return CommandResult.Success(responseBody ?? "No response");
     }
 }
+#endif

@@ -164,7 +164,7 @@ AIBridgeCLI CodeExecuteCommand_RuntimeExecute --file .aibridge/code/probe.csx --
             sha256 = sb.ToString();
         }
 
-        var commandPayload = AIBridge.Internal.Json.AIBridgeJson.Serialize(new Dictionary<string, object>
+        var commandPayload = global::AIBridge.Internal.Json.AIBridgeJson.Serialize(new Dictionary<string, object>
         {
             ["Id"] = "rte_" + Guid.NewGuid().ToString("N"),
             ["Action"] = "runtime.code.execute",

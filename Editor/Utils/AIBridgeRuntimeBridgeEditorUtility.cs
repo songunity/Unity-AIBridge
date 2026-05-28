@@ -1,3 +1,4 @@
+#if AIBRIDGE_RUNTIME_ENABLED
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -611,3 +612,4 @@ namespace AIBridge.Editor
         }
     }
 }
+#endif

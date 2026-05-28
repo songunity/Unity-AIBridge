@@ -1,3 +1,4 @@
+#if AIBRIDGE_RUNTIME_ENABLED
 using System;
 using System.IO;
 using AIBridge.Runtime;
@@ -338,3 +339,4 @@ namespace AIBridge.Editor
         }
     }
 }
+#endif

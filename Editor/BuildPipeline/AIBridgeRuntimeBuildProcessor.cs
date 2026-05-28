@@ -12,6 +12,7 @@ namespace AIBridge.Editor
     {
         private const string AutoInjectDisabledDefine = "AIBRIDGE_RUNTIME_AUTO_INJECT_DISABLED";
         private const string ReleaseBuildAllowedDefine = "AIBRIDGE_RUNTIME_ALLOW_RELEASE_BUILD";
+        private const string RuntimeEnabledDefine = "AIBRIDGE_RUNTIME_ENABLED";
 
         static AIBridgeRuntimeBuildProcessor()
         {
@@ -65,6 +66,10 @@ namespace AIBridge.Editor
             var defines = ParseDefines(symbols);
 
             var changed = false;
+            changed |= SetDefine(
+                defines,
+                RuntimeEnabledDefine,
+                settings.EnableRuntimeBridge);
             changed |= SetDefine(
                 defines,
                 AutoInjectDisabledDefine,

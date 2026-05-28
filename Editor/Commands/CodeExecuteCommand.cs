@@ -1,8 +1,14 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text;
 using AIBridge.Editor;
+using AIBridge.Internal.Json;
 using UnityEngine;
 
 public static class CodeExecuteCommand
@@ -102,5 +108,146 @@ public static class CodeExecutor
             var returnValue = result.ReturnValue == null ? "null" : result.ReturnValue.ToString();
             yield return CommandResult.Success($"ReturnValue:\n{returnValue}\nOutput:\n{output}");
         }
+    }
+
+    [AIBridge("在运行时Player中执行C#代码（需要HybridCLR）。Editor端编译为DLL后通过HTTP发送到AIBridgeRuntime执行",
+        example:@"
+AIBridgeCLI CodeExecuteCommand_RuntimeExecute --code 'using UnityEngine; Debug.Log(""Hello from Runtime""); return Time.frameCount;' --url http://127.0.0.1:27182 --timeout 10000
+AIBridgeCLI CodeExecuteCommand_RuntimeExecute --file .aibridge/code/probe.csx --url http://127.0.0.1:27182
+")]
+    public static IEnumerator RuntimeExecute(
+        [Description("要执行的代码")] string code = null,
+        [Description("要执行的文件路径")] string file = null,
+        [Description("Runtime HTTP地址，如 http://127.0.0.1:27182")] string url = "http://127.0.0.1:27182",
+        [Description("超时毫秒数")] int timeout = 10000)
+    {
+        if (!string.IsNullOrEmpty(file))
+        {
+            if (File.Exists(file))
+            {
+                code = File.ReadAllText(file);
+                if (string.IsNullOrWhiteSpace(code))
+                {
+                    yield return CommandResult.Failure("File is empty.");
+                    yield break;
+                }
+            }
+            else
+            {
+                yield return CommandResult.Failure("File does not exist: " + file);
+                yield break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            yield return CommandResult.Failure("Code is null or empty.");
+            yield break;
+        }
+
+        var runner = new CSharpCodeRunner();
+        var compileResult = runner.CompileToBytes(code);
+        if (!compileResult.Success)
+        {
+            yield return CommandResult.Failure("Compilation failed:\n" + compileResult.ErrorMessage);
+            yield break;
+        }
+
+        var assemblyBytes = compileResult.AssemblyBytes;
+        var assemblyBase64 = Convert.ToBase64String(assemblyBytes);
+        string sha256;
+        using (var hasher = SHA256.Create())
+        {
+            var hash = hasher.ComputeHash(assemblyBytes);
+            var sb = new StringBuilder(hash.Length * 2);
+            for (var i = 0; i < hash.Length; i++)
+                sb.Append(hash[i].ToString("x2"));
+            sha256 = sb.ToString();
+        }
+
+        var commandPayload = AIBridgeJson.Serialize(new Dictionary<string, object>
+        {
+            ["Id"] = "rte_" + Guid.NewGuid().ToString("N"),
+            ["Action"] = "runtime.code.execute",
+            ["Params"] = new Dictionary<string, object>
+            {
+                ["assemblyBase64"] = assemblyBase64,
+                ["sha256"] = sha256,
+                ["riskAccepted"] = true
+            }
+        }, pretty: false);
+
+        var commandUrl = url.TrimEnd('/') + "/aibridge/commands?timeoutMs=" + timeout;
+        string responseBody = null;
+        string httpError = null;
+
+        var sendThread = new System.Threading.Thread(() =>
+        {
+            try
+            {
+                var bodyBytes = Encoding.UTF8.GetBytes(commandPayload);
+                var uri = new Uri(commandUrl);
+                using (var client = new TcpClient())
+                {
+                    client.Connect(uri.Host, uri.Port);
+                    client.SendTimeout = timeout;
+                    client.ReceiveTimeout = timeout + 5000;
+                    var stream = client.GetStream();
+
+                    var requestHeader = "POST " + uri.PathAndQuery + " HTTP/1.1\r\n"
+                        + "Host: " + uri.Host + ":" + uri.Port + "\r\n"
+                        + "Content-Type: application/json\r\n"
+                        + "Content-Length: " + bodyBytes.Length + "\r\n"
+                        + "Connection: close\r\n"
+                        + "\r\n";
+                    var headerBytes = Encoding.ASCII.GetBytes(requestHeader);
+                    stream.Write(headerBytes, 0, headerBytes.Length);
+                    stream.Write(bodyBytes, 0, bodyBytes.Length);
+                    stream.Flush();
+
+                    var responseBytes = new List<byte>(4096);
+                    var buffer = new byte[4096];
+                    int read;
+                    while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        for (var i = 0; i < read; i++)
+                            responseBytes.Add(buffer[i]);
+                    }
+
+                    var fullResponse = Encoding.UTF8.GetString(responseBytes.ToArray());
+                    var bodyStart = fullResponse.IndexOf("\r\n\r\n");
+                    responseBody = bodyStart >= 0 ? fullResponse.Substring(bodyStart + 4) : fullResponse;
+                }
+            }
+            catch (Exception ex)
+            {
+                httpError = ex.GetType().Name + ": " + ex.Message;
+            }
+        });
+
+        sendThread.IsBackground = true;
+        sendThread.Start();
+
+        var elapsed = 0f;
+        var maxWait = (timeout + 10000) / 1000f;
+        while (sendThread.IsAlive && elapsed < maxWait)
+        {
+            elapsed += UnityEngine.Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        if (sendThread.IsAlive)
+        {
+            yield return CommandResult.Failure("HTTP request timed out after " + maxWait + "s");
+            yield break;
+        }
+
+        if (!string.IsNullOrEmpty(httpError))
+        {
+            yield return CommandResult.Failure("HTTP error: " + httpError);
+            yield break;
+        }
+
+        yield return CommandResult.Success(responseBody ?? "No response");
     }
 }

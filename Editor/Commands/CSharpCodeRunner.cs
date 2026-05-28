@@ -96,6 +96,65 @@ public static class CodeExecutor
     }
 
     /// <summary>
+    /// Compiles the specified C# code and returns the raw assembly bytes without executing.
+    /// Used for runtime_execute where the DLL is sent to a remote Player.
+    /// </summary>
+    public EvaluationResult CompileToBytes(string code)
+    {
+        if (string.IsNullOrEmpty(code))
+        {
+            return new EvaluationResult
+            {
+                Success = false,
+                ErrorMessage = "Code cannot be null or empty"
+            };
+        }
+
+        var wrappedCode = this.WrapCodeInClass(code);
+        return this.CompileCodeToBytes(wrappedCode);
+    }
+
+    private EvaluationResult CompileCodeToBytes(string code)
+    {
+        var options = new CSharpCompilationOptions(
+            OutputKind.DynamicallyLinkedLibrary,
+            optimizationLevel: OptimizationLevel.Debug,
+            allowUnsafe: true);
+
+        var syntaxTree = CSharpSyntaxTree.ParseText(code);
+        var compilation = CSharpCompilation.Create(
+            "DynamicAssembly_" + Guid.NewGuid().ToString("N"),
+            new[] { syntaxTree },
+            this.references,
+            options);
+
+        using (var ms = new MemoryStream())
+        {
+            var emitResult = compilation.Emit(ms);
+
+            if (!emitResult.Success)
+            {
+                var errors = emitResult.Diagnostics
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.GetMessage())
+                    .ToArray();
+
+                return new EvaluationResult
+                {
+                    Success = false,
+                    ErrorMessage = string.Join(Environment.NewLine, errors)
+                };
+            }
+
+            return new EvaluationResult
+            {
+                Success = true,
+                AssemblyBytes = ms.ToArray()
+            };
+        }
+    }
+
+    /// <summary>
     /// Compiles and executes the specified C# code.
     /// </summary>
     /// <param name="code">The C# code to compile and execute.</param>
@@ -327,6 +386,11 @@ public sealed class EvaluationResult
     /// Gets or sets the compiled assembly.
     /// </summary>
     internal Assembly CompiledAssembly { get; set; }
+
+    /// <summary>
+    /// Gets or sets the raw compiled assembly bytes (for remote execution).
+    /// </summary>
+    public byte[] AssemblyBytes { get; set; }
 
     internal Task PendingTask { get; set; }
 }

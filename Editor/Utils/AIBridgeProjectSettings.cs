@@ -558,7 +558,15 @@ namespace AIBridge.Editor
         {
             var objects = InternalEditorUtility.LoadSerializedFileAndForget(SettingsFilePath);
             var loadedSettings = objects.Length > 0 ? objects[0] as AIBridgeProjectSettings : null;
-            _instance = loadedSettings ?? _instance ?? CreateInstance<AIBridgeProjectSettings>();
+            if (loadedSettings != null)
+            {
+                _instance = loadedSettings;
+            }
+            else if (_instance == null)
+            {
+                _instance = CreateInstance<AIBridgeProjectSettings>();
+            }
+
             _instance.MigrateDataIfNeeded();
             return _instance;
         }

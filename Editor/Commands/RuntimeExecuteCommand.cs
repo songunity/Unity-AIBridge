@@ -89,6 +89,7 @@ AIBridgeCLI RuntimeExecuteCommand_Execute --file .aibridge/code/probe.csx --url 
         }, pretty: false);
 
         var commandUrl = url.TrimEnd('/') + "/aibridge/commands?timeoutMs=" + timeout;
+        var authToken = AIBridge.Editor.AIBridgeProjectSettings.Instance.RuntimeBridge.AuthToken;
         string responseBody = null;
         string httpError = null;
 
@@ -109,6 +110,7 @@ AIBridgeCLI RuntimeExecuteCommand_Execute --file .aibridge/code/probe.csx --url 
                         + "Host: " + uri.Host + ":" + uri.Port + "\r\n"
                         + "Content-Type: application/json\r\n"
                         + "Content-Length: " + bodyBytes.Length + "\r\n"
+                        + (string.IsNullOrEmpty(authToken) ? "" : "Authorization: Bearer " + authToken + "\r\n")
                         + "Connection: close\r\n"
                         + "\r\n";
                     var headerBytes = Encoding.ASCII.GetBytes(requestHeader);

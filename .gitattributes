@@ -1,0 +1,2 @@
+# Unity .meta files have trailing whitespace by design; suppress git diff --check warnings.
+*.meta -whitespace

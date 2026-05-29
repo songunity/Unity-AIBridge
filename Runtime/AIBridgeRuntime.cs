@@ -325,6 +325,15 @@ namespace AIBridge.Runtime
                     return;
                 }
 
+                if (!IsCustomActionAllowed(cmd.Action))
+                {
+                    result = AIBridgeRuntimeCommandResult.FromFailure(
+                        cmd.Id,
+                        $"Runtime action is not allowed: {cmd.Action}");
+                    WriteResult(result);
+                    return;
+                }
+
                 if (TryHandleBuiltInCommand(cmd, out result, out var asyncStarted))
                 {
                     if (!asyncStarted)
@@ -332,15 +341,6 @@ namespace AIBridge.Runtime
                         WriteResult(result);
                     }
 
-                    return;
-                }
-
-                if (!IsCustomActionAllowed(cmd.Action))
-                {
-                    result = AIBridgeRuntimeCommandResult.FromFailure(
-                        cmd.Id,
-                        $"Runtime action is not allowed: {cmd.Action}");
-                    WriteResult(result);
                     return;
                 }
 
@@ -1448,6 +1448,13 @@ namespace AIBridge.Runtime
         {
             if (IsBuiltInAction(action))
             {
+                // When allowedActions is configured, built-in actions (including runtime.code.execute)
+                // must also be explicitly listed to be allowed.
+                if (runtimeSettings.allowedActions != null && runtimeSettings.allowedActions.Length > 0)
+                {
+                    return runtimeSettings.IsActionExplicitlyAllowed(action);
+                }
+
                 return true;
             }
 

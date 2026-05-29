@@ -262,6 +262,9 @@ namespace AIBridge.Editor
             RegisterCommand(transformCommandType.GetMethod("SetScale", flags));
             var codeExecuteCommandType = loadedAssemblies["com.sh.aibridge.Editor"].GetType("CodeExecuteCommand");
             RegisterCommand(codeExecuteCommandType.GetMethod("Execute", flags));
+            var runtimeExecuteCommandType = loadedAssemblies["com.sh.aibridge.Editor"].GetType("RuntimeExecuteCommand");
+            if (runtimeExecuteCommandType != null)
+                RegisterCommand(runtimeExecuteCommandType.GetMethod("Execute", flags));
 
             AIBridgeLogger.LogInfo($"[CommandRegistry] Registered {_registry.Count} commands.");
                 }

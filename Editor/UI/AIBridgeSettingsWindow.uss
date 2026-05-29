@@ -6,10 +6,17 @@
 
 /* Header */
 .header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
     background-color: rgb(42, 42, 42);
     padding: 15px;
     border-bottom-width: 1px;
     border-bottom-color: rgb(26, 26, 26);
+}
+
+.header-left {
+    flex-grow: 1;
 }
 
 .header-title {
@@ -22,6 +29,11 @@
 .header-subtitle {
     font-size: 12px;
     color: rgb(150, 150, 150);
+}
+
+.language-selector {
+    width: 120px;
+    margin-left: 15px;
 }
 
 /* Tab Bar */
@@ -135,6 +147,30 @@
     margin-top: 5px;
     margin-left: 3px;
     font-style: italic;
+}
+
+.warning-text {
+    font-size: 11px;
+    color: rgb(225, 170, 85);
+    margin-top: 5px;
+    margin-left: 3px;
+    font-style: italic;
+    white-space: normal;
+}
+
+.runtime-info-value {
+    color: rgb(180, 180, 180);
+    white-space: normal;
+}
+
+.runtime-button-row {
+    flex-direction: row;
+    margin-top: 5px;
+}
+
+.runtime-button-row .action-button {
+    flex-grow: 1;
+    margin-right: 6px;
 }
 
 /* Assembly Field */

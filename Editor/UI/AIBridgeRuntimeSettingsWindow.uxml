@@ -1,0 +1,88 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <Style src="AIBridgeSettingsWindow.uss" />
+
+    <ui:VisualElement class="root">
+        <ui:VisualElement class="header">
+            <ui:VisualElement class="header-left">
+                <ui:Label name="header-title" text="AIBridge Runtime" class="header-title" />
+                <ui:Label name="header-subtitle" text="Configure Runtime Bridge for Play Mode and Player builds" class="header-subtitle" />
+            </ui:VisualElement>
+            <ui:DropdownField name="language-selector" class="language-selector" />
+        </ui:VisualElement>
+
+        <ui:ScrollView class="content-scroll">
+            <ui:VisualElement class="section">
+                <ui:Label name="runtime-bridge-title" text="Runtime Bridge" class="section-title" />
+                <ui:Label name="runtime-bridge-help" text="Runtime Bridge lets AIBridgeCLI connect to AIBridgeRuntime inside Play Mode or a built Player. Release builds remain disabled unless explicitly allowed." class="help-text" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="section">
+                <ui:Label name="settings-title" text="Settings" class="section-title" />
+                <ui:Toggle name="compile-runtime-bridge" label="Compile Runtime Bridge" class="setting-item" />
+                <ui:Toggle name="auto-inject-editor-play-mode" label="Auto Inject In Editor Play Mode (Planned)" class="setting-item" />
+                <ui:Label name="auto-inject-editor-play-mode-help" text="This feature is not yet implemented." class="help-text" />
+                <ui:Toggle name="auto-inject-development-build" label="Auto Inject In Development Build" class="setting-item" />
+                <ui:Toggle name="keep-running-in-background" label="Keep Running In Background" class="setting-item" />
+                <ui:Toggle name="enable-runtime-code-execution" label="Enable Runtime Code Execution" class="setting-item" />
+                <ui:Label name="hybridclr-help" text="HybridCLR package is not installed. Runtime code execution will stay disabled to avoid IL2CPP Assembly.Load failures." class="help-text" />
+                <ui:Label name="runtime-code-warning" text="Runtime code execution loads Roslyn-compiled DLLs in Player by Assembly.Load. Keep it for trusted debugging builds only." class="warning-text" />
+                <ui:Toggle name="allow-release-build" label="Allow Runtime Bridge In Release Build" class="setting-item" />
+                <ui:Label name="release-warning" text="Release Build Runtime Bridge is a debugging backdoor. Use an auth token and restrict Allowed Actions before shipping." class="warning-text" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="section">
+                <ui:Label name="http-transport-title" text="HTTP Transport Settings" class="section-title" />
+                <ui:Toggle name="enable-http-transport" label="Enable HTTP Transport" class="setting-item" />
+                <ui:TextField name="http-bind-address" label="HTTP Bind Address" class="setting-item" />
+                <uie:IntegerField name="http-port" label="HTTP Port" class="setting-item" />
+                <ui:Toggle name="enable-lan-discovery" label="Enable LAN Discovery" class="setting-item" />
+                <uie:IntegerField name="discovery-udp-port" label="Discovery UDP Port" class="setting-item" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="section">
+                <ui:Label name="runtime-config-title" text="Runtime Config" class="section-title" />
+                <ui:TextField name="exchange-directory" label="Runtime Directory" class="setting-item" />
+                <ui:TextField name="target-id" label="Default Target Id" class="setting-item" />
+                <ui:TextField name="auth-token" label="Auth Token" class="setting-item" />
+                <ui:TextField name="allowed-actions" label="Allowed Actions" class="setting-item" />
+                <ui:Slider name="heartbeat-interval-seconds" label="Heartbeat Interval" low-value="0.1" high-value="10" show-input-field="true" class="setting-item" />
+                <ui:SliderInt name="log-buffer-size" label="Log Buffer Size" low-value="50" high-value="5000" show-input-field="true" class="setting-item" />
+                <uie:IntegerField name="max-result-bytes" label="Max Result Bytes" class="setting-item" />
+                <ui:Label name="allowed-actions-help" text="Allowed Actions accepts comma, semicolon, or newline separated runtime action names, including built-in actions (e.g. runtime.status, runtime.code.execute). Empty means all built-in actions are allowed; custom actions are allowed in Editor/Development Build and blocked in Release Build." class="help-text" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="section">
+                <ui:Label name="info-display-title" text="Runtime Info" class="section-title" />
+                <ui:VisualElement class="info-row">
+                    <ui:Label name="runtime-directory-label" text="Resolved Runtime Directory:" class="info-label" />
+                    <ui:Label name="runtime-directory-value" text="" class="info-value runtime-info-value" />
+                </ui:VisualElement>
+                <ui:VisualElement class="info-row">
+                    <ui:Label name="runtime-http-entry-label" text="Runtime HTTP Entry:" class="info-label" />
+                    <ui:Label name="runtime-http-entry-value" text="" class="info-value runtime-info-value" />
+                </ui:VisualElement>
+                <ui:VisualElement class="info-row">
+                    <ui:Label name="runtime-config-path-label" text="Runtime Config path:" class="info-label" />
+                    <ui:Label name="runtime-config-path-value" text="" class="info-value runtime-info-value" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="section">
+                <ui:Label name="actions-title" text="Actions" class="section-title" />
+                <ui:VisualElement class="runtime-button-row">
+                    <ui:Button name="create-runtime-object" text="Create Runtime Object" class="action-button" />
+                    <ui:Button name="apply-scene-runtime" text="Apply To Scene Runtime" class="action-button" />
+                </ui:VisualElement>
+                <ui:VisualElement class="runtime-button-row">
+                    <ui:Button name="open-runtime-directory" text="Open Runtime Directory" class="action-button" />
+                    <ui:Button name="copy-launch-args" text="Copy Launch Args" class="action-button" />
+                </ui:VisualElement>
+                <ui:VisualElement class="runtime-button-row">
+                    <ui:Button name="write-runtime-config" text="Write Runtime Config" class="action-button" />
+                    <ui:Button name="copy-http-status-cli" text="Copy HTTP Status CLI" class="action-button" />
+                    <ui:Button name="copy-discover-cli" text="Copy Discover CLI" class="action-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:ScrollView>
+    </ui:VisualElement>
+</ui:UXML>

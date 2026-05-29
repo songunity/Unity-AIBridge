@@ -1,10 +1,11 @@
-#if AIBRIDGE_RUNTIME_ENABLED
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using AIBridge.Internal.Json;
+#if AIBRIDGE_RUNTIME_ENABLED
 using AIBridge.Runtime;
+#endif
 using UnityEditor;
 using UnityEngine;
 
@@ -54,7 +55,7 @@ namespace AIBridge.Editor
         public double? AgeSeconds;
     }
 
-    internal static class AIBridgeRuntimeBridgeEditorUtility
+    internal static partial class AIBridgeRuntimeBridgeEditorUtility
     {
         public const string RuntimeDirectoryName = "runtime";
         public const string TargetsDirectoryName = "targets";
@@ -369,6 +370,7 @@ namespace AIBridge.Editor
             return "\"" + (value ?? string.Empty).Replace("\"", "\\\"") + "\"";
         }
 
+#if AIBRIDGE_RUNTIME_ENABLED
         public static AIBridgeRuntime FindSceneRuntime()
         {
             return FindSceneRuntimes().FirstOrDefault();
@@ -434,6 +436,7 @@ namespace AIBridge.Editor
             runtime.runtimeSettings.enableLanDiscovery = source.EnableLanDiscovery;
             runtime.runtimeSettings.discoveryUdpPort = Math.Max(1, source.DiscoveryUdpPort);
         }
+#endif
 
         private static Dictionary<string, object> ReadHeartbeat(string heartbeatPath)
         {
@@ -612,4 +615,3 @@ namespace AIBridge.Editor
         }
     }
 }
-#endif

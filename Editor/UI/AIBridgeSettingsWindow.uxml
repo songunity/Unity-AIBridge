@@ -4,8 +4,11 @@
     <ui:VisualElement class="root">
         <!-- Header -->
         <ui:VisualElement class="header">
-            <ui:Label text="AI Bridge Settings" class="header-title" />
-            <ui:Label text="Configure AI Bridge behavior and tools" class="header-subtitle" />
+            <ui:VisualElement class="header-left">
+                <ui:Label name="header-title" text="AI Bridge Settings" class="header-title" />
+                <ui:Label name="header-subtitle" text="Configure AI Bridge behavior and tools" class="header-subtitle" />
+            </ui:VisualElement>
+            <ui:DropdownField name="language-selector" class="language-selector" />
         </ui:VisualElement>
         
         <!-- Tab Bar -->
@@ -20,9 +23,9 @@
             <!-- General Tab -->
             <ui:VisualElement name="content-general" class="tab-content">
                 <ui:VisualElement class="section">
-                    <ui:Label text="Quick Skill Install" class="section-title" />
-                    <ui:Label text="Generate SKILL.md and copy to selected agent directories" class="help-text" />
-                    <ui:Button name="one-click-skill" text="Generate &amp; Install Skill" class="action-button" />
+                    <ui:Label name="quick-skill-title" text="Quick Skill Install" class="section-title" />
+                    <ui:Label name="quick-skill-help" text="Generate SKILL.md and copy to selected agent directories" class="help-text" />
+                    <ui:Button name="one-click-skill" text="Generate and Install Skill" class="action-button" />
                     <ui:VisualElement class="agent-toggles-row">
                         <ui:Toggle name="agent-codex" label="Codex (.agents)" class="setting-item" />
                         <ui:Toggle name="agent-claude" label="Claude Code (.claude)" class="setting-item" />
@@ -31,25 +34,25 @@
                 </ui:VisualElement>
 
                 <ui:VisualElement class="section">
-                    <ui:Label text="Bridge Settings" class="section-title" />
+                    <ui:Label name="bridge-settings-title" text="Bridge Settings" class="section-title" />
                     <ui:Toggle name="bridge-enabled" label="Enable AI Bridge" class="setting-item" />
                     <ui:Toggle name="debug-logging" label="Debug Logging" class="setting-item" />
                 </ui:VisualElement>
 
                 <ui:VisualElement class="section">
-                    <ui:Label text="Directory Information" class="section-title" />
+                    <ui:Label name="directory-info-title" text="Directory Information" class="section-title" />
                     <ui:VisualElement class="info-row">
-                        <ui:Label text="Command Queue:" class="info-label" />
+                        <ui:Label name="command-queue-label" text="Command Queue:" class="info-label" />
                         <ui:TextField name="queue-dir" readonly="true" class="info-value" />
                         <ui:Button name="open-queue-dir" text="Open" class="small-button" />
                     </ui:VisualElement>
                     <ui:VisualElement class="info-row">
-                        <ui:Label text="Screenshots:" class="info-label" />
+                        <ui:Label name="screenshots-label" text="Screenshots:" class="info-label" />
                         <ui:TextField name="screenshot-dir" readonly="true" class="info-value" />
                         <ui:Button name="open-screenshot-dir" text="Open" class="small-button" />
                     </ui:VisualElement>
                     <ui:VisualElement class="info-row">
-                        <ui:Label text="CLI Path:" class="info-label" />
+                        <ui:Label name="cli-path-label" text="CLI Path:" class="info-label" />
                         <ui:TextField name="cli-path" readonly="true" class="info-value" />
                         <ui:Button name="open-cli-dir" text="Open" class="small-button" />
                     </ui:VisualElement>
@@ -59,13 +62,13 @@
             <!-- GIF Recorder Tab -->
             <ui:VisualElement name="content-gif" class="tab-content" style="display: none;">
                 <ui:VisualElement class="section">
-                    <ui:Label text="Shortcuts" class="section-title" />
-                    <ui:Label text="F12 - Screenshot Game View (Play Mode)&#10;F11 - Start/Stop GIF Recording (Play Mode)" class="help-text" />
+                    <ui:Label name="shortcuts-title" text="Shortcuts" class="section-title" />
+                    <ui:Label name="shortcuts-help" text="F12 - Screenshot Game View (Play Mode)&#10;F11 - Start/Stop GIF Recording (Play Mode)" class="help-text" />
                 </ui:VisualElement>
 
                 <ui:VisualElement class="section">
-                    <ui:Label text="GIF Recording Settings" class="section-title" />
-                    <ui:Label text="Uses streaming encoding: frames are encoded and written to disk immediately, minimizing memory usage." class="help-text" />
+                    <ui:Label name="gif-settings-title" text="GIF Recording Settings" class="section-title" />
+                    <ui:Label name="gif-settings-help" text="Uses streaming encoding: frames are encoded and written to disk immediately, minimizing memory usage." class="help-text" />
                     <ui:Slider name="gif-duration" label="Duration (seconds)" low-value="0.5" high-value="10.0" show-input-field="true" class="setting-item" />
                     <ui:SliderInt name="gif-fps" label="FPS" low-value="5" high-value="60" show-input-field="true" class="setting-item" />
                     <ui:Slider name="gif-scale" label="Scale" low-value="0.1" high-value="1.0" show-input-field="true" class="setting-item" />
@@ -76,15 +79,15 @@
             <!-- Commands Tab -->
             <ui:VisualElement name="content-commands" class="tab-content" style="display: none;">
                 <ui:VisualElement class="section">
-                    <ui:Label text="Command Registration" class="section-title" />
+                    <ui:Label name="command-registration-title" text="Command Registration" class="section-title" />
                     <ui:Toggle name="auto-scan" label="Auto-scan Assemblies" class="setting-item" />
-                    <ui:Label text="When enabled, commands are scanned at runtime. When disabled, commands are pre-registered in code for better performance." class="help-text" />
+                    <ui:Label name="auto-scan-help" text="When enabled, commands are scanned at runtime. When disabled, commands are pre-registered in code for better performance." class="help-text" />
                     <ui:TextField name="scan-assemblies" label="Scan Assemblies" multiline="true" class="setting-item assembly-field" />
-                    <ui:Label text="Separate multiple assemblies with semicolons (e.g., Assembly-CSharp;Assembly-CSharp-Editor)" class="help-text" />
+                    <ui:Label name="scan-assemblies-help" text="Separate multiple assemblies with semicolons (e.g., Assembly-CSharp;Assembly-CSharp-Editor)" class="help-text" />
                 </ui:VisualElement>
                 
                 <ui:VisualElement class="section">
-                    <ui:Label text="Registered Commands" class="section-title" />
+                    <ui:Label name="registered-commands-title" text="Registered Commands" class="section-title" />
                     <ui:Label name="command-count" text="Loading..." class="info-text" />
                     <ui:ScrollView name="command-list" class="command-list" />
                     <ui:Button name="refresh-commands" text="Refresh Command List" class="action-button" />
@@ -94,19 +97,19 @@
             <!-- Tools Tab -->
             <ui:VisualElement name="content-tools" class="tab-content" style="display: none;">
                 <ui:VisualElement class="section">
-                    <ui:Label text="Skill Documentation" class="section-title" />
-                    <ui:Label text="Generate SKILL.md file for Droid integration" class="help-text" />
+                    <ui:Label name="skill-doc-title" text="Skill Documentation" class="section-title" />
+                    <ui:Label name="skill-doc-help" text="Generate SKILL.md file for Droid integration" class="help-text" />
                     <ui:Button name="generate-skill" text="Generate SKILL.md" class="action-button" />
                 </ui:VisualElement>
                 
                 <ui:VisualElement class="section">
-                    <ui:Label text="Skill Installation" class="section-title" />
-                    <ui:Label text="Copy AIBridge skill to agent directory" class="help-text" />
+                    <ui:Label name="skill-install-title" text="Skill Installation" class="section-title" />
+                    <ui:Label name="skill-install-help" text="Copy AIBridge skill to agent directory" class="help-text" />
                     <ui:Button name="install-skill-agent" text="Copy to Agent" class="action-button" />
                 </ui:VisualElement>
                 
                 <ui:VisualElement class="section">
-                    <ui:Label text="Maintenance" class="section-title" />
+                    <ui:Label name="maintenance-title" text="Maintenance" class="section-title" />
                     <ui:Button name="clear-cache" text="Clear Screenshot Cache" class="action-button" />
                     <ui:Button name="reset-settings" text="Reset All Settings" class="action-button warning-button" />
                 </ui:VisualElement>

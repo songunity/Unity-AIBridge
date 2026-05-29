@@ -80,10 +80,12 @@ namespace AIBridge.Editor
 
             InitializeFields();
             LoadSettings();
-            RegisterSettingsCallbacks();
             SetupActionButtons();
             SetupLanguageSelector();
+            // 先本地化（设置 label）再注册回调：UIToolkit 中 TextField 内部 label 的文本变化
+            // 会冒泡出 ChangeEvent<string>，若回调已注册会被误当成 value 变更，污染配置。
             ApplyLocalization();
+            RegisterSettingsCallbacks();
             RefreshDynamicState();
         }
 
@@ -191,6 +193,11 @@ namespace AIBridge.Editor
 
             _httpBindAddress.RegisterValueChangedCallback(evt =>
             {
+                if (evt.target != _httpBindAddress)
+                {
+                    return;
+                }
+
                 AIBridgeProjectSettings.Instance.RuntimeBridge.HttpBindAddress = evt.newValue ?? string.Empty;
                 SaveRuntimeSettings();
             });
@@ -221,24 +228,44 @@ namespace AIBridge.Editor
 
             _exchangeDirectory.RegisterValueChangedCallback(evt =>
             {
+                if (evt.target != _exchangeDirectory)
+                {
+                    return;
+                }
+
                 AIBridgeProjectSettings.Instance.RuntimeBridge.ExchangeDirectory = evt.newValue ?? string.Empty;
                 SaveRuntimeSettings();
             });
 
             _targetId.RegisterValueChangedCallback(evt =>
             {
+                if (evt.target != _targetId)
+                {
+                    return;
+                }
+
                 AIBridgeProjectSettings.Instance.RuntimeBridge.TargetId = evt.newValue ?? string.Empty;
                 SaveRuntimeSettings();
             });
 
             _authToken.RegisterValueChangedCallback(evt =>
             {
+                if (evt.target != _authToken)
+                {
+                    return;
+                }
+
                 AIBridgeProjectSettings.Instance.RuntimeBridge.AuthToken = evt.newValue ?? string.Empty;
                 SaveRuntimeSettings();
             });
 
             _allowedActions.RegisterValueChangedCallback(evt =>
             {
+                if (evt.target != _allowedActions)
+                {
+                    return;
+                }
+
                 AIBridgeProjectSettings.Instance.RuntimeBridge.AllowedActions = evt.newValue ?? string.Empty;
                 SaveRuntimeSettings();
             });

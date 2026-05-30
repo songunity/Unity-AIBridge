@@ -416,7 +416,7 @@ namespace AIBridge.Editor
             _createRuntimeObject.text = AIBridgeEditorText.T("Create Runtime Object", "创建 Runtime 对象");
             _applySceneRuntime.text = AIBridgeEditorText.T("Apply To Scene Runtime", "应用到场景 Runtime");
             rootVisualElement.Q<Button>("open-runtime-directory").text =
-                AIBridgeEditorText.T("Open Runtime Directory", "打开 Runtime 目录");
+                AIBridgeEditorText.T("Open", "打开");
             rootVisualElement.Q<Button>("copy-launch-args").text =
                 AIBridgeEditorText.T("Copy Launch Args", "复制启动参数");
             rootVisualElement.Q<Button>("write-runtime-config").text =

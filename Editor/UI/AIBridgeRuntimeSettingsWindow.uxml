@@ -56,6 +56,7 @@
                 <ui:VisualElement class="info-row">
                     <ui:Label name="runtime-directory-label" text="Resolved Runtime Directory:" class="info-label" />
                     <ui:Label name="runtime-directory-value" text="" class="info-value runtime-info-value" />
+                    <ui:Button name="open-runtime-directory" text="Open" class="small-button" />
                 </ui:VisualElement>
                 <ui:VisualElement class="info-row">
                     <ui:Label name="runtime-http-entry-label" text="Runtime HTTP Entry:" class="info-label" />
@@ -74,7 +75,6 @@
                     <ui:Button name="apply-scene-runtime" text="Apply To Scene Runtime" class="action-button" />
                 </ui:VisualElement>
                 <ui:VisualElement class="runtime-button-row">
-                    <ui:Button name="open-runtime-directory" text="Open Runtime Directory" class="action-button" />
                     <ui:Button name="copy-launch-args" text="Copy Launch Args" class="action-button" />
                 </ui:VisualElement>
                 <ui:VisualElement class="runtime-button-row">

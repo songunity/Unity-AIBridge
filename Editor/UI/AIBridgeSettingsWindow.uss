@@ -133,7 +133,7 @@
 
 .info-label {
     min-width: 120px;
-    max-width: 120px;
+    margin-right: 8px;
     color: rgb(190, 190, 190);
     flex-shrink: 0;
 }

@@ -142,7 +142,10 @@ namespace AIBridge.Editor
             _enableLanDiscovery.SetValueWithoutNotify(settings.EnableLanDiscovery);
             _discoveryUdpPort.SetValueWithoutNotify(settings.DiscoveryUdpPort);
             _allowRuntimeBridgeInReleaseBuild.SetValueWithoutNotify(settings.AllowRuntimeBridgeInReleaseBuild);
-            _exchangeDirectory.SetValueWithoutNotify(settings.ExchangeDirectory ?? string.Empty);
+            _exchangeDirectory.SetValueWithoutNotify(
+                string.IsNullOrWhiteSpace(settings.ExchangeDirectory)
+                    ? AIBridgeRuntimeBridgeEditorUtility.GetDefaultRuntimeDirectory()
+                    : settings.ExchangeDirectory);
             _targetId.SetValueWithoutNotify(settings.TargetId ?? string.Empty);
             _authToken.SetValueWithoutNotify(settings.AuthToken ?? string.Empty);
             _allowedActions.SetValueWithoutNotify(settings.AllowedActions ?? string.Empty);
@@ -233,7 +236,14 @@ namespace AIBridge.Editor
                     return;
                 }
 
-                AIBridgeProjectSettings.Instance.RuntimeBridge.ExchangeDirectory = evt.newValue ?? string.Empty;
+                // 输入等于默认路径时存空字符串，保持「跟随默认」语义，避免固化绝对路径
+                var input = evt.newValue ?? string.Empty;
+                var isDefault = string.Equals(
+                    input.Trim(),
+                    AIBridgeRuntimeBridgeEditorUtility.GetDefaultRuntimeDirectory(),
+                    StringComparison.Ordinal);
+                AIBridgeProjectSettings.Instance.RuntimeBridge.ExchangeDirectory =
+                    isDefault ? string.Empty : input;
                 SaveRuntimeSettings();
             });
 

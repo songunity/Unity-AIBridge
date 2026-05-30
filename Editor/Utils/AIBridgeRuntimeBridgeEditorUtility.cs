@@ -68,12 +68,17 @@ namespace AIBridge.Editor
         private static readonly TimeSpan StaleHeartbeatTimeout = TimeSpan.FromSeconds(15);
         private static readonly TimeSpan DiscoveryCacheStaleTimeout = TimeSpan.FromSeconds(DiscoveryCacheFreshSeconds);
 
+        public static string GetDefaultRuntimeDirectory()
+        {
+            return Path.Combine(AIBridge.BridgeDirectory, RuntimeDirectoryName);
+        }
+
         public static string GetRuntimeDirectory()
         {
             var configured = AIBridgeProjectSettings.Instance.RuntimeBridge.ExchangeDirectory;
             if (string.IsNullOrWhiteSpace(configured))
             {
-                return Path.Combine(AIBridge.BridgeDirectory, RuntimeDirectoryName);
+                return GetDefaultRuntimeDirectory();
             }
 
             return Path.IsPathRooted(configured)

@@ -107,6 +107,23 @@
     color: rgb(190, 190, 190);
 }
 
+.setting-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.setting-row-field {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+    margin-right: 5px;
+}
+
+.setting-row-field Label {
+    min-width: 120px;
+    color: rgb(190, 190, 190);
+}
+
 /* Info Rows */
 .info-row {
     flex-direction: row;

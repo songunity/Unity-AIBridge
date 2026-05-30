@@ -41,7 +41,10 @@
 
             <ui:VisualElement class="section">
                 <ui:Label name="runtime-config-title" text="Runtime Config" class="section-title" />
-                <ui:TextField name="exchange-directory" label="Runtime Directory" class="setting-item" />
+                <ui:VisualElement class="setting-item setting-row">
+                    <ui:TextField name="exchange-directory" label="Runtime Directory" class="setting-row-field" />
+                    <ui:Button name="open-runtime-directory" text="Open" class="small-button" />
+                </ui:VisualElement>
                 <ui:TextField name="target-id" label="Default Target Id" class="setting-item" />
                 <ui:TextField name="auth-token" label="Auth Token" class="setting-item" />
                 <ui:TextField name="allowed-actions" label="Allowed Actions" class="setting-item" />
@@ -56,7 +59,6 @@
                 <ui:VisualElement class="info-row">
                     <ui:Label name="runtime-directory-label" text="Resolved Runtime Directory:" class="info-label" />
                     <ui:Label name="runtime-directory-value" text="" class="info-value runtime-info-value" />
-                    <ui:Button name="open-runtime-directory" text="Open" class="small-button" />
                 </ui:VisualElement>
                 <ui:VisualElement class="info-row">
                     <ui:Label name="runtime-http-entry-label" text="Runtime HTTP Entry:" class="info-label" />

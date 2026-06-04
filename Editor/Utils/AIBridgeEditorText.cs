@@ -15,6 +15,16 @@ namespace AIBridge.Editor
         AllowReleaseBuild,
         AllowedActions,
         AllowedActionsHelp,
+        AllowedActionsCustom,
+        AllowedActionsWhitelistHelp,
+        AllowedActionCodeExecuteHelp,
+        AllowedActionHandlersHelp,
+        AllowedActionLogsClearHelp,
+        AllowedActionLogsHelp,
+        AllowedActionPerfHelp,
+        AllowedActionPingHelp,
+        AllowedActionScreenshotHelp,
+        AllowedActionStatusHelp,
         ApplySceneRuntime,
         AppliedRuntimeSettingsMessage,
         Auth,
@@ -169,6 +179,7 @@ namespace AIBridge.Editor
         TotalRegisteredCommands,
         Transport,
         Unreachable,
+        UseAllowedActionsWhitelist,
         Url,
         Warning,
         WriteRuntimeConfig,
@@ -250,7 +261,17 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.AgentKiro: return "Kiro (.kiro)";
                 case AIBridgeEditorTextKey.AllowReleaseBuild: return T("Allow Runtime Bridge In Release Build", "允许 Release Build 启用 Runtime Bridge");
                 case AIBridgeEditorTextKey.AllowedActions: return T("Allowed Actions", "允许的 Actions");
-                case AIBridgeEditorTextKey.AllowedActionsHelp: return T("Allowed Actions accepts comma, semicolon, or newline separated runtime action names, including built-in actions (e.g. runtime.status, runtime.code.execute). Empty means all built-in actions are allowed; custom actions are allowed in Editor/Development Build and blocked in Release Build.", "Allowed Actions 支持用逗号、分号或换行分隔 Runtime action 名称，包括内置 action（如 runtime.status、runtime.code.execute）。为空时所有内置 action 允许；自定义 action 在 Editor/Development Build 允许，Release Build 阻止。");
+                case AIBridgeEditorTextKey.AllowedActionsHelp: return T("Whitelist off: all built-in actions are allowed. Custom actions stay limited by build type.", "关闭白名单：允许所有内置 action。自定义 action 仍按构建类型限制。");
+                case AIBridgeEditorTextKey.AllowedActionsCustom: return T("Custom Actions", "自定义 Actions");
+                case AIBridgeEditorTextKey.AllowedActionsWhitelistHelp: return T("Whitelist on: only selected built-in actions and listed custom actions are allowed.", "开启白名单：只允许已选择的内置 action 和列出的自定义 action。");
+                case AIBridgeEditorTextKey.AllowedActionCodeExecuteHelp: return T("Executes runtime C# code through the Runtime Bridge. Highest risk; keep it for trusted debug builds.", "通过 Runtime Bridge 执行运行时 C# 代码。风险最高，仅建议可信调试构建使用。");
+                case AIBridgeEditorTextKey.AllowedActionHandlersHelp: return T("Lists registered runtime handlers and their supported actions.", "列出已注册的 Runtime handler 及其支持的 actions。");
+                case AIBridgeEditorTextKey.AllowedActionLogsClearHelp: return T("Clears the in-memory runtime log buffer.", "清空内存中的 Runtime 日志缓存。");
+                case AIBridgeEditorTextKey.AllowedActionLogsHelp: return T("Reads recent runtime logs from the in-memory log buffer.", "读取内存日志缓存中的近期 Runtime 日志。");
+                case AIBridgeEditorTextKey.AllowedActionPerfHelp: return T("Samples runtime performance metrics such as FPS and frame time.", "采样 Runtime 性能指标，例如 FPS 和帧耗时。");
+                case AIBridgeEditorTextKey.AllowedActionPingHelp: return T("Health check used to verify that the Runtime Bridge is reachable.", "健康检查，用于确认 Runtime Bridge 可连接。");
+                case AIBridgeEditorTextKey.AllowedActionScreenshotHelp: return T("Captures a runtime screenshot from the connected Player or Play Mode.", "从连接的 Player 或 Play Mode 截取 Runtime 截图。");
+                case AIBridgeEditorTextKey.AllowedActionStatusHelp: return T("Reads runtime status, target info, transport state, and basic settings.", "读取 Runtime 状态、目标信息、传输状态和基础设置。");
                 case AIBridgeEditorTextKey.ApplySceneRuntime: return T("Apply To Scene Runtime", "应用到场景 Runtime");
                 case AIBridgeEditorTextKey.AppliedRuntimeSettingsMessage: return T("Applied Runtime Bridge settings to {0} scene runtime object(s).", "已将 Runtime Bridge 设置应用到 {0} 个场景 Runtime 对象。");
                 case AIBridgeEditorTextKey.Auth: return T("Auth", "鉴权");
@@ -405,6 +426,7 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.TotalRegisteredCommands: return T("Total registered commands: {0}", "已注册命令总数：{0}");
                 case AIBridgeEditorTextKey.Transport: return T("Transport", "传输");
                 case AIBridgeEditorTextKey.Unreachable: return T("unreachable", "不可达");
+                case AIBridgeEditorTextKey.UseAllowedActionsWhitelist: return T("Use Action Whitelist", "启用 Action 白名单");
                 case AIBridgeEditorTextKey.Url: return T("URL", "URL");
                 case AIBridgeEditorTextKey.Warning: return T("Warning", "警告");
                 case AIBridgeEditorTextKey.WriteRuntimeConfig: return T("Write Runtime Config", "写入 Runtime 配置");

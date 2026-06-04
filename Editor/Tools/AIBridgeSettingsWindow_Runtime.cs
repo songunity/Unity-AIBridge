@@ -73,6 +73,7 @@ namespace AIBridge.Editor
             settings.EnableRuntimeBridge = EditorGUILayout.Toggle(
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.CompileRuntimeBridge),
                 settings.EnableRuntimeBridge);
+            EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CompileRuntimeBridgeHelp), MessageType.None);
 
             settings.AutoInjectRuntimeBridgeInDevelopmentBuild = EditorGUILayout.Toggle(
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.AutoInjectDevelopmentBuild),

@@ -14,7 +14,7 @@ namespace AIBridge.Editor
 
         private Vector2 _scrollPosition;
 
-        [MenuItem("Window/AIBridge Runtime")]
+        [MenuItem("Window/AIBridge/Runtime")]
         private static void OpenWindow()
         {
             var window = GetWindow<AIBridgeRuntimeSettingsWindow>();

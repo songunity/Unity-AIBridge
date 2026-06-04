@@ -22,7 +22,6 @@ namespace AIBridge.Editor
         private int _lanScanGeneration;
         private double _lastRefreshTime;
 
-        [MenuItem("Window/AIBridge Players")]
         [MenuItem("Window/AIBridge/Players")]
         [MenuItem("AIBridge/Players")]
         public static void OpenWindow()

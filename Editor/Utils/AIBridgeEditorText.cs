@@ -150,7 +150,6 @@ namespace AIBridge.Editor
         Scene,
         ScreenshotCacheCleared,
         Screenshots,
-        SecuritySettings,
         Settings,
         SettingsReset,
         Shortcuts,
@@ -387,7 +386,6 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.Scene: return T("Scene", "场景");
                 case AIBridgeEditorTextKey.ScreenshotCacheCleared: return T("Screenshot cache cleared.", "截图缓存已清除。");
                 case AIBridgeEditorTextKey.Screenshots: return T("Screenshots:", "截图：");
-                case AIBridgeEditorTextKey.SecuritySettings: return T("Security", "安全");
                 case AIBridgeEditorTextKey.Settings: return T("Settings", "设置");
                 case AIBridgeEditorTextKey.SettingsReset: return T("Settings reset to default.", "设置已重置为默认值。");
                 case AIBridgeEditorTextKey.Shortcuts: return T("Shortcuts", "快捷键");

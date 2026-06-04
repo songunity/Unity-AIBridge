@@ -310,6 +310,12 @@ namespace AIBridge.Editor
 #endif
 
             rootVisualElement.Q<Button>("open-runtime-directory").clicked += OpenRuntimeDirectory;
+            var openPlayersPanel = rootVisualElement.Q<Button>("open-players-panel");
+            if (openPlayersPanel != null)
+            {
+                openPlayersPanel.clicked += AIBridgePlayersWindow.OpenWindow;
+            }
+
             rootVisualElement.Q<Button>("copy-launch-args").clicked += CopyLaunchArguments;
             rootVisualElement.Q<Button>("write-runtime-config").clicked += WriteRuntimeConfig;
             rootVisualElement.Q<Button>("copy-http-status-cli").clicked += CopyHttpStatusCommand;
@@ -417,6 +423,12 @@ namespace AIBridge.Editor
             _applySceneRuntime.text = AIBridgeEditorText.T("Apply To Scene Runtime", "应用到场景 Runtime");
             rootVisualElement.Q<Button>("open-runtime-directory").text =
                 AIBridgeEditorText.T("Open", "打开");
+            var openPlayersPanel = rootVisualElement.Q<Button>("open-players-panel");
+            if (openPlayersPanel != null)
+            {
+                openPlayersPanel.text = AIBridgeEditorText.T("Open Players Panel", "打开 Players 面板");
+            }
+
             rootVisualElement.Q<Button>("copy-launch-args").text =
                 AIBridgeEditorText.T("Copy Launch Args", "复制启动参数");
             rootVisualElement.Q<Button>("write-runtime-config").text =

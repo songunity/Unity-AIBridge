@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using UnityEditor;
+using UnityEditor.Compilation;
 
 namespace AIBridge.Editor
 {
@@ -28,9 +29,12 @@ namespace AIBridge.Editor
             if (EditorApplication.isPlaying | EditorApplication.isPaused)
             {
                 yield return CommandResult.Failure("Unity is playing, compile need stop play");
+                yield break;
             }
 
-            AssetDatabase.Refresh();
+            CompilationTracker.Reset();
+            CompilationTracker.StartTracking();
+            CompilationPipeline.RequestScriptCompilation();
             yield return CommandResult.Success(new
             {
                 compilationStarted = true,
@@ -64,8 +68,10 @@ namespace AIBridge.Editor
                     status = statusStr,
                     isCompiling = false,
                     errorCount = result.errorCount,
+                    warningCount = result.warningCount,
                     duration = result.durationSeconds,
                     errors = ConvertErrors(result.errors),
+                    warnings = ConvertErrors(result.warnings),
                 });
             }
             else
@@ -75,6 +81,7 @@ namespace AIBridge.Editor
                     status = statusStr,
                     isCompiling = false,
                     errorCount = result.errorCount,
+                    warningCount = result.warningCount,
                     duration = result.durationSeconds
                 });
             }

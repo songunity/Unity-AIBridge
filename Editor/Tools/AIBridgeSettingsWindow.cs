@@ -26,7 +26,7 @@ namespace AIBridge.Editor
         private bool _agentClaude;
         private bool _agentKiro;
 
-        [MenuItem("Window/AIBridge")]
+        [MenuItem("Window/AIBridge/AIBridge")]
         private static void OpenWindow()
         {
             var window = GetWindow<AIBridgeSettingsWindow>();

@@ -13,13 +13,6 @@ namespace AIBridge.Editor
         private const float RuntimeBridgeSettingsMaxLabelWidth = 280f;
 
         private Vector2 _scrollPosition;
-        private bool _buildInjectionExpanded = true;
-        private bool _runtimeCapabilitiesExpanded = true;
-        private bool _transportExpanded = true;
-        private bool _securityExpanded = true;
-        private bool _runtimeBehaviorExpanded = true;
-        private bool _resolvedInfoExpanded = true;
-        private bool _actionsExpanded = true;
         private bool _cliCommandsExpanded;
 
         [MenuItem("Window/AIBridge/Runtime")]
@@ -76,156 +69,125 @@ namespace AIBridge.Editor
             var oldLabelWidth = EditorGUIUtility.labelWidth;
             EditorGUIUtility.labelWidth = GetRuntimeBridgeSettingsLabelWidth();
 
-            var settingsChanged = false;
+            EditorGUI.BeginChangeCheck();
 
-            _buildInjectionExpanded = DrawFoldout(_buildInjectionExpanded, AIBridgeEditorText.Get(AIBridgeEditorTextKey.BuildInjectionSettings));
-            if (_buildInjectionExpanded)
+            DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.BuildInjectionSettings));
+
+            settings.EnableRuntimeBridge = EditorGUILayout.Toggle(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.CompileRuntimeBridge),
+                settings.EnableRuntimeBridge);
+            EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CompileRuntimeBridgeHelp), MessageType.None);
+
+            settings.AutoInjectRuntimeBridgeInDevelopmentBuild = EditorGUILayout.Toggle(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.AutoInjectDevelopmentBuild),
+                settings.AutoInjectRuntimeBridgeInDevelopmentBuild);
+
+            settings.AllowRuntimeBridgeInReleaseBuild = EditorGUILayout.Toggle(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowReleaseBuild),
+                settings.AllowRuntimeBridgeInReleaseBuild);
+
+            if (settings.AllowRuntimeBridgeInReleaseBuild)
             {
-                EditorGUI.BeginChangeCheck();
-
-                settings.EnableRuntimeBridge = EditorGUILayout.Toggle(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.CompileRuntimeBridge),
-                    settings.EnableRuntimeBridge);
-                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CompileRuntimeBridgeHelp), MessageType.None);
-
-                settings.AutoInjectRuntimeBridgeInDevelopmentBuild = EditorGUILayout.Toggle(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.AutoInjectDevelopmentBuild),
-                    settings.AutoInjectRuntimeBridgeInDevelopmentBuild);
-
-                settings.AllowRuntimeBridgeInReleaseBuild = EditorGUILayout.Toggle(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowReleaseBuild),
-                    settings.AllowRuntimeBridgeInReleaseBuild);
-
-                if (settings.AllowRuntimeBridgeInReleaseBuild)
-                {
-                    EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.ReleaseWarning), MessageType.Warning);
-                }
-
-                settingsChanged |= EditorGUI.EndChangeCheck();
+                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.ReleaseWarning), MessageType.Warning);
             }
 
-            _runtimeCapabilitiesExpanded = DrawFoldout(_runtimeCapabilitiesExpanded, AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeCapabilities));
-            if (_runtimeCapabilitiesExpanded)
+            DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeCapabilities));
+
+            var hybridClrInstalled = AIBridgeHybridClrUtility.IsHybridClrInstalled();
+            using (new EditorGUI.DisabledScope(!hybridClrInstalled))
             {
-                EditorGUI.BeginChangeCheck();
-
-                var hybridClrInstalled = AIBridgeHybridClrUtility.IsHybridClrInstalled();
-                using (new EditorGUI.DisabledScope(!hybridClrInstalled))
-                {
-                    settings.EnableRuntimeCodeExecution = EditorGUILayout.Toggle(
-                        AIBridgeEditorText.Get(AIBridgeEditorTextKey.EnableRuntimeCodeExecution),
-                        settings.EnableRuntimeCodeExecution);
-                }
-
-                if (!hybridClrInstalled)
-                {
-                    EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.HybridClrHelp), MessageType.Info);
-                }
-                else if (settings.EnableRuntimeCodeExecution)
-                {
-                    EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeCodeWarning), MessageType.Warning);
-                }
-
-                settings.AllowedActions = EditorGUILayout.DelayedTextField(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowedActions),
-                    settings.AllowedActions ?? string.Empty);
-                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowedActionsHelp), MessageType.None);
-
-                settingsChanged |= EditorGUI.EndChangeCheck();
+                settings.EnableRuntimeCodeExecution = EditorGUILayout.Toggle(
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.EnableRuntimeCodeExecution),
+                    settings.EnableRuntimeCodeExecution);
             }
 
-            _transportExpanded = DrawFoldout(_transportExpanded, AIBridgeEditorText.Get(AIBridgeEditorTextKey.Transport));
-            if (_transportExpanded)
+            if (!hybridClrInstalled)
             {
-                EditorGUI.BeginChangeCheck();
+                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.HybridClrHelp), MessageType.Info);
+            }
+            else if (settings.EnableRuntimeCodeExecution)
+            {
+                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeCodeWarning), MessageType.Warning);
+            }
 
-                var displayExchangeDirectory = string.IsNullOrWhiteSpace(settings.ExchangeDirectory)
-                    ? AIBridgeRuntimeBridgeEditorUtility.GetDefaultRuntimeDirectory()
-                    : settings.ExchangeDirectory;
-                var nextExchangeDirectory = EditorGUILayout.DelayedTextField(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeDirectory),
-                    displayExchangeDirectory);
-                settings.ExchangeDirectory = string.Equals(
-                    nextExchangeDirectory.Trim(),
-                    AIBridgeRuntimeBridgeEditorUtility.GetDefaultRuntimeDirectory(),
-                    StringComparison.Ordinal)
-                    ? string.Empty
-                    : nextExchangeDirectory;
+            settings.AllowedActions = EditorGUILayout.DelayedTextField(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowedActions),
+                settings.AllowedActions ?? string.Empty);
+            EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowedActionsHelp), MessageType.None);
 
-                settings.TargetId = EditorGUILayout.DelayedTextField(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.DefaultTargetId),
-                    settings.TargetId ?? string.Empty);
+            DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Transport));
 
-                settings.EnableHttpTransport = EditorGUILayout.Toggle(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.EnableHttpTransport),
-                    settings.EnableHttpTransport);
+            var displayExchangeDirectory = string.IsNullOrWhiteSpace(settings.ExchangeDirectory)
+                ? AIBridgeRuntimeBridgeEditorUtility.GetDefaultRuntimeDirectory()
+                : settings.ExchangeDirectory;
+            var nextExchangeDirectory = EditorGUILayout.DelayedTextField(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeDirectory),
+                displayExchangeDirectory);
+            settings.ExchangeDirectory = string.Equals(
+                nextExchangeDirectory.Trim(),
+                AIBridgeRuntimeBridgeEditorUtility.GetDefaultRuntimeDirectory(),
+                StringComparison.Ordinal)
+                ? string.Empty
+                : nextExchangeDirectory;
 
-                using (new EditorGUI.DisabledScope(!settings.EnableHttpTransport))
+            settings.TargetId = EditorGUILayout.DelayedTextField(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.DefaultTargetId),
+                settings.TargetId ?? string.Empty);
+
+            settings.AuthToken = EditorGUILayout.DelayedTextField(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.AuthToken),
+                settings.AuthToken ?? string.Empty);
+            EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AuthTokenHelp), MessageType.None);
+
+            settings.EnableHttpTransport = EditorGUILayout.Toggle(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.EnableHttpTransport),
+                settings.EnableHttpTransport);
+
+            using (new EditorGUI.DisabledScope(!settings.EnableHttpTransport))
+            {
+                settings.HttpBindAddress = EditorGUILayout.DelayedTextField(
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpBindAddress),
+                    settings.HttpBindAddress ?? string.Empty);
+
+                settings.HttpPort = EditorGUILayout.IntField(
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpPort),
+                    settings.HttpPort);
+
+                settings.EnableLanDiscovery = EditorGUILayout.Toggle(
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.EnableLanDiscovery),
+                    settings.EnableLanDiscovery);
+
+                using (new EditorGUI.DisabledScope(!settings.EnableLanDiscovery))
                 {
-                    settings.HttpBindAddress = EditorGUILayout.DelayedTextField(
-                        AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpBindAddress),
-                        settings.HttpBindAddress ?? string.Empty);
-
-                    settings.HttpPort = EditorGUILayout.IntField(
-                        AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpPort),
-                        settings.HttpPort);
-
-                    settings.EnableLanDiscovery = EditorGUILayout.Toggle(
-                        AIBridgeEditorText.Get(AIBridgeEditorTextKey.EnableLanDiscovery),
-                        settings.EnableLanDiscovery);
-
-                    using (new EditorGUI.DisabledScope(!settings.EnableLanDiscovery))
-                    {
-                        settings.DiscoveryUdpPort = EditorGUILayout.IntField(
-                            AIBridgeEditorText.Get(AIBridgeEditorTextKey.DiscoveryUdpPort),
-                            settings.DiscoveryUdpPort);
-                    }
+                    settings.DiscoveryUdpPort = EditorGUILayout.IntField(
+                        AIBridgeEditorText.Get(AIBridgeEditorTextKey.DiscoveryUdpPort),
+                        settings.DiscoveryUdpPort);
                 }
-
-                settingsChanged |= EditorGUI.EndChangeCheck();
             }
 
-            _securityExpanded = DrawFoldout(_securityExpanded, AIBridgeEditorText.Get(AIBridgeEditorTextKey.SecuritySettings));
-            if (_securityExpanded)
-            {
-                EditorGUI.BeginChangeCheck();
+            DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeBehaviorLimits));
 
-                settings.AuthToken = EditorGUILayout.DelayedTextField(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.AuthToken),
-                    settings.AuthToken ?? string.Empty);
-                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AuthTokenHelp), MessageType.None);
+            settings.KeepRunningInBackground = EditorGUILayout.Toggle(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.KeepRunningInBackground),
+                settings.KeepRunningInBackground);
 
-                settingsChanged |= EditorGUI.EndChangeCheck();
-            }
+            settings.HeartbeatIntervalSeconds = EditorGUILayout.Slider(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.HeartbeatInterval),
+                settings.HeartbeatIntervalSeconds,
+                0.1f,
+                10f);
 
-            _runtimeBehaviorExpanded = DrawFoldout(_runtimeBehaviorExpanded, AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeBehaviorLimits));
-            if (_runtimeBehaviorExpanded)
-            {
-                EditorGUI.BeginChangeCheck();
+            settings.LogBufferSize = EditorGUILayout.IntSlider(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.LogBufferSize),
+                settings.LogBufferSize,
+                50,
+                5000);
 
-                settings.KeepRunningInBackground = EditorGUILayout.Toggle(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.KeepRunningInBackground),
-                    settings.KeepRunningInBackground);
+            settings.MaxResultBytes = EditorGUILayout.IntField(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.MaxResultBytes),
+                settings.MaxResultBytes);
 
-                settings.HeartbeatIntervalSeconds = EditorGUILayout.Slider(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.HeartbeatInterval),
-                    settings.HeartbeatIntervalSeconds,
-                    0.1f,
-                    10f);
-
-                settings.LogBufferSize = EditorGUILayout.IntSlider(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.LogBufferSize),
-                    settings.LogBufferSize,
-                    50,
-                    5000);
-
-                settings.MaxResultBytes = EditorGUILayout.IntField(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.MaxResultBytes),
-                    settings.MaxResultBytes);
-
-                settingsChanged |= EditorGUI.EndChangeCheck();
-            }
-
+            var settingsChanged = EditorGUI.EndChangeCheck();
             EditorGUIUtility.labelWidth = oldLabelWidth;
 
             if (settingsChanged)
@@ -239,12 +201,7 @@ namespace AIBridge.Editor
 
         private void DrawRuntimeInfo()
         {
-            _resolvedInfoExpanded = DrawFoldout(_resolvedInfoExpanded, AIBridgeEditorText.Get(AIBridgeEditorTextKey.ResolvedInfo));
-            if (!_resolvedInfoExpanded)
-            {
-                return;
-            }
-
+            DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.ResolvedInfo));
             DrawRuntimeDirectoryInfoBlock();
             DrawInfoBlock(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeHttpEntry), AIBridgeRuntimeBridgeEditorUtility.BuildLocalHttpUrl());
             DrawInfoBlock(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeConfigPath), AIBridgeRuntimeBridgeEditorUtility.GetRuntimeConfigPath());
@@ -270,12 +227,7 @@ namespace AIBridge.Editor
 
         private void DrawRuntimeActions()
         {
-            _actionsExpanded = DrawFoldout(_actionsExpanded, AIBridgeEditorText.Get(AIBridgeEditorTextKey.Actions));
-            if (!_actionsExpanded)
-            {
-                return;
-            }
-
+            DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Actions));
             EditorGUILayout.BeginHorizontal();
 #if AIBRIDGE_RUNTIME_ENABLED
             if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CreateRuntimeObject), GUILayout.Height(28)))
@@ -335,10 +287,10 @@ namespace AIBridge.Editor
             EditorGUILayout.EndHorizontal();
         }
 
-        private static bool DrawFoldout(bool expanded, string label)
+        private static void DrawSectionHeader(string label)
         {
             EditorGUILayout.Space(8);
-            return EditorGUILayout.Foldout(expanded, label, true);
+            EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
         }
 
         private static void SaveRuntimeSettings()

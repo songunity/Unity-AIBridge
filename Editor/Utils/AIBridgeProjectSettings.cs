@@ -58,7 +58,6 @@ namespace AIBridge.Editor
         internal sealed class RuntimeBridgeSettingsData
         {
             public bool EnableRuntimeBridge = DefaultRuntimeBridgeEnabled;
-            public bool AutoInjectRuntimeBridgeInEditorPlayMode = DefaultRuntimeBridgeAutoInjectInEditorPlayMode;
             public bool AutoInjectRuntimeBridgeInDevelopmentBuild = DefaultRuntimeBridgeAutoInjectInDevelopmentBuild;
             public bool AllowInReleaseBuild = DefaultRuntimeBridgeAllowInReleaseBuild;
             public string ExchangeDirectory = DefaultRuntimeBridgeExchangeDirectory;
@@ -83,7 +82,7 @@ namespace AIBridge.Editor
             }
         }
 
-        public const int CurrentDataVersion = 14;
+        public const int CurrentDataVersion = 15;
         public const string DefaultEditorLanguage = "English";
         public const string LegacySharedSkillRootDirectory = ".skills";
         public const string DefaultSkillRootDirectory = "";
@@ -98,7 +97,6 @@ namespace AIBridge.Editor
         public const bool DefaultEnableCodeExecution = true;
         public const bool DefaultCodeExecutionRiskAccepted = true;
         public const bool DefaultRuntimeBridgeEnabled = true;
-        public const bool DefaultRuntimeBridgeAutoInjectInEditorPlayMode = true;
         public const bool DefaultRuntimeBridgeAutoInjectInDevelopmentBuild = true;
         public const bool DefaultRuntimeBridgeAllowInReleaseBuild = false;
         public const string DefaultRuntimeBridgeExchangeDirectory = "";
@@ -371,6 +369,7 @@ namespace AIBridge.Editor
                     runtimeBridge.DiscoveryUdpPort = DefaultRuntimeBridgeDiscoveryUdpPort;
                 }
 
+                SanitizeRuntimeBridgeTextFields(runtimeBridge);
                 return runtimeBridge;
             }
         }
@@ -622,11 +621,6 @@ namespace AIBridge.Editor
                 runtimeBridge.KeepRunningInBackground = DefaultRuntimeBridgeKeepRunningInBackground;
             }
 
-            if (dataVersion < 12)
-            {
-                runtimeBridge.AutoInjectRuntimeBridgeInEditorPlayMode = DefaultRuntimeBridgeAutoInjectInEditorPlayMode;
-            }
-
             if (dataVersion < 13)
             {
                 runtimeBridge.EnableHttpTransport = DefaultRuntimeBridgeEnableHttpTransport;
@@ -641,10 +635,54 @@ namespace AIBridge.Editor
                 runtimeBridge.EnableRuntimeCodeExecution = DefaultRuntimeBridgeCodeExecutionEnabled;
             }
 
+            if (dataVersion < 15)
+            {
+                SanitizeRuntimeBridgeTextFields(runtimeBridge);
+            }
+
             if (dataVersion != CurrentDataVersion)
             {
                 dataVersion = CurrentDataVersion;
             }
+        }
+
+        private static void SanitizeRuntimeBridgeTextFields(RuntimeBridgeSettingsData settings)
+        {
+            if (settings == null)
+            {
+                return;
+            }
+
+            if (IsUiLabelValue(settings.ExchangeDirectory, "Runtime Directory", "Runtime 目录"))
+            {
+                settings.ExchangeDirectory = DefaultRuntimeBridgeExchangeDirectory;
+            }
+
+            if (IsUiLabelValue(settings.TargetId, "Default Target Id", "默认 Target Id"))
+            {
+                settings.TargetId = DefaultRuntimeBridgeTargetId;
+            }
+
+            if (IsUiLabelValue(settings.AuthToken, "Auth Token", "鉴权 Token"))
+            {
+                settings.AuthToken = string.Empty;
+            }
+
+            if (IsUiLabelValue(settings.AllowedActions, "Allowed Actions", "允许的 Actions"))
+            {
+                settings.AllowedActions = string.Empty;
+            }
+
+            if (IsUiLabelValue(settings.HttpBindAddress, "HTTP Bind Address", "HTTP 监听地址"))
+            {
+                settings.HttpBindAddress = DefaultRuntimeBridgeHttpBindAddress;
+            }
+        }
+
+        private static bool IsUiLabelValue(string value, string englishLabel, string chineseLabel)
+        {
+            return string.Equals(value, englishLabel, StringComparison.Ordinal)
+                || string.Equals(value, chineseLabel, StringComparison.Ordinal);
         }
     }
 }

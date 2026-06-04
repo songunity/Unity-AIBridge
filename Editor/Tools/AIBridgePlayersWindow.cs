@@ -21,9 +21,9 @@ namespace AIBridge.Editor
         private string _lanScanStatus;
         private int _lanScanGeneration;
         private double _lastRefreshTime;
+        private bool _cliCommandsExpanded;
 
         [MenuItem("Window/AIBridge/Players")]
-        [MenuItem("AIBridge/Players")]
         public static void OpenWindow()
         {
             var window = GetWindow<AIBridgePlayersWindow>();
@@ -41,6 +41,7 @@ namespace AIBridge.Editor
         {
             titleContent = new GUIContent(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AIBridgePlayersTitle));
             DrawToolbar();
+            DrawCliCommands();
             EditorGUILayout.Space(6);
 
             EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeDirectory), _runtimeDirectory ?? string.Empty, EditorStyles.wordWrappedMiniLabel);
@@ -102,22 +103,6 @@ namespace AIBridge.Editor
                 OpenRuntimeDirectory();
             }
 
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyListCli), EditorStyles.toolbarButton, GUILayout.Width(110)))
-            {
-                CopyFileCommand("runtime list_targets");
-            }
-
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyHttpCli), EditorStyles.toolbarButton, GUILayout.Width(112)))
-            {
-                CopyHttpCommand("runtime status --transport http --url " + Quote(_localHttpUrl) + " --target latest");
-            }
-
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyDiscoverCli), EditorStyles.toolbarButton, GUILayout.Width(128)))
-            {
-                var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
-                CopyHttpCommand("runtime discover --udpPort " + Math.Max(1, settings.DiscoveryUdpPort));
-            }
-
             GUILayout.FlexibleSpace();
             EditorGUILayout.LabelField(
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.TargetCount, _players.Count + _discoveredTargets.Count),
@@ -127,6 +112,36 @@ namespace AIBridge.Editor
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.RefreshedCount, FormatRefreshAge()),
                 EditorStyles.miniLabel,
                 GUILayout.Width(130));
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private void DrawCliCommands()
+        {
+            _cliCommandsExpanded = EditorGUILayout.Foldout(
+                _cliCommandsExpanded,
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.CliCommands),
+                true);
+            if (!_cliCommandsExpanded)
+            {
+                return;
+            }
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyListCli), GUILayout.Height(24)))
+            {
+                CopyFileCommand("runtime list_targets");
+            }
+
+            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyHttpCli), GUILayout.Height(24)))
+            {
+                CopyHttpCommand("runtime status --transport http --url " + Quote(_localHttpUrl) + " --target latest");
+            }
+
+            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyDiscoverCli), GUILayout.Height(24)))
+            {
+                var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
+                CopyHttpCommand("runtime discover --udpPort " + Math.Max(1, settings.DiscoveryUdpPort));
+            }
             EditorGUILayout.EndHorizontal();
         }
 

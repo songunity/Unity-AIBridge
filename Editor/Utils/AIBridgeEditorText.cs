@@ -19,11 +19,13 @@ namespace AIBridge.Editor
         AppliedRuntimeSettingsMessage,
         Auth,
         AuthToken,
+        AuthTokenHelp,
         AutoScanAssemblies,
         AutoScanAssembliesHelp,
         AutoInjectDevelopmentBuild,
         BindUrl,
         BridgeSettings,
+        BuildInjectionSettings,
         Cache,
         Cancel,
         ClearCache,
@@ -36,6 +38,7 @@ namespace AIBridge.Editor
         Commands,
         CompileRuntimeBridge,
         CompileRuntimeBridgeHelp,
+        CliCommands,
         CopyAgent,
         CopyDiscoverCli,
         CopyHttpCli,
@@ -121,9 +124,12 @@ namespace AIBridge.Editor
         ResetAllSettings,
         ResetSettings,
         ResetSettingsConfirm,
+        ResolvedInfo,
         Runtime,
         RuntimeBridge,
         RuntimeBridgeHelp,
+        RuntimeBehaviorLimits,
+        RuntimeCapabilities,
         RuntimeCliCopied,
         RuntimeCodeWarning,
         RuntimeConfig,
@@ -144,6 +150,7 @@ namespace AIBridge.Editor
         Scene,
         ScreenshotCacheCleared,
         Screenshots,
+        SecuritySettings,
         Settings,
         SettingsReset,
         Shortcuts,
@@ -249,11 +256,13 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.AppliedRuntimeSettingsMessage: return T("Applied Runtime Bridge settings to {0} scene runtime object(s).", "已将 Runtime Bridge 设置应用到 {0} 个场景 Runtime 对象。");
                 case AIBridgeEditorTextKey.Auth: return T("Auth", "鉴权");
                 case AIBridgeEditorTextKey.AuthToken: return T("Auth Token", "鉴权 Token");
+                case AIBridgeEditorTextKey.AuthTokenHelp: return T("Empty token means Runtime commands do not require authentication.", "Token 为空时，Runtime 命令不要求鉴权。");
                 case AIBridgeEditorTextKey.AutoScanAssemblies: return T("Auto-scan Assemblies", "自动扫描程序集");
                 case AIBridgeEditorTextKey.AutoScanAssembliesHelp: return T("When enabled, commands are scanned at runtime. When disabled, commands are pre-registered in code for better performance.", "启用后会在运行时扫描命令；禁用后命令会在代码中预注册以提升性能。");
                 case AIBridgeEditorTextKey.AutoInjectDevelopmentBuild: return T("Auto Inject In Development Build", "Development Build 自动注入");
                 case AIBridgeEditorTextKey.BindUrl: return T("Bind URL", "监听 URL");
                 case AIBridgeEditorTextKey.BridgeSettings: return T("Bridge Settings", "Bridge 设置");
+                case AIBridgeEditorTextKey.BuildInjectionSettings: return T("Build & Injection", "构建与注入");
                 case AIBridgeEditorTextKey.Cache: return T("CACHE", "缓存");
                 case AIBridgeEditorTextKey.Cancel: return T("Cancel", "取消");
                 case AIBridgeEditorTextKey.ClearCache: return T("Clear Cache", "清除缓存");
@@ -266,6 +275,7 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.Commands: return T("Commands", "命令");
                 case AIBridgeEditorTextKey.CompileRuntimeBridge: return T("Compile Runtime Bridge", "编译 Runtime Bridge");
                 case AIBridgeEditorTextKey.CompileRuntimeBridgeHelp: return T("Enable this for builds that should include Runtime Bridge code. Turn it off if you want the package build process to exclude Runtime Bridge code completely.", "需要在打包流程中包含 Runtime Bridge 代码时启用；如果完全不想让包里包含 Runtime Bridge 代码，请关闭。");
+                case AIBridgeEditorTextKey.CliCommands: return T("CLI Commands", "CLI 命令");
                 case AIBridgeEditorTextKey.CopyAgent: return T("Copy to Agent", "复制到 Agent");
                 case AIBridgeEditorTextKey.CopyDiscoverCli: return T("Copy Discover CLI", "复制发现命令");
                 case AIBridgeEditorTextKey.CopyHttpCli: return T("Copy HTTP CLI", "复制 HTTP 命令");
@@ -351,9 +361,12 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.ResetAllSettings: return T("Reset All Settings", "重置所有设置");
                 case AIBridgeEditorTextKey.ResetSettings: return T("Reset Settings", "重置设置");
                 case AIBridgeEditorTextKey.ResetSettingsConfirm: return T("Are you sure you want to reset all settings to default?", "确定要将所有设置重置为默认值吗？");
+                case AIBridgeEditorTextKey.ResolvedInfo: return T("Resolved Info", "解析后的信息");
                 case AIBridgeEditorTextKey.Runtime: return T("Runtime", "Runtime");
                 case AIBridgeEditorTextKey.RuntimeBridge: return T("Runtime Bridge", "Runtime Bridge");
                 case AIBridgeEditorTextKey.RuntimeBridgeHelp: return T("Runtime Bridge lets AIBridgeCLI connect to AIBridgeRuntime inside Play Mode or a built Player. Release builds remain disabled unless explicitly allowed.", "Runtime Bridge 允许 AIBridgeCLI 连接 Play Mode 或已编译 Player 内的 AIBridgeRuntime。Release Build 默认关闭，除非显式允许。");
+                case AIBridgeEditorTextKey.RuntimeBehaviorLimits: return T("Runtime Behavior & Limits", "运行行为与限制");
+                case AIBridgeEditorTextKey.RuntimeCapabilities: return T("Runtime Capabilities", "Runtime 能力");
                 case AIBridgeEditorTextKey.RuntimeCliCopied: return T("[AIBridge] Runtime CLI command copied.", "[AIBridge] Runtime CLI 命令已复制。");
                 case AIBridgeEditorTextKey.RuntimeCodeWarning: return T("Runtime code execution loads Roslyn-compiled DLLs in Player by Assembly.Load. Keep it for trusted debugging builds only.", "Runtime 代码执行会在 Player 中通过 Assembly.Load 加载 Roslyn 编译的 DLL。仅用于可信调试构建。");
                 case AIBridgeEditorTextKey.RuntimeConfig: return T("Runtime Config", "Runtime 配置");
@@ -374,6 +387,7 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.Scene: return T("Scene", "场景");
                 case AIBridgeEditorTextKey.ScreenshotCacheCleared: return T("Screenshot cache cleared.", "截图缓存已清除。");
                 case AIBridgeEditorTextKey.Screenshots: return T("Screenshots:", "截图：");
+                case AIBridgeEditorTextKey.SecuritySettings: return T("Security", "安全");
                 case AIBridgeEditorTextKey.Settings: return T("Settings", "设置");
                 case AIBridgeEditorTextKey.SettingsReset: return T("Settings reset to default.", "设置已重置为默认值。");
                 case AIBridgeEditorTextKey.Shortcuts: return T("Shortcuts", "快捷键");

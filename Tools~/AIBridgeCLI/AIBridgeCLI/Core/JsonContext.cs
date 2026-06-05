@@ -7,6 +7,7 @@ namespace AIBridgeCLI;
 [JsonSerializable(typeof(CommandResult))]
 [JsonSerializable(typeof(EditorInstanceMetadata))]
 [JsonSerializable(typeof(Dictionary<string, object>))]
+[JsonSerializable(typeof(Dictionary<string, object>[]), TypeInfoPropertyName = "DictionaryStringObjectArray")]
 [JsonSerializable(typeof(Dictionary<string, string>))]
 [JsonSerializable(typeof(object))]
 [JsonSerializable(typeof(object[]), TypeInfoPropertyName = "ObjectArray")]

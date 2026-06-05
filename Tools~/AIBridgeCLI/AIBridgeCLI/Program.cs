@@ -25,6 +25,11 @@ public class Program
 
     static int Run(string[] args)
     {
+        if (args.Length > 0 && string.Equals(args[0], "runtime", StringComparison.OrdinalIgnoreCase))
+        {
+            return RuntimeCliCommand.Execute(args.Skip(1).ToArray());
+        }
+
         var parsed = ParsedArgs.Parse(args);
             
         // Global help

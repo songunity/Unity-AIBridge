@@ -11,6 +11,7 @@ public static class HelpProvider
         sb.AppendLine();
         sb.AppendLine("Usage:");
         sb.AppendLine("  AIBridgeCLI <CommandName> [options]");
+        sb.AppendLine("  AIBridgeCLI runtime <subcommand> [options]");
         sb.AppendLine();
         sb.AppendLine("Global Options:");
         sb.AppendLine("  --timeout <ms>     Timeout in milliseconds (default: 5000)");
@@ -25,6 +26,8 @@ public static class HelpProvider
         sb.AppendLine("  AIBridgeCLI GameObjectCommand_Find --name \"Main Camera\"");
         sb.AppendLine("  AIBridgeCLI ScreenshotCommand_Image");
         sb.AppendLine("  AIBridgeCLI GetLogsCommand_Log --count 10");
+        sb.AppendLine("  AIBridgeCLI runtime discover --raw");
+        sb.AppendLine("  AIBridgeCLI runtime status --transport http --url http://127.0.0.1:27182 --raw");
         sb.AppendLine("  AIBridgeCLI Help");
         sb.AppendLine();
         sb.AppendLine("Tip: use [AIBridgeCLI Help --command XXX] command to get command detail.");

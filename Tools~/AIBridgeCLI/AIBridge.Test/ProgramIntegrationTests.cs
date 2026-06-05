@@ -20,6 +20,15 @@ namespace AIBridgeCLI.Tests
             return exitCode;
         }
 
+        private static int InvokeRun(string[] args)
+        {
+            MethodInfo method = typeof(Program)
+                .GetMethod("Run", BindingFlags.NonPublic | BindingFlags.Static)
+                ?? throw new InvalidOperationException("Program.Run method not found");
+
+            return (int)method.Invoke(null, [args])!;
+        }
+
         // ===========================================================================
         // 1. Basic command → type = CommandName
         // ===========================================================================
@@ -160,6 +169,41 @@ namespace AIBridgeCLI.Tests
             Assert.NotNull(req);
             Assert.False(req.@params.ContainsKey("no-wait"));
             Assert.Equal("Enemy", req.@params["name"]);
+        }
+
+        [Fact]
+        public void RuntimeHelp_ReturnsExitCode0()
+        {
+            int exit = InvokeRun(["runtime", "--help"]);
+
+            Assert.Equal(0, exit);
+        }
+
+        [Fact]
+        public void RuntimeListTargets_DoesNotRequireEditorMetadata()
+        {
+            var tempRuntimeDir = Path.Combine(Path.GetTempPath(), "aibridge-runtime-test-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                int exit = InvokeRun(["runtime", "list_targets", "--runtime-dir", tempRuntimeDir, "--raw"]);
+
+                Assert.Equal(0, exit);
+            }
+            finally
+            {
+                if (Directory.Exists(tempRuntimeDir))
+                {
+                    Directory.Delete(tempRuntimeDir, recursive: true);
+                }
+            }
+        }
+
+        [Fact]
+        public void RuntimeExecCode_ReturnsEditorHint()
+        {
+            int exit = InvokeRun(["runtime", "exec", "--code", "return null;", "--raw"]);
+
+            Assert.Equal(1, exit);
         }
 
         // ===========================================================================

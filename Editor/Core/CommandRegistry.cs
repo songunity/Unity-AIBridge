@@ -265,6 +265,16 @@ namespace AIBridge.Editor
             var runtimeExecuteCommandType = loadedAssemblies["com.sh.aibridge.Editor"].GetType("RuntimeExecuteCommand");
             if (runtimeExecuteCommandType != null)
                 RegisterCommand(runtimeExecuteCommandType.GetMethod("Execute", flags));
+            var runtimeCommandType = loadedAssemblies["com.sh.aibridge.Editor"].GetType("AIBridge.Editor.RuntimeCommand");
+            if (runtimeCommandType != null)
+            {
+                RegisterCommand(runtimeCommandType.GetMethod("ListTargets", flags));
+                RegisterCommand(runtimeCommandType.GetMethod("Discover", flags));
+                RegisterCommand(runtimeCommandType.GetMethod("Status", flags));
+                RegisterCommand(runtimeCommandType.GetMethod("Logs", flags));
+                RegisterCommand(runtimeCommandType.GetMethod("Screenshot", flags));
+                RegisterCommand(runtimeCommandType.GetMethod("ExecDll", flags));
+            }
 
             AIBridgeLogger.LogInfo($"[CommandRegistry] Registered {_registry.Count} commands.");
                 }

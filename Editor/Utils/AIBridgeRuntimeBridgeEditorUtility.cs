@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using AIBridge.Internal.Json;
+#if AIBRIDGE_RUNTIME_ENABLED
 using AIBridge.Runtime;
+#endif
 using UnityEditor;
 using UnityEngine;
 
@@ -373,6 +375,7 @@ namespace AIBridge.Editor
             return "\"" + (value ?? string.Empty).Replace("\"", "\\\"") + "\"";
         }
 
+#if AIBRIDGE_RUNTIME_ENABLED
         public static AIBridgeRuntimeSettings CreateRuntimeSettingsFromProjectSettings()
         {
             var source = AIBridgeProjectSettings.Instance.RuntimeBridge;
@@ -402,7 +405,6 @@ namespace AIBridge.Editor
             };
         }
 
-#if AIBRIDGE_RUNTIME_ENABLED
         public static AIBridgeRuntime FindSceneRuntime()
         {
             return FindSceneRuntimes().FirstOrDefault();

@@ -103,6 +103,19 @@ namespace AIBridge.Editor
                 settings.EnableRuntimeBridge);
             EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CompileRuntimeBridgeHelp), MessageType.None);
 
+            if (!settings.EnableRuntimeBridge)
+            {
+                var compileToggleChanged = EditorGUI.EndChangeCheck();
+                EditorGUIUtility.labelWidth = oldLabelWidth;
+
+                if (compileToggleChanged)
+                {
+                    SaveRuntimeSettings();
+                }
+
+                return;
+            }
+
             settings.AutoInjectRuntimeBridgeInDevelopmentBuild = EditorGUILayout.Toggle(
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.AutoInjectDevelopmentBuild),
                 settings.AutoInjectRuntimeBridgeInDevelopmentBuild);

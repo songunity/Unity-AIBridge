@@ -386,9 +386,11 @@ namespace AIBridge.Editor
                 allowedActions = ParseAllowedActions(source.AllowedActions),
                 enableRuntimeCodeExecution =
                     source.EnableRuntimeCodeExecution && AIBridgeHybridClrUtility.IsHybridClrInstalled(),
+                maxRuntimeCodeExecutionSeconds = Math.Max(0f, source.MaxRuntimeCodeExecutionSeconds),
                 heartbeatIntervalSeconds = source.HeartbeatIntervalSeconds,
                 logBufferSize = Math.Max(1, source.LogBufferSize),
                 maxResultBytes = Math.Max(1024, source.MaxResultBytes),
+                orphanResultRetentionSeconds = Math.Max(0f, source.OrphanResultRetentionSeconds),
                 keepRunningInBackground = source.KeepRunningInBackground,
                 enableHttpTransport = source.EnableHttpTransport,
                 httpBindAddress = string.IsNullOrWhiteSpace(source.HttpBindAddress)

@@ -490,9 +490,10 @@ namespace AIBridge.Runtime.Transports
         private static HttpRequestData ReadRequest(NetworkStream stream)
         {
             var bytes = new List<byte>(4096);
-            var buffer = new byte[1024];
+            var buffer = new byte[4096];
             var headerEnd = -1;
             var contentLength = 0;
+            byte[] allBytes = null;
 
             while (bytes.Count < MaxRequestBytes)
             {
@@ -502,17 +503,15 @@ namespace AIBridge.Runtime.Transports
                     break;
                 }
 
-                for (var i = 0; i < read; i++)
-                {
-                    bytes.Add(buffer[i]);
-                }
+                bytes.AddRange(new ArraySegment<byte>(buffer, 0, read));
 
                 if (headerEnd < 0)
                 {
                     headerEnd = FindHeaderEnd(bytes);
                     if (headerEnd >= 0)
                     {
-                        var headerText = Encoding.ASCII.GetString(bytes.ToArray(), 0, headerEnd);
+                        allBytes = bytes.ToArray();
+                        var headerText = Encoding.ASCII.GetString(allBytes, 0, headerEnd);
                         contentLength = ParseContentLength(headerText);
                     }
                 }
@@ -528,7 +527,11 @@ namespace AIBridge.Runtime.Transports
                 return null;
             }
 
-            var allBytes = bytes.ToArray();
+            if (allBytes == null || allBytes.Length != bytes.Count)
+            {
+                allBytes = bytes.ToArray();
+            }
+
             var headersText = Encoding.ASCII.GetString(allBytes, 0, headerEnd);
             var request = ParseHeaders(headersText);
             if (request == null)

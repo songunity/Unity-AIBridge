@@ -133,6 +133,11 @@ namespace AIBridge.Editor
             else if (settings.EnableRuntimeCodeExecution)
             {
                 EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeCodeWarning), MessageType.Warning);
+
+                settings.MaxRuntimeCodeExecutionSeconds = EditorGUILayout.FloatField(
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.MaxCodeExecutionSeconds),
+                    settings.MaxRuntimeCodeExecutionSeconds);
+                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.MaxCodeExecutionSecondsHelp), MessageType.None);
             }
 
             DrawAllowedActionsField(settings);
@@ -171,6 +176,11 @@ namespace AIBridge.Editor
                     AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpBindAddress),
                     settings.HttpBindAddress ?? string.Empty);
 
+                if (!IsLoopbackBindAddress(settings.HttpBindAddress) && string.IsNullOrEmpty(settings.AuthToken))
+                {
+                    EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.InsecureBindWarning), MessageType.Warning);
+                }
+
                 settings.HttpPort = EditorGUILayout.IntField(
                     AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpPort),
                     settings.HttpPort);
@@ -208,6 +218,11 @@ namespace AIBridge.Editor
             settings.MaxResultBytes = EditorGUILayout.IntField(
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.MaxResultBytes),
                 settings.MaxResultBytes);
+
+            settings.OrphanResultRetentionSeconds = EditorGUILayout.FloatField(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.OrphanResultRetentionSeconds),
+                settings.OrphanResultRetentionSeconds);
+            EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.OrphanResultRetentionSecondsHelp), MessageType.None);
 
             var settingsChanged = EditorGUI.EndChangeCheck();
             EditorGUIUtility.labelWidth = oldLabelWidth;
@@ -432,6 +447,21 @@ namespace AIBridge.Editor
 
             index = -1;
             return false;
+        }
+
+        // 反向白名单:仅本机回环地址视为安全;其余(0.0.0.0、::、* 、具体网卡 IP 等)在无 Token 时均需警告。
+        private static bool IsLoopbackBindAddress(string address)
+        {
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                return false;
+            }
+
+            var trimmed = address.Trim();
+            return string.Equals(trimmed, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(trimmed, "::1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(trimmed, "[::1]", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(trimmed, "localhost", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void SaveRuntimeSettings()

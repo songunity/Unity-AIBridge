@@ -38,6 +38,7 @@ namespace AIBridge.Runtime
         private const int MaxRuntimeCodeAssemblyBytes = 16 * 1024 * 1024;
         private const int MaxRuntimeCodeResultDepth = 8;
         private const int MaxRuntimeCodeCollectionItems = 512;
+        private const int MaxCachedAssemblies = 64;
         private const int CommandPumpStaleMilliseconds = 3000;
 
         private static readonly string[] BuiltInActions =
@@ -93,6 +94,7 @@ namespace AIBridge.Runtime
         private bool _cachedIsDebugBuild;
 
         private readonly Queue<AIBridgeRuntimeCommand> _commandQueue = new Queue<AIBridgeRuntimeCommand>();
+        private readonly Dictionary<string, Assembly> _assemblyCache = new Dictionary<string, Assembly>(StringComparer.OrdinalIgnoreCase);
         private readonly List<IAIBridgeHandler> _handlers = new List<IAIBridgeHandler>();
         private readonly List<IAIBridgeAsyncHandler> _asyncHandlers = new List<IAIBridgeAsyncHandler>();
         private readonly AIBridgeRuntimeLogBuffer _logBuffer = new AIBridgeRuntimeLogBuffer();
@@ -104,6 +106,7 @@ namespace AIBridge.Runtime
 
         private float _lastPollTime;
         private float _lastHeartbeatTime;
+        private float _lastOrphanCleanupTime;
         private DateTime _startedAtUtc;
         private bool _initialized;
         private bool _runInBackgroundChanged;
@@ -173,6 +176,7 @@ namespace AIBridge.Runtime
 
             MarkMainThreadTick();
             WriteHeartbeatIfDue();
+            CleanupOrphanResultsIfDue();
 
             var now = Time.realtimeSinceStartup;
             if (now - _lastPollTime >= pollIntervalSeconds)
@@ -668,7 +672,7 @@ namespace AIBridge.Runtime
             RuntimeCodeInvocationContext context = null;
             try
             {
-                var assembly = Assembly.Load(assemblyBytes);
+                var assembly = LoadRuntimeCodeAssembly(assemblyBytes, actualSha256);
                 var entryTypeName = ReadStringParam(cmd, "entryType", null);
                 var methodName = ReadStringParam(cmd, "methodName", null);
                 Type entryType;
@@ -734,6 +738,32 @@ namespace AIBridge.Runtime
             }
         }
 
+        // 同一段代码(sha256 相同)复用已加载的 Assembly,避免反复发送相同探针时程序集无限累积。
+        // key 使用运行时计算的 sha256,而非客户端声明值,防止伪造命中。已加载的 Assembly 无法卸载,
+        // 缓存仅复用引用;不同代码仍会累积,故设上限,超限时整体清空以遏制字典无限增长。
+        private Assembly LoadRuntimeCodeAssembly(byte[] assemblyBytes, string sha256)
+        {
+            if (!string.IsNullOrEmpty(sha256)
+                && _assemblyCache.TryGetValue(sha256, out var cached)
+                && cached != null)
+            {
+                return cached;
+            }
+
+            var assembly = Assembly.Load(assemblyBytes);
+            if (!string.IsNullOrEmpty(sha256))
+            {
+                if (_assemblyCache.Count >= MaxCachedAssemblies)
+                {
+                    _assemblyCache.Clear();
+                }
+
+                _assemblyCache[sha256] = assembly;
+            }
+
+            return assembly;
+        }
+
         private static bool IsRuntimeCodeExecutionAvailable(out string reason)
         {
 #if AIBRIDGE_HYBRIDCLR_AVAILABLE
@@ -747,8 +777,23 @@ namespace AIBridge.Runtime
 
         private IEnumerator CompleteRuntimeCodeTask(AIBridgeRuntimeCommand cmd, RuntimeCodeInvocationContext context, Task task)
         {
+            // 仅对 async Task 路径生效:超时后写回失败并停止协程空转。底层 Task 无法强制中止,可能仍在后台运行。
+            // 同步阻塞(while(true)/CPU 密集)会占满主线程、Update 不被调度,此 deadline 形同虚设,属固有风险。
+            var timeoutSeconds = runtimeSettings == null ? 0f : runtimeSettings.maxRuntimeCodeExecutionSeconds;
+            var deadline = timeoutSeconds > 0f ? Time.realtimeSinceStartup + timeoutSeconds : float.PositiveInfinity;
             while (task != null && !task.IsCompleted)
             {
+                if (Time.realtimeSinceStartup >= deadline)
+                {
+                    var timeoutResult = AIBridgeRuntimeCommandResult.FromFailure(
+                        cmd.Id,
+                        "Runtime code async task timed out after "
+                            + timeoutSeconds.ToString(CultureInfo.InvariantCulture) + "s.");
+                    timeoutResult.Data = BuildRuntimeCodeResultData(context, null, true, context.StartedAtUtc, null);
+                    WriteResult(timeoutResult);
+                    yield break;
+                }
+
                 yield return null;
             }
 
@@ -1538,6 +1583,57 @@ namespace AIBridge.Runtime
             return false;
         }
 
+        // File 传输下 CLI 超时或异步晚到的 result 文件无人取走会持续堆积;低频清理超龄文件。
+        // 保守原则:仅删确实超龄者,读取修改时间或删除失败均跳过,宁可漏删不可错删。
+        // 已知局限:若 CLI --timeout 大于 orphanResultRetentionSeconds,仍可能误删未读结果(UI 注明)。
+        private void CleanupOrphanResultsIfDue()
+        {
+            const float CleanupIntervalSeconds = 30f;
+            var retentionSeconds = runtimeSettings == null ? 0f : runtimeSettings.orphanResultRetentionSeconds;
+            if (retentionSeconds <= 0f)
+            {
+                return;
+            }
+
+            if (Time.realtimeSinceStartup - _lastOrphanCleanupTime < CleanupIntervalSeconds)
+            {
+                return;
+            }
+
+            _lastOrphanCleanupTime = Time.realtimeSinceStartup;
+
+            if (string.IsNullOrEmpty(_resultsPath) || !Directory.Exists(_resultsPath))
+            {
+                return;
+            }
+
+            string[] files;
+            try
+            {
+                files = Directory.GetFiles(_resultsPath, "*.json");
+            }
+            catch
+            {
+                return;
+            }
+
+            var threshold = DateTime.UtcNow.AddSeconds(-retentionSeconds);
+            for (var i = 0; i < files.Length; i++)
+            {
+                var file = files[i];
+                try
+                {
+                    if (File.GetLastWriteTimeUtc(file) < threshold)
+                    {
+                        File.Delete(file);
+                    }
+                }
+                catch
+                {
+                }
+            }
+        }
+
         private void WriteHeartbeatIfDue()
         {
             var interval = runtimeSettings == null ? 1f : Mathf.Max(0.1f, runtimeSettings.heartbeatIntervalSeconds);
@@ -1793,7 +1889,7 @@ namespace AIBridge.Runtime
                 if (maxBytes > 0 && Encoding.UTF8.GetByteCount(json) > maxBytes)
                 {
                     result = AIBridgeRuntimeCommandResult.FromFailure(result.CommandId, "Runtime command result exceeded maxResultBytes.");
-                    json = AIBridgeJson.Serialize(result, pretty: true);
+                    json = AIBridgeJson.Serialize(result, pretty: false);
                 }
 
                 CacheHttpResult(result);

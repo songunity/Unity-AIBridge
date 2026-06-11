@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+#if AIBRIDGE_RUNTIME_ENABLED
 using AIBridge.Runtime;
+#endif
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -51,6 +53,7 @@ namespace AIBridge.Editor
 
         public void OnProcessScene(Scene scene, BuildReport report)
         {
+#if AIBRIDGE_RUNTIME_ENABLED
             if (_runtimeSettingsCarrierInjected)
             {
                 return;
@@ -80,6 +83,7 @@ namespace AIBridge.Editor
             carrier.RuntimeSettings = AIBridgeRuntimeBridgeEditorUtility.CreateRuntimeSettingsFromProjectSettings();
             carrier.GeneratedForBuild = true;
             _runtimeSettingsCarrierInjected = true;
+#endif
         }
 
         internal static void SyncRuntimeBootstrapDefinesForActiveTarget()
@@ -137,6 +141,7 @@ namespace AIBridge.Editor
             return true;
         }
 
+#if AIBRIDGE_RUNTIME_ENABLED
         private static bool ShouldInjectRuntimeSettingsCarrier(
             AIBridgeProjectSettings.RuntimeBridgeSettingsData settings,
             BuildReport report)
@@ -185,6 +190,7 @@ namespace AIBridge.Editor
 
             return null;
         }
+#endif
 
         private static List<string> ParseDefines(string symbols)
         {

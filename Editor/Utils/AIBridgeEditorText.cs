@@ -299,7 +299,7 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.CommandRegistration: return T("Command Registration", "命令注册");
                 case AIBridgeEditorTextKey.Commands: return T("Commands", "命令");
                 case AIBridgeEditorTextKey.CompileRuntimeBridge: return T("Compile Runtime Bridge", "编译 Runtime Bridge");
-                case AIBridgeEditorTextKey.CompileRuntimeBridgeHelp: return T("Enable this for builds that should include Runtime Bridge code. Turn it off if you want the package build process to exclude Runtime Bridge code completely.", "需要在打包流程中包含 Runtime Bridge 代码时启用；如果完全不想让包里包含 Runtime Bridge 代码，请关闭。");
+                case AIBridgeEditorTextKey.CompileRuntimeBridgeHelp: return T("Enable this to compile Runtime Bridge code and expose Runtime Bridge editor controls. Turn it off to remove the Runtime assembly from compilation.", "启用后编译 Runtime Bridge 代码并显示 Runtime Bridge 编辑器控制；关闭后从编译中剔除 Runtime assembly。");
                 case AIBridgeEditorTextKey.CliCommands: return T("CLI Commands", "CLI 命令");
                 case AIBridgeEditorTextKey.CopyAgent: return T("Copy to Agent", "复制到 Agent");
                 case AIBridgeEditorTextKey.CopyDiscoverCli: return T("Copy Discover CLI", "复制发现命令");

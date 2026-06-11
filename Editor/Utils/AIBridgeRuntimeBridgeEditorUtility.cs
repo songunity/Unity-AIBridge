@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using AIBridge.Internal.Json;
 #if AIBRIDGE_RUNTIME_ENABLED
 using AIBridge.Runtime;
 #endif
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -202,7 +203,7 @@ namespace AIBridge.Editor
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllText(path, AIBridgeJson.Serialize(config, pretty: true));
+            File.WriteAllText(path, SerializeJson(config, pretty: true));
             return path;
         }
 
@@ -360,7 +361,7 @@ namespace AIBridge.Editor
                     Directory.CreateDirectory(directory);
                 }
 
-                File.WriteAllText(path, AIBridgeJson.Serialize(cache, pretty: true));
+                File.WriteAllText(path, SerializeJson(cache, pretty: true));
                 return true;
             }
             catch (Exception exception)
@@ -462,7 +463,7 @@ namespace AIBridge.Editor
 
             try
             {
-                return AIBridgeJson.DeserializeObject(File.ReadAllText(heartbeatPath));
+                return DeserializeJson(File.ReadAllText(heartbeatPath));
             }
             catch
             {
@@ -480,7 +481,7 @@ namespace AIBridge.Editor
 
             try
             {
-                return AIBridgeJson.DeserializeObject(File.ReadAllText(path));
+                return DeserializeJson(File.ReadAllText(path));
             }
             catch
             {
@@ -571,6 +572,53 @@ namespace AIBridge.Editor
                 .Where(action => !string.IsNullOrEmpty(action))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+        }
+
+        private static string SerializeJson(object value, bool pretty)
+        {
+            return JsonConvert.SerializeObject(value, pretty ? Formatting.Indented : Formatting.None);
+        }
+
+        private static Dictionary<string, object> DeserializeJson(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
+
+            return ConvertJsonValue(JToken.Parse(json)) as Dictionary<string, object>;
+        }
+
+        private static object ConvertJsonValue(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null)
+            {
+                return null;
+            }
+
+            if (token is JObject jsonObject)
+            {
+                var result = new Dictionary<string, object>(StringComparer.Ordinal);
+                foreach (var property in jsonObject.Properties())
+                {
+                    result[property.Name] = ConvertJsonValue(property.Value);
+                }
+
+                return result;
+            }
+
+            if (token is JArray jsonArray)
+            {
+                var result = new List<object>();
+                for (var i = 0; i < jsonArray.Count; i++)
+                {
+                    result.Add(ConvertJsonValue(jsonArray[i]));
+                }
+
+                return result;
+            }
+
+            return ((JValue)token).Value;
         }
 
         private static bool IsChildPath(string childPath, string parentPath)

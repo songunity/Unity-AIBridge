@@ -65,9 +65,11 @@ namespace AIBridge.Editor
             public string AuthToken = string.Empty;
             public string AllowedActions = string.Empty;
             public bool EnableRuntimeCodeExecution = DefaultRuntimeBridgeCodeExecutionEnabled;
+            public float MaxRuntimeCodeExecutionSeconds = DefaultRuntimeBridgeMaxCodeExecutionSeconds;
             public float HeartbeatIntervalSeconds = DefaultRuntimeBridgeHeartbeatIntervalSeconds;
             public int LogBufferSize = DefaultRuntimeBridgeLogBufferSize;
             public int MaxResultBytes = DefaultRuntimeBridgeMaxResultBytes;
+            public float OrphanResultRetentionSeconds = DefaultRuntimeBridgeOrphanResultRetentionSeconds;
             public bool KeepRunningInBackground = DefaultRuntimeBridgeKeepRunningInBackground;
             public bool EnableHttpTransport = DefaultRuntimeBridgeEnableHttpTransport;
             public string HttpBindAddress = DefaultRuntimeBridgeHttpBindAddress;
@@ -102,9 +104,11 @@ namespace AIBridge.Editor
         public const string DefaultRuntimeBridgeExchangeDirectory = "";
         public const string DefaultRuntimeBridgeTargetId = "";
         public const bool DefaultRuntimeBridgeCodeExecutionEnabled = true;
+        public const float DefaultRuntimeBridgeMaxCodeExecutionSeconds = 30f;
         public const float DefaultRuntimeBridgeHeartbeatIntervalSeconds = 1f;
         public const int DefaultRuntimeBridgeLogBufferSize = 500;
         public const int DefaultRuntimeBridgeMaxResultBytes = 1048576;
+        public const float DefaultRuntimeBridgeOrphanResultRetentionSeconds = 60f;
         public const bool DefaultRuntimeBridgeKeepRunningInBackground = true;
         public const bool DefaultRuntimeBridgeEnableHttpTransport = true;
         public const string DefaultRuntimeBridgeHttpBindAddress = "0.0.0.0";
@@ -352,6 +356,17 @@ namespace AIBridge.Editor
                 if (runtimeBridge.MaxResultBytes <= 0)
                 {
                     runtimeBridge.MaxResultBytes = DefaultRuntimeBridgeMaxResultBytes;
+                }
+
+                // 0 表示禁用(不限时长 / 不清理),仅修正非法负值。
+                if (runtimeBridge.MaxRuntimeCodeExecutionSeconds < 0f)
+                {
+                    runtimeBridge.MaxRuntimeCodeExecutionSeconds = DefaultRuntimeBridgeMaxCodeExecutionSeconds;
+                }
+
+                if (runtimeBridge.OrphanResultRetentionSeconds < 0f)
+                {
+                    runtimeBridge.OrphanResultRetentionSeconds = DefaultRuntimeBridgeOrphanResultRetentionSeconds;
                 }
 
                 if (string.IsNullOrWhiteSpace(runtimeBridge.HttpBindAddress))

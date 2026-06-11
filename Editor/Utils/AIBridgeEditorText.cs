@@ -108,6 +108,10 @@ namespace AIBridge.Editor
         LogBufferSize,
         Maintenance,
         MaxResultBytes,
+        MaxCodeExecutionSeconds,
+        MaxCodeExecutionSecondsHelp,
+        OrphanResultRetentionSeconds,
+        OrphanResultRetentionSecondsHelp,
         NoFileTransportTargets,
         NoLanDiscoveredTargets,
         NoToken,
@@ -142,6 +146,7 @@ namespace AIBridge.Editor
         RuntimeCapabilities,
         RuntimeCliCopied,
         RuntimeCodeWarning,
+        InsecureBindWarning,
         RuntimeConfig,
         RuntimeConfigPath,
         RuntimeConfigWritten,
@@ -355,6 +360,10 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.LogBufferSize: return T("Log Buffer Size", "日志缓存数量");
                 case AIBridgeEditorTextKey.Maintenance: return T("Maintenance", "维护");
                 case AIBridgeEditorTextKey.MaxResultBytes: return T("Max Result Bytes", "最大结果字节数");
+                case AIBridgeEditorTextKey.MaxCodeExecutionSeconds: return T("Max Code Execution Seconds", "代码执行超时（秒）");
+                case AIBridgeEditorTextKey.MaxCodeExecutionSecondsHelp: return T("Async runtime code task timeout in seconds (0 = unlimited). Synchronous blocking code is not protected.", "异步 Runtime 代码任务的超时秒数（0 = 不限）。同步阻塞代码不受此保护。");
+                case AIBridgeEditorTextKey.OrphanResultRetentionSeconds: return T("Orphan Result Retention Seconds", "孤儿结果保留时长（秒）");
+                case AIBridgeEditorTextKey.OrphanResultRetentionSecondsHelp: return T("Unread result files older than this are cleaned up (0 = never). Must exceed the File transport CLI --timeout, otherwise long-running command results may be removed before the client reads them.", "超过该时长仍未被读取的结果文件会被清理（0 = 不清理）。该值必须大于 File transport CLI 端 --timeout，否则长耗时命令的结果可能在客户端读取前被清除。");
                 case AIBridgeEditorTextKey.NoFileTransportTargets: return T("No file transport Runtime targets found. Start Play Mode or a built Player with AIBridgeRuntime enabled, or run LAN discovery for phone targets.", "未找到 File transport Runtime 目标。请启动挂有 AIBridgeRuntime 的 Play Mode/Player，或对手机目标执行局域网发现。");
                 case AIBridgeEditorTextKey.NoLanDiscoveredTargets: return T("No LAN-discovered HTTP targets found. Keep Scan LAN checked and refresh after the Player is running on the same network.", "未发现局域网 HTTP 目标。请保持“扫描局域网”勾选，并在同一网络中的 Player 运行后刷新。");
                 case AIBridgeEditorTextKey.NoToken: return T("No token", "无 Token");
@@ -389,6 +398,7 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.RuntimeCapabilities: return T("Runtime Capabilities", "Runtime 能力");
                 case AIBridgeEditorTextKey.RuntimeCliCopied: return T("[AIBridge] Runtime CLI command copied.", "[AIBridge] Runtime CLI 命令已复制。");
                 case AIBridgeEditorTextKey.RuntimeCodeWarning: return T("Runtime code execution loads Roslyn-compiled DLLs in Player by Assembly.Load. Keep it for trusted debugging builds only.", "Runtime 代码执行会在 Player 中通过 Assembly.Load 加载 Roslyn 编译的 DLL。仅用于可信调试构建。");
+                case AIBridgeEditorTextKey.InsecureBindWarning: return T("HTTP bind address is not loopback and no auth token is set: any host on the network can send Runtime commands (including code execution). Set an auth token or bind to 127.0.0.1.", "HTTP 绑定地址非本机回环且未设置鉴权 Token：局域网内任意主机均可发送 Runtime 命令（含代码执行）。请设置鉴权 Token 或绑定到 127.0.0.1。");
                 case AIBridgeEditorTextKey.RuntimeConfig: return T("Runtime Config", "Runtime 配置");
                 case AIBridgeEditorTextKey.RuntimeConfigPath: return T("Runtime Config path:", "Runtime 配置路径：");
                 case AIBridgeEditorTextKey.RuntimeConfigWritten: return T("[AIBridge] Runtime config written: {0}", "[AIBridge] Runtime 配置已写入：{0}");

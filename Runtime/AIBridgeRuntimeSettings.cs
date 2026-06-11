@@ -12,9 +12,11 @@ namespace AIBridge.Runtime
         public string authToken;
         public string[] allowedActions = new string[0];
         public bool enableRuntimeCodeExecution = true;
+        public float maxRuntimeCodeExecutionSeconds = 30f;
         public float heartbeatIntervalSeconds = 1f;
         public int logBufferSize = 500;
         public int maxResultBytes = 1048576;
+        public float orphanResultRetentionSeconds = 60f;
         public bool keepRunningInBackground = true;
         public bool enableHttpTransport = true;
         public string httpBindAddress = "0.0.0.0";
@@ -43,9 +45,11 @@ namespace AIBridge.Runtime
             authToken = source.authToken;
             allowedActions = source.allowedActions == null ? null : (string[])source.allowedActions.Clone();
             enableRuntimeCodeExecution = source.enableRuntimeCodeExecution;
+            maxRuntimeCodeExecutionSeconds = source.maxRuntimeCodeExecutionSeconds;
             heartbeatIntervalSeconds = source.heartbeatIntervalSeconds;
             logBufferSize = source.logBufferSize;
             maxResultBytes = source.maxResultBytes;
+            orphanResultRetentionSeconds = source.orphanResultRetentionSeconds;
             keepRunningInBackground = source.keepRunningInBackground;
             enableHttpTransport = source.enableHttpTransport;
             httpBindAddress = source.httpBindAddress;

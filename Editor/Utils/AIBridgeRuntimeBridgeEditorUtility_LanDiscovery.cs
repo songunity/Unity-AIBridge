@@ -8,7 +8,6 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using AIBridge.Internal.Json;
 
 namespace AIBridge.Editor
 {
@@ -50,7 +49,7 @@ namespace AIBridge.Editor
                     ["version"] = 1,
                     ["requestId"] = requestId
                 };
-                var bytes = Encoding.UTF8.GetBytes(AIBridgeJson.Serialize(payload, pretty: false));
+                var bytes = Encoding.UTF8.GetBytes(SerializeJson(payload, pretty: false));
                 var interfaces = BuildLanDiscoveryInterfacePlan();
 
                 for (var i = 0; i < interfaces.Count; i++)
@@ -289,7 +288,7 @@ namespace AIBridge.Editor
         {
             try
             {
-                var json = AIBridgeJson.DeserializeObject(Encoding.UTF8.GetString(bytes));
+                var json = DeserializeJson(Encoding.UTF8.GetString(bytes));
                 if (!string.Equals(GetString(json, "protocol"), DiscoveryProtocol, StringComparison.Ordinal)
                     || !string.Equals(GetString(json, "requestId"), requestId, StringComparison.Ordinal))
                 {
@@ -416,7 +415,7 @@ namespace AIBridge.Editor
 
                         using (var reader = new StreamReader(stream, Encoding.UTF8))
                         {
-                            health = AIBridgeJson.DeserializeObject(reader.ReadToEnd());
+                            health = DeserializeJson(reader.ReadToEnd());
                         }
                     }
                 }
@@ -465,7 +464,7 @@ namespace AIBridge.Editor
                 ["updatedAtUtc"] = DateTime.UtcNow.ToString("o"),
                 ["targets"] = MergeDiscoveryCacheTargets(targets)
             };
-            File.WriteAllText(path, AIBridgeJson.Serialize(cache, pretty: true));
+            File.WriteAllText(path, SerializeJson(cache, pretty: true));
         }
 
         private static List<object> MergeDiscoveryCacheTargets(List<AIBridgeRuntimeLanDiscoveryTarget> targets)

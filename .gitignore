@@ -43,3 +43,4 @@ sysinfo.txt
 *.unitypackage
 .claude/settings.local.json
 plans/i18n-uitoolkit-unification.md
+plans/

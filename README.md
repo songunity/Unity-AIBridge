@@ -39,6 +39,7 @@ return go.transform.position;
 - **输入模拟** - 点击、拖拽、长按 GameObject（运行时）
 - **日志捕获** - 获取控制台日志、精确时间戳捕获模式
 - **代码执行** - 在编辑器或运行时动态执行 C# 代码片段（意味着即使没有预置命令，也能通过代码实现任何 Unity API 操作）
+- **Runtime Bridge** - 连接打包后的 Player，读取运行状态、日志、截图、性能数据，并在启用 Runtime 代码执行后发送已编译 DLL 执行
 - **批量命令** - 单次调用执行多个命令
 - **菜单项** - 执行任意 Unity 编辑器菜单项
 - **测试运行** - 集成 Unity TestRunner API
@@ -185,6 +186,54 @@ public static class MyCustomCommand
 
 ```bash
 AIBridgeCLI.exe MyCustomCommand_CreateCustomCube --name "MyCube" --size 2.0
+```
+
+### 4. 使用 Runtime Bridge
+
+Runtime Bridge 主要用于连接**打包后的 Player**。它适合调试真机包、独立 Player，以及 Editor 命令无法直接看到的打包后运行时数据。
+
+Unity Editor 下的 Play Mode 仍然推荐使用原来的 `CodeExecuteCommand_Execute` 和 Editor 命令；只有需要模拟或验证打包后 Runtime Bridge 链路时，才需要在 Play Mode 中创建 `AIBridgeRuntime`。
+
+常见用途：
+
+- 查看 Runtime 目标状态、当前场景、平台、HTTP 入口和能力
+- 读取 Player 内存日志，或清理 Runtime 日志缓存
+- 截取 Player 运行时截图
+- 采样 FPS、帧耗时等性能数据
+- 基于 HybridCLR，在显式启用后把自己组织并编译好的 DLL 发送到 Runtime 执行
+
+默认情况下，**Compile Runtime Bridge 是关闭的**。如需使用：
+
+1. 打开 `Window > AIBridge > Runtime`
+2. 勾选 **Compile Runtime Bridge**
+3. 按需要配置 **启用 Bootstrap 自动注入**、HTTP、Token、Allowed Actions 等选项
+4. 打开 `Window > AIBridge > Players` 查看 File Transport / HTTP / LAN 发现到的 Runtime targets
+
+Development Build 在启用 Bootstrap 自动注入后会自动创建 `AIBridgeRuntime`；Release Build 默认不启用，只有勾选 **Release Build 自动注入** 后才会自动创建。Editor Play Mode 如需调试 Runtime Bridge 链路，可以在 Runtime 面板中手动创建或应用场景 Runtime 对象。
+
+Runtime 代码执行依赖 HybridCLR。调用方可以自行组织 C# 代码、编译成 DLL，再通过 Runtime Bridge 发送到 Player 中加载执行；`runtime exec --dll` 只负责发送已编译 DLL，不负责在 CLI 侧编译源码。
+
+常用 CLI：
+
+```bash
+# 列出本机 Runtime targets
+AIBridgeCLI.exe runtime list_targets --raw
+
+# 扫描局域网 Runtime targets
+AIBridgeCLI.exe runtime discover --udpPort 27183 --raw
+
+# 获取 Runtime 状态
+AIBridgeCLI.exe runtime status --transport file --target latest --raw
+AIBridgeCLI.exe runtime status --transport http --url http://127.0.0.1:27182 --raw
+
+# 读取 Runtime 日志
+AIBridgeCLI.exe runtime logs --transport file --target latest --logType Error --count 100 --raw
+
+# 截取 Runtime 截图
+AIBridgeCLI.exe runtime screenshot --transport file --target latest --raw
+
+# 执行已编译 DLL（需要 HybridCLR 和启用 Runtime 代码执行）
+AIBridgeCLI.exe runtime exec --dll probe.dll --transport http --url http://127.0.0.1:27182 --riskAccepted true --raw
 ```
 
 ## 命令注册

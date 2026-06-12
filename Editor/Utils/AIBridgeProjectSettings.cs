@@ -98,7 +98,7 @@ namespace AIBridge.Editor
         public const string DefaultScriptDirectory = "Assets/AIBridgeScripts";
         public const bool DefaultEnableCodeExecution = true;
         public const bool DefaultCodeExecutionRiskAccepted = true;
-        public const bool DefaultRuntimeBridgeEnabled = true;
+        public const bool DefaultRuntimeBridgeEnabled = false;
         public const bool DefaultRuntimeBridgeAutoInjectInDevelopmentBuild = true;
         public const bool DefaultRuntimeBridgeAllowInReleaseBuild = false;
         public const string DefaultRuntimeBridgeExchangeDirectory = "";

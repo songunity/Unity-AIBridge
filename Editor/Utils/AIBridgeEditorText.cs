@@ -17,7 +17,6 @@ namespace AIBridge.Editor
         AllowedActionsHelp,
         AllowedActionsCustom,
         AllowedActionsWhitelistHelp,
-        AllowedActionCodeExecuteHelp,
         AllowedActionHandlersHelp,
         AllowedActionLogsClearHelp,
         AllowedActionLogsHelp,
@@ -33,6 +32,7 @@ namespace AIBridge.Editor
         AutoScanAssemblies,
         AutoScanAssembliesHelp,
         AutoInjectDevelopmentBuild,
+        AutoInjectDevelopmentBuildHelp,
         BindUrl,
         BridgeSettings,
         BuildInjectionSettings,
@@ -264,12 +264,11 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.AgentClaude: return "Claude Code (.claude)";
                 case AIBridgeEditorTextKey.AgentCodex: return "Codex (.agents)";
                 case AIBridgeEditorTextKey.AgentKiro: return "Kiro (.kiro)";
-                case AIBridgeEditorTextKey.AllowReleaseBuild: return T("Allow Runtime Bridge In Release Build", "允许 Release Build 启用 Runtime Bridge");
+                case AIBridgeEditorTextKey.AllowReleaseBuild: return T("Auto Inject In Release Build", "Release Build 自动注入");
                 case AIBridgeEditorTextKey.AllowedActions: return T("Allowed Actions", "允许的 Actions");
                 case AIBridgeEditorTextKey.AllowedActionsHelp: return T("Whitelist off: all built-in actions are allowed. Custom actions stay limited by build type.", "关闭白名单：允许所有内置 action。自定义 action 仍按构建类型限制。");
                 case AIBridgeEditorTextKey.AllowedActionsCustom: return T("Custom Actions", "自定义 Actions");
                 case AIBridgeEditorTextKey.AllowedActionsWhitelistHelp: return T("Whitelist on: only selected built-in actions and listed custom actions are allowed.", "开启白名单：只允许已选择的内置 action 和列出的自定义 action。");
-                case AIBridgeEditorTextKey.AllowedActionCodeExecuteHelp: return T("Executes runtime C# code through the Runtime Bridge. Highest risk; keep it for trusted debug builds.", "通过 Runtime Bridge 执行运行时 C# 代码。风险最高，仅建议可信调试构建使用。");
                 case AIBridgeEditorTextKey.AllowedActionHandlersHelp: return T("Lists registered runtime handlers and their supported actions.", "列出已注册的 Runtime handler 及其支持的 actions。");
                 case AIBridgeEditorTextKey.AllowedActionLogsClearHelp: return T("Clears the in-memory runtime log buffer.", "清空内存中的 Runtime 日志缓存。");
                 case AIBridgeEditorTextKey.AllowedActionLogsHelp: return T("Reads recent runtime logs from the in-memory log buffer.", "读取内存日志缓存中的近期 Runtime 日志。");
@@ -284,7 +283,8 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.AuthTokenHelp: return T("Empty token means Runtime commands do not require authentication.", "Token 为空时，Runtime 命令不要求鉴权。");
                 case AIBridgeEditorTextKey.AutoScanAssemblies: return T("Auto-scan Assemblies", "自动扫描程序集");
                 case AIBridgeEditorTextKey.AutoScanAssembliesHelp: return T("When enabled, commands are scanned at runtime. When disabled, commands are pre-registered in code for better performance.", "启用后会在运行时扫描命令；禁用后命令会在代码中预注册以提升性能。");
-                case AIBridgeEditorTextKey.AutoInjectDevelopmentBuild: return T("Auto Inject In Development Build", "Development Build 自动注入");
+                case AIBridgeEditorTextKey.AutoInjectDevelopmentBuild: return T("Enable Bootstrap Auto Injection", "启用 Bootstrap 自动注入");
+                case AIBridgeEditorTextKey.AutoInjectDevelopmentBuildHelp: return T("Default on: Development Build auto-creates AIBridgeRuntime. Release Build auto-creates it only when Release auto injection is enabled.", "默认开启：Development Build 会自动创建 AIBridgeRuntime；Release Build 只有勾选 Release 自动注入才会自动创建。");
                 case AIBridgeEditorTextKey.BindUrl: return T("Bind URL", "监听 URL");
                 case AIBridgeEditorTextKey.BridgeSettings: return T("Bridge Settings", "Bridge 设置");
                 case AIBridgeEditorTextKey.BuildInjectionSettings: return T("Build & Injection", "构建与注入");
@@ -362,8 +362,8 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.MaxResultBytes: return T("Max Result Bytes", "最大结果字节数");
                 case AIBridgeEditorTextKey.MaxCodeExecutionSeconds: return T("Max Code Execution Seconds", "代码执行超时（秒）");
                 case AIBridgeEditorTextKey.MaxCodeExecutionSecondsHelp: return T("Async runtime code task timeout in seconds (0 = unlimited). Synchronous blocking code is not protected.", "异步 Runtime 代码任务的超时秒数（0 = 不限）。同步阻塞代码不受此保护。");
-                case AIBridgeEditorTextKey.OrphanResultRetentionSeconds: return T("Orphan Result Retention Seconds", "孤儿结果保留时长（秒）");
-                case AIBridgeEditorTextKey.OrphanResultRetentionSecondsHelp: return T("Unread result files older than this are cleaned up (0 = never). Must exceed the File transport CLI --timeout, otherwise long-running command results may be removed before the client reads them.", "超过该时长仍未被读取的结果文件会被清理（0 = 不清理）。该值必须大于 File transport CLI 端 --timeout，否则长耗时命令的结果可能在客户端读取前被清除。");
+                case AIBridgeEditorTextKey.OrphanResultRetentionSeconds: return T("Unread Result Cleanup Seconds", "未读取结果清理时间（秒）");
+                case AIBridgeEditorTextKey.OrphanResultRetentionSecondsHelp: return T("File transport result files not read within this time are cleaned up (0 = never). Keep it greater than the CLI --timeout to avoid deleting long-running command results before the client reads them.", "File transport 的结果文件超过该时间仍未被 CLI 读取就会被清理（0 = 不清理）。建议大于 CLI --timeout，避免长耗时命令的结果在读取前被删除。");
                 case AIBridgeEditorTextKey.NoFileTransportTargets: return T("No file transport Runtime targets found. Start Play Mode or a built Player with AIBridgeRuntime enabled, or run LAN discovery for phone targets.", "未找到 File transport Runtime 目标。请启动挂有 AIBridgeRuntime 的 Play Mode/Player，或对手机目标执行局域网发现。");
                 case AIBridgeEditorTextKey.NoLanDiscoveredTargets: return T("No LAN-discovered HTTP targets found. Keep Scan LAN checked and refresh after the Player is running on the same network.", "未发现局域网 HTTP 目标。请保持“扫描局域网”勾选，并在同一网络中的 Player 运行后刷新。");
                 case AIBridgeEditorTextKey.NoToken: return T("No token", "无 Token");
@@ -385,7 +385,7 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.Refresh: return T("Refresh", "刷新");
                 case AIBridgeEditorTextKey.RefreshCommandList: return T("Refresh Command List", "刷新命令列表");
                 case AIBridgeEditorTextKey.RegisteredCommands: return T("Registered Commands", "已注册命令");
-                case AIBridgeEditorTextKey.ReleaseWarning: return T("Release Build Runtime Bridge is a debugging backdoor. Use an auth token and restrict Allowed Actions before shipping.", "Release Build Runtime Bridge 是调试入口。发布前请设置鉴权 Token 并限制 Allowed Actions。");
+                case AIBridgeEditorTextKey.ReleaseWarning: return T("Release builds will auto-create AIBridgeRuntime. Use an auth token and restrict Allowed Actions before shipping.", "Release Build 会自动创建 AIBridgeRuntime。发布前请设置鉴权 Token 并限制 Allowed Actions。");
                 case AIBridgeEditorTextKey.Remote: return T("Remote", "远端");
                 case AIBridgeEditorTextKey.ResetAllSettings: return T("Reset All Settings", "重置所有设置");
                 case AIBridgeEditorTextKey.ResetSettings: return T("Reset Settings", "重置设置");

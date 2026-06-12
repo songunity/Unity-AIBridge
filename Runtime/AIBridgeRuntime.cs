@@ -1532,10 +1532,14 @@ namespace AIBridge.Runtime
 
         private bool IsCustomActionAllowed(string action)
         {
+            if (string.Equals(action, RuntimeCodeExecuteAction, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
             if (IsBuiltInAction(action))
             {
-                // When allowedActions is configured, built-in actions (including runtime.code.execute)
-                // must also be explicitly listed to be allowed.
+                // When allowedActions is configured, built-in actions must also be explicitly listed to be allowed.
                 if (runtimeSettings.allowedActions != null && runtimeSettings.allowedActions.Length > 0)
                 {
                     return runtimeSettings.IsActionExplicitlyAllowed(action);

@@ -12,7 +12,7 @@ namespace AIBridge.Editor
         private const float RuntimeBridgeSettingsLabelWidthRatio = 0.28f;
         private const float RuntimeBridgeSettingsMinLabelWidth = 220f;
         private const float RuntimeBridgeSettingsMaxLabelWidth = 280f;
-        private const int AllBuiltInRuntimeActionsMask = (1 << 8) - 1;
+        private const string RuntimeCodeExecuteAction = "runtime.code.execute";
         private static readonly string[] BuiltInRuntimeActions =
         {
             "runtime.ping",
@@ -21,7 +21,6 @@ namespace AIBridge.Editor
             "runtime.logs.clear",
             "runtime.perf",
             "runtime.screenshot",
-            "runtime.code.execute",
             "runtime.handlers"
         };
 
@@ -33,7 +32,6 @@ namespace AIBridge.Editor
             AIBridgeEditorTextKey.AllowedActionLogsClearHelp,
             AIBridgeEditorTextKey.AllowedActionPerfHelp,
             AIBridgeEditorTextKey.AllowedActionScreenshotHelp,
-            AIBridgeEditorTextKey.AllowedActionCodeExecuteHelp,
             AIBridgeEditorTextKey.AllowedActionHandlersHelp
         };
 
@@ -119,10 +117,19 @@ namespace AIBridge.Editor
             settings.AutoInjectRuntimeBridgeInDevelopmentBuild = EditorGUILayout.Toggle(
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.AutoInjectDevelopmentBuild),
                 settings.AutoInjectRuntimeBridgeInDevelopmentBuild);
+            EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AutoInjectDevelopmentBuildHelp), MessageType.None);
 
-            settings.AllowRuntimeBridgeInReleaseBuild = EditorGUILayout.Toggle(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowReleaseBuild),
-                settings.AllowRuntimeBridgeInReleaseBuild);
+            using (new EditorGUI.DisabledScope(!settings.AutoInjectRuntimeBridgeInDevelopmentBuild))
+            {
+                settings.AllowRuntimeBridgeInReleaseBuild = EditorGUILayout.Toggle(
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowReleaseBuild),
+                    settings.AllowRuntimeBridgeInReleaseBuild);
+            }
+
+            if (!settings.AutoInjectRuntimeBridgeInDevelopmentBuild)
+            {
+                settings.AllowRuntimeBridgeInReleaseBuild = false;
+            }
 
             if (settings.AllowRuntimeBridgeInReleaseBuild)
             {
@@ -355,14 +362,18 @@ namespace AIBridge.Editor
             {
                 settings.AllowedActions = string.Empty;
                 EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowedActionsHelp), MessageType.None);
-                DrawBuiltInActionDescriptions();
                 return;
             }
 
-            var mask = hasAllowedActions ? 0 : AllBuiltInRuntimeActionsMask;
+            var mask = hasAllowedActions ? 0 : (1 << BuiltInRuntimeActions.Length) - 1;
             var customActions = new List<string>();
             for (var i = 0; i < allowedActions.Count; i++)
             {
+                if (IsRuntimeCodeExecuteAction(allowedActions[i]))
+                {
+                    continue;
+                }
+
                 if (TryGetBuiltInActionIndex(allowedActions[i], out var builtInIndex))
                 {
                     mask |= 1 << builtInIndex;
@@ -376,28 +387,24 @@ namespace AIBridge.Editor
             var nextMask = EditorGUILayout.MaskField(
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowedActions),
                 mask,
-                BuiltInRuntimeActions);
+                GetBuiltInRuntimeActionLabels());
             var nextCustomActions = EditorGUILayout.DelayedTextField(
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowedActionsCustom),
                 string.Join("\n", customActions.ToArray()));
 
             settings.AllowedActions = BuildAllowedActionsValue(nextMask, nextCustomActions);
             EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowedActionsWhitelistHelp), MessageType.None);
-            DrawBuiltInActionDescriptions();
         }
 
-        private static void DrawBuiltInActionDescriptions()
+        private static string[] GetBuiltInRuntimeActionLabels()
         {
-            EditorGUILayout.Space(2);
+            var labels = new string[BuiltInRuntimeActions.Length];
             for (var i = 0; i < BuiltInRuntimeActions.Length; i++)
             {
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField(BuiltInRuntimeActions[i], EditorStyles.miniBoldLabel, GUILayout.Width(170));
-                GUILayout.Label(
-                    AIBridgeEditorText.Get(BuiltInRuntimeActionHelpKeys[i]),
-                    EditorStyles.wordWrappedMiniLabel);
-                EditorGUILayout.EndHorizontal();
+                labels[i] = BuiltInRuntimeActions[i] + " - " + AIBridgeEditorText.Get(BuiltInRuntimeActionHelpKeys[i]);
             }
+
+            return labels;
         }
 
         private static List<string> ParseAllowedActionNames(string value)
@@ -438,7 +445,8 @@ namespace AIBridge.Editor
             var customActions = ParseAllowedActionNames(customActionsValue);
             for (var i = 0; i < customActions.Count; i++)
             {
-                if (!TryGetBuiltInActionIndex(customActions[i], out _))
+                if (!TryGetBuiltInActionIndex(customActions[i], out _)
+                    && !IsRuntimeCodeExecuteAction(customActions[i]))
                 {
                     actions.Add(customActions[i]);
                 }
@@ -460,6 +468,11 @@ namespace AIBridge.Editor
 
             index = -1;
             return false;
+        }
+
+        private static bool IsRuntimeCodeExecuteAction(string action)
+        {
+            return string.Equals(action, RuntimeCodeExecuteAction, StringComparison.OrdinalIgnoreCase);
         }
 
         // 反向白名单:仅本机回环地址视为安全;其余(0.0.0.0、::、* 、具体网卡 IP 等)在无 Token 时均需警告。

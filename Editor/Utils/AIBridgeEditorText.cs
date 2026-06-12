@@ -393,7 +393,7 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.ResolvedInfo: return T("Resolved Info", "解析后的信息");
                 case AIBridgeEditorTextKey.Runtime: return T("Runtime", "Runtime");
                 case AIBridgeEditorTextKey.RuntimeBridge: return T("Runtime Bridge", "Runtime Bridge");
-                case AIBridgeEditorTextKey.RuntimeBridgeHelp: return T("Runtime Bridge lets AIBridgeCLI connect to AIBridgeRuntime inside Play Mode or a built Player. Release builds remain disabled unless explicitly allowed.", "Runtime Bridge 允许 AIBridgeCLI 连接 Play Mode 或已编译 Player 内的 AIBridgeRuntime。Release Build 默认关闭，除非显式允许。");
+                case AIBridgeEditorTextKey.RuntimeBridgeHelp: return T("Runtime Bridge lets AIBridgeCLI and agents connect to Play Mode or a built Player to read status, logs, screenshots, performance data, and run explicitly enabled runtime code. Release builds remain disabled unless explicitly allowed.", "Runtime Bridge 用于让 AIBridgeCLI 和 Agent 连接 Play Mode 或已编译 Player，读取状态、日志、截图、性能数据，并在显式启用后执行 Runtime 代码。Release Build 默认关闭，除非显式允许。");
                 case AIBridgeEditorTextKey.RuntimeBehaviorLimits: return T("Runtime Behavior & Limits", "运行行为与限制");
                 case AIBridgeEditorTextKey.RuntimeCapabilities: return T("Runtime Capabilities", "Runtime 能力");
                 case AIBridgeEditorTextKey.RuntimeCliCopied: return T("[AIBridge] Runtime CLI command copied.", "[AIBridge] Runtime CLI 命令已复制。");

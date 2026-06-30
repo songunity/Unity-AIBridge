@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Reflection;
 using UnityEditor.PackageManager;
 
 namespace AIBridge.Editor
@@ -11,19 +12,32 @@ namespace AIBridge.Editor
 
         public static bool IsHybridClrInstalled()
         {
-            try
+            if (PackageInfoContainsHybridClrPackage())
             {
-                var packageInfo = PackageInfo.FindForPackageName(PackageName);
-                if (packageInfo != null)
-                {
-                    return true;
-                }
-            }
-            catch
-            {
+                return true;
             }
 
             return ManifestContainsHybridClrPackage();
+        }
+
+        private static bool PackageInfoContainsHybridClrPackage()
+        {
+            try
+            {
+                var findForPackageName = typeof(PackageInfo).GetMethod(
+                    "FindForPackageName",
+                    BindingFlags.Public | BindingFlags.Static,
+                    null,
+                    new[] { typeof(string) },
+                    null);
+
+                return findForPackageName != null
+                    && findForPackageName.Invoke(null, new object[] { PackageName }) != null;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static bool ManifestContainsHybridClrPackage()

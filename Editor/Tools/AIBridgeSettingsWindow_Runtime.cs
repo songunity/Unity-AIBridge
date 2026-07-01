@@ -136,24 +136,24 @@ namespace AIBridge.Editor
                 settings.AuthToken ?? string.Empty);
             EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AuthTokenHelp), MessageType.None);
 
-            settings.EnableHttpTransport = EditorGUILayout.Toggle(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.EnableHttpTransport),
-                settings.EnableHttpTransport);
-
-            using (new EditorGUI.DisabledScope(!settings.EnableHttpTransport))
+            if (!IsLoopbackBindAddress(settings.HttpBindAddress) && string.IsNullOrEmpty(settings.AuthToken))
             {
-                if (!IsLoopbackBindAddress(settings.HttpBindAddress) && string.IsNullOrEmpty(settings.AuthToken))
-                {
-                    EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.InsecureBindWarning), MessageType.Warning);
-                }
+                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.InsecureBindWarning), MessageType.Warning);
+            }
 
-                settings.HttpPort = EditorGUILayout.IntField(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpPort),
-                    settings.HttpPort);
+            settings.HttpPort = EditorGUILayout.IntField(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpPort),
+                settings.HttpPort);
 
-                settings.EnableLanDiscovery = EditorGUILayout.Toggle(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.EnableLanDiscovery),
-                    settings.EnableLanDiscovery);
+            settings.EnableLanDiscovery = EditorGUILayout.Toggle(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.EnableLanDiscovery),
+                settings.EnableLanDiscovery);
+
+            using (new EditorGUI.DisabledScope(!settings.EnableLanDiscovery))
+            {
+                settings.DiscoveryUdpPort = EditorGUILayout.IntField(
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.DiscoveryUdpPort),
+                    settings.DiscoveryUdpPort);
             }
 
             var settingsChanged = EditorGUI.EndChangeCheck();
@@ -561,10 +561,11 @@ namespace AIBridge.Editor
             settings.LogBufferSize = AIBridgeProjectSettings.DefaultRuntimeBridgeLogBufferSize;
             settings.MaxResultBytes = AIBridgeProjectSettings.DefaultRuntimeBridgeMaxResultBytes;
             settings.OrphanResultRetentionSeconds = AIBridgeProjectSettings.DefaultRuntimeBridgeOrphanResultRetentionSeconds;
+            settings.EnableHttpTransport = AIBridgeProjectSettings.DefaultRuntimeBridgeEnableHttpTransport;
             settings.HttpBindAddress = AIBridgeProjectSettings.DefaultRuntimeBridgeHttpBindAddress;
-            settings.DiscoveryUdpPort = AIBridgeProjectSettings.DefaultRuntimeBridgeDiscoveryUdpPort;
             settings.MaxResultBytes = Math.Max(1024, settings.MaxResultBytes);
             settings.HttpPort = Math.Max(1, settings.HttpPort);
+            settings.DiscoveryUdpPort = Math.Max(1, settings.DiscoveryUdpPort);
 
             AIBridgeProjectSettings.Instance.SaveSettings();
             AIBridgeRuntimeBridgeEditorUtility.WriteRuntimeConfig();

@@ -352,8 +352,8 @@ namespace AIBridge.Editor
                 runtimeBridge.LogBufferSize = DefaultRuntimeBridgeLogBufferSize;
                 runtimeBridge.MaxResultBytes = DefaultRuntimeBridgeMaxResultBytes;
                 runtimeBridge.OrphanResultRetentionSeconds = DefaultRuntimeBridgeOrphanResultRetentionSeconds;
+                runtimeBridge.EnableHttpTransport = DefaultRuntimeBridgeEnableHttpTransport;
                 runtimeBridge.HttpBindAddress = DefaultRuntimeBridgeHttpBindAddress;
-                runtimeBridge.DiscoveryUdpPort = DefaultRuntimeBridgeDiscoveryUdpPort;
 
                 if (runtimeBridge.HeartbeatIntervalSeconds <= 0f)
                 {

@@ -59,10 +59,18 @@ internal static class RuntimeCliCommand
                 return Success("runtime_list_targets", BuildListTargetsData(parsed));
             case "discover":
                 return Discover(parsed);
+            case "ping":
+                return SendRuntimeAction(parsed, "runtime.ping");
             case "status":
                 return SendRuntimeAction(parsed, "runtime.status");
             case "logs":
                 return SendRuntimeAction(parsed, "runtime.logs");
+            case "logs_clear":
+                return SendRuntimeAction(parsed, "runtime.logs.clear");
+            case "perf":
+                return SendRuntimeAction(parsed, "runtime.perf");
+            case "handlers":
+                return SendRuntimeAction(parsed, "runtime.handlers");
             case "screenshot":
                 return SendRuntimeAction(parsed, "runtime.screenshot");
             case "ui_snapshot":
@@ -577,14 +585,18 @@ internal static class RuntimeCliCommand
         return "Usage:\n"
             + "  AIBridgeCLI runtime list_targets [--runtime-dir <dir>]\n"
             + "  AIBridgeCLI runtime discover [--udpPort 27183]\n"
+            + "  AIBridgeCLI runtime ping --transport file|http [--target latest] [--url <url>]\n"
             + "  AIBridgeCLI runtime status --transport file|http [--target latest] [--url <url>]\n"
-            + "  AIBridgeCLI runtime logs --transport file|http [--target latest] [--url <url>] [--logType Error] [--count 100]\n"
+            + "  AIBridgeCLI runtime logs --transport file|http [--target latest] [--url <url>] [--logType Error] [--count 100] [--tail 100] [--regex <pattern>] [--includeStackTrace true] [--clear true]\n"
+            + "  AIBridgeCLI runtime logs_clear --transport file|http [--target latest] [--url <url>]\n"
+            + "  AIBridgeCLI runtime perf --transport file|http [--target latest] [--url <url>] [--durationMs 5000] [--intervalMs 100] [--hitchThresholdMs 50]\n"
+            + "  AIBridgeCLI runtime handlers --transport file|http [--target latest] [--url <url>]\n"
             + "  AIBridgeCLI runtime screenshot --transport file|http [--target latest] [--url <url>]\n"
-            + "  AIBridgeCLI runtime ui_snapshot --transport file|http [--target latest] [--url <url>] [--maxResults 100]\n"
-            + "  AIBridgeCLI runtime ui_find --transport file|http [--target latest] [--url <url>] [--keyword Start]\n"
-            + "  AIBridgeCLI runtime ui_raycast --transport file|http [--target latest] [--url <url>] [--path Canvas/Button]\n"
-            + "  AIBridgeCLI runtime ui_click --transport file|http [--target latest] [--url <url>] [--path Canvas/Button]\n"
-            + "  AIBridgeCLI runtime exec --dll <path> --transport http --url <url> --riskAccepted true";
+            + "  AIBridgeCLI runtime ui_snapshot --transport file|http [--target latest] [--url <url>] [--maxResults 100] [--includeDisabled true]\n"
+            + "  AIBridgeCLI runtime ui_find --transport file|http [--target latest] [--url <url>] [--keyword Start] [--maxResults 100] [--includeDisabled true]\n"
+            + "  AIBridgeCLI runtime ui_raycast --transport file|http [--target latest] [--url <url>] [--path Canvas/Button] [--instanceId 123] [--x 480] [--y 60] [--maxResults 20]\n"
+            + "  AIBridgeCLI runtime ui_click --transport file|http [--target latest] [--url <url>] [--path Canvas/Button] [--instanceId 123] [--x 480] [--y 60]\n"
+            + "  AIBridgeCLI runtime exec --dll <path> --transport http --url <url> --riskAccepted true [--entryType Namespace.Type] [--methodName Method]";
     }
 
     private sealed class RuntimeTarget

@@ -343,8 +343,17 @@ namespace AIBridge.Editor
                     runtimeBridge = new RuntimeBridgeSettingsData();
                 }
 
+                runtimeBridge.ExchangeDirectory = DefaultRuntimeBridgeExchangeDirectory;
+                runtimeBridge.TargetId = DefaultRuntimeBridgeTargetId;
                 runtimeBridge.AllowedActions = string.Empty;
                 runtimeBridge.EnableRuntimeCodeExecution = DefaultRuntimeBridgeCodeExecutionEnabled;
+                runtimeBridge.KeepRunningInBackground = DefaultRuntimeBridgeKeepRunningInBackground;
+                runtimeBridge.HeartbeatIntervalSeconds = DefaultRuntimeBridgeHeartbeatIntervalSeconds;
+                runtimeBridge.LogBufferSize = DefaultRuntimeBridgeLogBufferSize;
+                runtimeBridge.MaxResultBytes = DefaultRuntimeBridgeMaxResultBytes;
+                runtimeBridge.OrphanResultRetentionSeconds = DefaultRuntimeBridgeOrphanResultRetentionSeconds;
+                runtimeBridge.HttpBindAddress = DefaultRuntimeBridgeHttpBindAddress;
+                runtimeBridge.DiscoveryUdpPort = DefaultRuntimeBridgeDiscoveryUdpPort;
 
                 if (runtimeBridge.HeartbeatIntervalSeconds <= 0f)
                 {

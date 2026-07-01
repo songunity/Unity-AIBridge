@@ -120,7 +120,6 @@ namespace AIBridge.Editor
         Online,
         Open,
         OpenDirectory,
-        OpenPlayersPanel,
         Path,
         Platform,
         Process,
@@ -372,7 +371,6 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.Online: return T("ONLINE", "在线");
                 case AIBridgeEditorTextKey.Open: return T("Open", "打开");
                 case AIBridgeEditorTextKey.OpenDirectory: return T("Open Directory", "打开目录");
-                case AIBridgeEditorTextKey.OpenPlayersPanel: return T("Open Players Panel", "打开 Players 面板");
                 case AIBridgeEditorTextKey.Path: return T("Path", "路径");
                 case AIBridgeEditorTextKey.Platform: return T("Platform", "平台");
                 case AIBridgeEditorTextKey.Process: return T("Process", "进程");

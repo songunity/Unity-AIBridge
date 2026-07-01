@@ -200,7 +200,7 @@ namespace AIBridge.Editor
 
         private void DrawRuntimeTargets()
         {
-            DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AIBridgePlayersTitle));
+            DrawRuntimeTargetsHeader();
             DrawRuntimeTargetsToolbar();
             EditorGUILayout.Space(6);
 
@@ -226,6 +226,15 @@ namespace AIBridge.Editor
                 DrawPlayer(_players[i]);
                 EditorGUILayout.Space(5);
             }
+        }
+
+        private static void DrawRuntimeTargetsHeader()
+        {
+            EditorGUILayout.Space(10);
+            var rect = EditorGUILayout.GetControlRect(false, 30f);
+            EditorGUI.DrawRect(rect, new Color(0.18f, 0.22f, 0.28f, 1f));
+            var labelRect = new Rect(rect.x + 10f, rect.y + 6f, rect.width - 20f, 20f);
+            EditorGUI.LabelField(labelRect, AIBridgeEditorText.Get(AIBridgeEditorTextKey.AIBridgePlayersTitle), EditorStyles.whiteBoldLabel);
         }
 
         private void DrawRuntimeTargetsToolbar()

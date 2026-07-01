@@ -100,7 +100,7 @@ namespace AIBridge.Editor
         public const bool DefaultCodeExecutionRiskAccepted = true;
         public const bool DefaultRuntimeBridgeEnabled = false;
         public const bool DefaultRuntimeBridgeAutoInjectInDevelopmentBuild = true;
-        public const bool DefaultRuntimeBridgeAllowInReleaseBuild = false;
+        public const bool DefaultRuntimeBridgeAllowInReleaseBuild = true;
         public const string DefaultRuntimeBridgeExchangeDirectory = "";
         public const string DefaultRuntimeBridgeTargetId = "";
         public const bool DefaultRuntimeBridgeCodeExecutionEnabled = true;
@@ -343,6 +343,8 @@ namespace AIBridge.Editor
                     runtimeBridge = new RuntimeBridgeSettingsData();
                 }
 
+                runtimeBridge.AutoInjectRuntimeBridgeInDevelopmentBuild = DefaultRuntimeBridgeAutoInjectInDevelopmentBuild;
+                runtimeBridge.AllowRuntimeBridgeInReleaseBuild = DefaultRuntimeBridgeAllowInReleaseBuild;
                 runtimeBridge.ExchangeDirectory = DefaultRuntimeBridgeExchangeDirectory;
                 runtimeBridge.TargetId = DefaultRuntimeBridgeTargetId;
                 runtimeBridge.AllowedActions = string.Empty;

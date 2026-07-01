@@ -14,7 +14,6 @@ namespace AIBridge.Runtime
         private const int DefaultDiscoveryUdpPort = 27183;
 
         private static bool _initialized;
-        private static bool _releaseBuildAllowed;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void InitializeBeforeSceneLoad()
@@ -28,11 +27,6 @@ namespace AIBridge.Runtime
             }
 
             _initialized = true;
-            if (!ShouldAutoInject(out _releaseBuildAllowed))
-            {
-                return;
-            }
-
             // BeforeSceneLoad 阶段还看不到首场景内的组件，等 sceneLoaded 后再判重创建。
             SceneManager.sceneLoaded += HandleFirstSceneLoaded;
 #endif
@@ -43,31 +37,6 @@ namespace AIBridge.Runtime
         {
             SceneManager.sceneLoaded -= HandleFirstSceneLoaded;
             CreateRuntimeIfNeeded(scene.name);
-        }
-
-        private static bool ShouldAutoInject(out bool releaseBuildAllowed)
-        {
-            releaseBuildAllowed = false;
-
-#if AIBRIDGE_RUNTIME_AUTO_INJECT_DISABLED
-            Debug.Log("[AIBridgeRuntimeBootstrap] Runtime Bridge auto injection is disabled. / Runtime Bridge 自动注入已关闭。");
-            return false;
-#else
-            if (Debug.isDebugBuild)
-            {
-                Debug.Log("[AIBridgeRuntimeBootstrap] Development Build auto injection is enabled. / Development Build 自动注入已启用。");
-                return true;
-            }
-
-#if AIBRIDGE_RUNTIME_ALLOW_RELEASE_BUILD
-            releaseBuildAllowed = true;
-            Debug.LogWarning("[AIBridgeRuntimeBootstrap] Release Build Runtime Bridge was explicitly allowed. Restrict token and allowed actions before shipping. / Release Build Runtime Bridge 已显式允许，发布前请限制 Token 和 action 白名单。");
-            return true;
-#else
-            Debug.Log("[AIBridgeRuntimeBootstrap] Release Build Runtime Bridge is disabled by default. / Release Build Runtime Bridge 默认关闭。");
-            return false;
-#endif
-#endif
         }
 
         private static void CreateRuntimeIfNeeded(string sceneName)
@@ -113,7 +82,7 @@ namespace AIBridge.Runtime
             }
 
             settings.enableRuntimeBridge = true;
-            settings.allowInReleaseBuild = _releaseBuildAllowed;
+            settings.allowInReleaseBuild = true;
             return settings;
         }
 

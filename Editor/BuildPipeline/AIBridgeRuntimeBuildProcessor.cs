@@ -14,8 +14,6 @@ namespace AIBridge.Editor
     [InitializeOnLoad]
     internal sealed class AIBridgeRuntimeBuildProcessor : IPreprocessBuildWithReport, IProcessSceneWithReport
     {
-        private const string AutoInjectDisabledDefine = "AIBRIDGE_RUNTIME_AUTO_INJECT_DISABLED";
-        private const string ReleaseBuildAllowedDefine = "AIBRIDGE_RUNTIME_ALLOW_RELEASE_BUILD";
         private const string RuntimeEnabledDefine = "AIBRIDGE_RUNTIME_ENABLED";
 
         private static bool _runtimeSettingsCarrierInjected;
@@ -46,9 +44,7 @@ namespace AIBridge.Editor
                     "AIBridge Runtime Bridge 构建宏已变化。Unity 需要先重新编译脚本，请重新执行构建。"));
             }
 
-            var isDevelopmentBuild = report != null
-                && (report.summary.options & BuildOptions.Development) == BuildOptions.Development;
-            LogBuildInjectionState(settings, isDevelopmentBuild);
+            LogBuildInjectionState(settings);
         }
 
         public void OnProcessScene(Scene scene, BuildReport report)
@@ -60,7 +56,7 @@ namespace AIBridge.Editor
             }
 
             var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
-            if (!ShouldInjectRuntimeSettingsCarrier(settings, report))
+            if (!ShouldInjectRuntimeSettingsCarrier(settings))
             {
                 return;
             }
@@ -114,14 +110,6 @@ namespace AIBridge.Editor
                 settings.EnableRuntimeBridge);
             changed |= SetDefine(
                 defines,
-                AutoInjectDisabledDefine,
-                !settings.EnableRuntimeBridge || !settings.AutoInjectRuntimeBridgeInDevelopmentBuild);
-            changed |= SetDefine(
-                defines,
-                ReleaseBuildAllowedDefine,
-                settings.EnableRuntimeBridge && settings.AllowRuntimeBridgeInReleaseBuild);
-            changed |= SetDefine(
-                defines,
                 AIBridgeHybridClrUtility.HybridClrAvailableDefine,
                 AIBridgeHybridClrUtility.IsHybridClrInstalled());
 
@@ -143,28 +131,14 @@ namespace AIBridge.Editor
 
 #if AIBRIDGE_RUNTIME_ENABLED
         private static bool ShouldInjectRuntimeSettingsCarrier(
-            AIBridgeProjectSettings.RuntimeBridgeSettingsData settings,
-            BuildReport report)
+            AIBridgeProjectSettings.RuntimeBridgeSettingsData settings)
         {
             if (settings == null || !settings.EnableRuntimeBridge)
             {
                 return false;
             }
 
-            if (!settings.AutoInjectRuntimeBridgeInDevelopmentBuild)
-            {
-                return false;
-            }
-
-            var isDevelopmentBuild = report != null
-                ? (report.summary.options & BuildOptions.Development) == BuildOptions.Development
-                : EditorUserBuildSettings.development;
-            if (isDevelopmentBuild)
-            {
-                return settings.AutoInjectRuntimeBridgeInDevelopmentBuild;
-            }
-
-            return settings.AllowRuntimeBridgeInReleaseBuild;
+            return true;
         }
 
         private static AIBridgeRuntimeSettingsCarrier FindCarrierInScene(Scene scene)
@@ -237,8 +211,7 @@ namespace AIBridge.Editor
         }
 
         private static void LogBuildInjectionState(
-            AIBridgeProjectSettings.RuntimeBridgeSettingsData settings,
-            bool isDevelopmentBuild)
+            AIBridgeProjectSettings.RuntimeBridgeSettingsData settings)
         {
             if (settings == null || !settings.EnableRuntimeBridge)
             {
@@ -248,33 +221,9 @@ namespace AIBridge.Editor
                 return;
             }
 
-            if (!settings.AutoInjectRuntimeBridgeInDevelopmentBuild)
-            {
-                Debug.Log(AIBridgeEditorText.T(
-                    "[AIBridge] Runtime Bridge bootstrap auto injection is disabled in settings.",
-                    "[AIBridge] Runtime Bridge bootstrap 自动注入已在设置中关闭。"));
-                return;
-            }
-
-            if (isDevelopmentBuild)
-            {
-                Debug.Log(AIBridgeEditorText.T(
-                    "[AIBridge] Development Build will auto inject AIBridgeRuntime bootstrap.",
-                    "[AIBridge] Development Build 将自动注入 AIBridgeRuntime bootstrap。"));
-                return;
-            }
-
-            if (settings.AllowRuntimeBridgeInReleaseBuild)
-            {
-                Debug.LogWarning(AIBridgeEditorText.T(
-                    "[AIBridge] Release Build Runtime Bridge is explicitly allowed; bootstrap can create AIBridgeRuntime.",
-                    "[AIBridge] Release Build Runtime Bridge 已显式允许，bootstrap 可创建 AIBridgeRuntime。"));
-                return;
-            }
-
             Debug.Log(AIBridgeEditorText.T(
-                "[AIBridge] Release Build Runtime Bridge remains disabled by default.",
-                "[AIBridge] Release Build Runtime Bridge 保持默认关闭。"));
+                "[AIBridge] Runtime Bridge is enabled; builds will auto inject AIBridgeRuntime bootstrap.",
+                "[AIBridge] Runtime Bridge 已启用，构建时会自动注入 AIBridgeRuntime bootstrap。"));
         }
     }
 }

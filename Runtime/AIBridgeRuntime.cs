@@ -1625,16 +1625,7 @@ namespace AIBridge.Runtime
 
         private bool IsRuntimeBridgeEnabled()
         {
-            if (runtimeSettings == null || !runtimeSettings.enableRuntimeBridge)
-            {
-                return false;
-            }
-
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            return true;
-#else
-            return runtimeSettings.allowInReleaseBuild;
-#endif
+            return runtimeSettings != null && runtimeSettings.enableRuntimeBridge;
         }
 
         private static bool IsBuiltInAction(string action)
@@ -2102,30 +2093,12 @@ namespace AIBridge.Runtime
 
         internal bool IsHttpTransportEnabled()
         {
-            if (runtimeSettings == null || !runtimeSettings.enableHttpTransport)
-            {
-                return false;
-            }
-
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            return true;
-#else
-            return runtimeSettings.allowInReleaseBuild;
-#endif
+            return runtimeSettings != null && runtimeSettings.enableHttpTransport;
         }
 
         internal bool IsLanDiscoveryEnabled()
         {
-            if (runtimeSettings == null || !runtimeSettings.enableLanDiscovery || !IsHttpTransportEnabled())
-            {
-                return false;
-            }
-
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            return true;
-#else
-            return runtimeSettings.allowInReleaseBuild;
-#endif
+            return runtimeSettings != null && runtimeSettings.enableLanDiscovery && IsHttpTransportEnabled();
         }
 
         internal Dictionary<string, object> BuildHttpHealthData()

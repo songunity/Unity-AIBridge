@@ -12,7 +12,6 @@ namespace AIBridge.Editor
         AgentClaude,
         AgentCodex,
         AgentKiro,
-        AllowReleaseBuild,
         AllowedActions,
         AllowedActionsHelp,
         AllowedActionsCustom,
@@ -31,8 +30,6 @@ namespace AIBridge.Editor
         AuthTokenHelp,
         AutoScanAssemblies,
         AutoScanAssembliesHelp,
-        AutoInjectDevelopmentBuild,
-        AutoInjectDevelopmentBuildHelp,
         BindUrl,
         BridgeSettings,
         BuildInjectionSettings,
@@ -127,7 +124,6 @@ namespace AIBridge.Editor
         Refresh,
         RefreshCommandList,
         RegisteredCommands,
-        ReleaseWarning,
         Remote,
         ResetAllSettings,
         ResetSettings,
@@ -254,7 +250,6 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.AgentClaude: return "Claude Code (.claude)";
                 case AIBridgeEditorTextKey.AgentCodex: return "Codex (.agents)";
                 case AIBridgeEditorTextKey.AgentKiro: return "Kiro (.kiro)";
-                case AIBridgeEditorTextKey.AllowReleaseBuild: return T("Auto Inject In Release Build", "Release Build 自动注入");
                 case AIBridgeEditorTextKey.AllowedActions: return T("Allowed Actions", "允许的 Actions");
                 case AIBridgeEditorTextKey.AllowedActionsHelp: return T("Whitelist off: all built-in actions are allowed. Custom actions stay limited by build type.", "关闭白名单：允许所有内置 action。自定义 action 仍按构建类型限制。");
                 case AIBridgeEditorTextKey.AllowedActionsCustom: return T("Custom Actions", "自定义 Actions");
@@ -273,8 +268,6 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.AuthTokenHelp: return T("Empty token means Runtime commands do not require authentication.", "Token 为空时，Runtime 命令不要求鉴权。");
                 case AIBridgeEditorTextKey.AutoScanAssemblies: return T("Auto-scan Assemblies", "自动扫描程序集");
                 case AIBridgeEditorTextKey.AutoScanAssembliesHelp: return T("When enabled, commands are scanned at runtime. When disabled, commands are pre-registered in code for better performance.", "启用后会在运行时扫描命令；禁用后命令会在代码中预注册以提升性能。");
-                case AIBridgeEditorTextKey.AutoInjectDevelopmentBuild: return T("Enable Bootstrap Auto Injection", "启用 Bootstrap 自动注入");
-                case AIBridgeEditorTextKey.AutoInjectDevelopmentBuildHelp: return T("Default on: Development Build auto-creates AIBridgeRuntime. Release Build auto-creates it only when Release auto injection is enabled.", "默认开启：Development Build 会自动创建 AIBridgeRuntime；Release Build 只有勾选 Release 自动注入才会自动创建。");
                 case AIBridgeEditorTextKey.BindUrl: return T("Bind URL", "监听 URL");
                 case AIBridgeEditorTextKey.BridgeSettings: return T("Bridge Settings", "Bridge 设置");
                 case AIBridgeEditorTextKey.BuildInjectionSettings: return T("Build & Injection", "构建与注入");
@@ -288,8 +281,8 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.CommandQueue: return T("Command Queue:", "命令队列：");
                 case AIBridgeEditorTextKey.CommandRegistration: return T("Command Registration", "命令注册");
                 case AIBridgeEditorTextKey.Commands: return T("Commands", "命令");
-                case AIBridgeEditorTextKey.CompileRuntimeBridge: return T("Compile Runtime Bridge", "编译 Runtime Bridge");
-                case AIBridgeEditorTextKey.CompileRuntimeBridgeHelp: return T("Enable this to compile Runtime Bridge code and expose Runtime Bridge editor controls. Turn it off to remove the Runtime assembly from compilation.", "启用后编译 Runtime Bridge 代码并显示 Runtime Bridge 编辑器控制；关闭后从编译中剔除 Runtime assembly。");
+                case AIBridgeEditorTextKey.CompileRuntimeBridge: return T("Enable Runtime Bridge", "启用 Runtime Bridge");
+                case AIBridgeEditorTextKey.CompileRuntimeBridgeHelp: return T("Enable this to compile Runtime Bridge code, expose Runtime Bridge editor controls, and auto-inject AIBridgeRuntime into built Players.", "启用后编译 Runtime Bridge 代码、显示 Runtime Bridge 编辑器控制，并在构建 Player 时自动注入 AIBridgeRuntime。");
                 case AIBridgeEditorTextKey.CopyAgent: return T("Copy to Agent", "复制到 Agent");
                 case AIBridgeEditorTextKey.CopyDiscoverCli: return T("Copy Discover CLI", "复制发现命令");
                 case AIBridgeEditorTextKey.CopyHttpStatus: return T("Copy HTTP Status", "复制 HTTP 状态");
@@ -369,7 +362,6 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.Refresh: return T("Refresh", "刷新");
                 case AIBridgeEditorTextKey.RefreshCommandList: return T("Refresh Command List", "刷新命令列表");
                 case AIBridgeEditorTextKey.RegisteredCommands: return T("Registered Commands", "已注册命令");
-                case AIBridgeEditorTextKey.ReleaseWarning: return T("Release builds will auto-create AIBridgeRuntime. Use an auth token and restrict Allowed Actions before shipping.", "Release Build 会自动创建 AIBridgeRuntime。发布前请设置鉴权 Token 并限制 Allowed Actions。");
                 case AIBridgeEditorTextKey.Remote: return T("Remote", "远端");
                 case AIBridgeEditorTextKey.ResetAllSettings: return T("Reset All Settings", "重置所有设置");
                 case AIBridgeEditorTextKey.ResetSettings: return T("Reset Settings", "重置设置");
@@ -377,7 +369,7 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.ResolvedInfo: return T("Resolved Info", "解析后的信息");
                 case AIBridgeEditorTextKey.Runtime: return T("Runtime", "Runtime");
                 case AIBridgeEditorTextKey.RuntimeBridge: return T("Runtime Bridge", "Runtime Bridge");
-                case AIBridgeEditorTextKey.RuntimeBridgeHelp: return T("Runtime Bridge lets AIBridgeCLI and agents connect to Play Mode or a built Player to read status, logs, screenshots, performance data, and run explicitly enabled runtime code. Release builds remain disabled unless explicitly allowed.", "Runtime Bridge 用于让 AIBridgeCLI 和 Agent 连接 Play Mode 或已编译 Player，读取状态、日志、截图、性能数据，并在显式启用后执行 Runtime 代码。Release Build 默认关闭，除非显式允许。");
+                case AIBridgeEditorTextKey.RuntimeBridgeHelp: return T("Runtime Bridge lets AIBridgeCLI and agents connect to Play Mode or a built Player to read status, logs, screenshots, performance data, UI automation data, and run runtime code when available.", "Runtime Bridge 用于让 AIBridgeCLI 和 Agent 连接 Play Mode 或已编译 Player，读取状态、日志、截图、性能数据、UI 自动化数据，并在可用时执行 Runtime 代码。");
                 case AIBridgeEditorTextKey.RuntimeBehaviorLimits: return T("Runtime Behavior & Limits", "运行行为与限制");
                 case AIBridgeEditorTextKey.RuntimeCapabilities: return T("Runtime Capabilities", "Runtime 能力");
                 case AIBridgeEditorTextKey.RuntimeCliCopied: return T("[AIBridge] Runtime CLI command copied.", "[AIBridge] Runtime CLI 命令已复制。");

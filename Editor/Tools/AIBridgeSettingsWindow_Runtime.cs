@@ -107,28 +107,6 @@ namespace AIBridge.Editor
                 return;
             }
 
-            settings.AutoInjectRuntimeBridgeInDevelopmentBuild = EditorGUILayout.Toggle(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.AutoInjectDevelopmentBuild),
-                settings.AutoInjectRuntimeBridgeInDevelopmentBuild);
-            EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AutoInjectDevelopmentBuildHelp), MessageType.None);
-
-            using (new EditorGUI.DisabledScope(!settings.AutoInjectRuntimeBridgeInDevelopmentBuild))
-            {
-                settings.AllowRuntimeBridgeInReleaseBuild = EditorGUILayout.Toggle(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowReleaseBuild),
-                    settings.AllowRuntimeBridgeInReleaseBuild);
-            }
-
-            if (!settings.AutoInjectRuntimeBridgeInDevelopmentBuild)
-            {
-                settings.AllowRuntimeBridgeInReleaseBuild = false;
-            }
-
-            if (settings.AllowRuntimeBridgeInReleaseBuild)
-            {
-                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.ReleaseWarning), MessageType.Warning);
-            }
-
             DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Transport));
 
             settings.AuthToken = EditorGUILayout.DelayedTextField(
@@ -552,6 +530,8 @@ namespace AIBridge.Editor
         {
             var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
 
+            settings.AutoInjectRuntimeBridgeInDevelopmentBuild = AIBridgeProjectSettings.DefaultRuntimeBridgeAutoInjectInDevelopmentBuild;
+            settings.AllowRuntimeBridgeInReleaseBuild = AIBridgeProjectSettings.DefaultRuntimeBridgeAllowInReleaseBuild;
             settings.ExchangeDirectory = AIBridgeProjectSettings.DefaultRuntimeBridgeExchangeDirectory;
             settings.TargetId = AIBridgeProjectSettings.DefaultRuntimeBridgeTargetId;
             settings.AllowedActions = string.Empty;

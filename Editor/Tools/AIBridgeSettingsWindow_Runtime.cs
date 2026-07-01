@@ -17,8 +17,6 @@ namespace AIBridge.Editor
         private readonly List<AIBridgeRuntimePlayerInfo> _players = new List<AIBridgeRuntimePlayerInfo>();
         private readonly List<AIBridgeRuntimeDiscoveredTargetInfo> _discoveredTargets = new List<AIBridgeRuntimeDiscoveredTargetInfo>();
         private Vector2 _scrollPosition;
-        private bool _cliCommandsExpanded;
-        private bool _targetCliCommandsExpanded;
         private string _runtimeDirectory;
         private string _localHttpUrl;
         private string _discoveryCachePath;
@@ -220,45 +218,12 @@ namespace AIBridge.Editor
 #endif
             EditorGUILayout.EndHorizontal();
 
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.WriteRuntimeConfig), GUILayout.Height(24)))
-            {
-                WriteRuntimeConfig();
-            }
-            EditorGUILayout.EndHorizontal();
-
-            _cliCommandsExpanded = EditorGUILayout.Foldout(
-                _cliCommandsExpanded,
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.CliCommands),
-                true);
-            if (!_cliCommandsExpanded)
-            {
-                return;
-            }
-
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyLaunchArgs), GUILayout.Height(24)))
-            {
-                CopyLaunchArguments();
-            }
-
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyHttpStatusCli), GUILayout.Height(24)))
-            {
-                CopyHttpStatusCommand();
-            }
-
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyDiscoverCli), GUILayout.Height(24)))
-            {
-                CopyDiscoverCommand();
-            }
-            EditorGUILayout.EndHorizontal();
         }
 
         private void DrawRuntimeTargets()
         {
             DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AIBridgePlayersTitle));
             DrawRuntimeTargetsToolbar();
-            DrawRuntimeTargetCliCommands();
             EditorGUILayout.Space(6);
 
             EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeDirectory), _runtimeDirectory ?? string.Empty, EditorStyles.wordWrappedMiniLabel);
@@ -323,36 +288,6 @@ namespace AIBridge.Editor
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.RefreshedCount, FormatRefreshAge()),
                 EditorStyles.miniLabel,
                 GUILayout.Width(130));
-            EditorGUILayout.EndHorizontal();
-        }
-
-        private void DrawRuntimeTargetCliCommands()
-        {
-            _targetCliCommandsExpanded = EditorGUILayout.Foldout(
-                _targetCliCommandsExpanded,
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.CliCommands),
-                true);
-            if (!_targetCliCommandsExpanded)
-            {
-                return;
-            }
-
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyListCli), GUILayout.Height(24)))
-            {
-                CopyFileCommand("runtime list_targets");
-            }
-
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyHttpCli), GUILayout.Height(24)))
-            {
-                CopyHttpCommand("runtime status --transport http --url " + Quote(_localHttpUrl) + " --target latest");
-            }
-
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyDiscoverCli), GUILayout.Height(24)))
-            {
-                var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
-                CopyHttpCommand("runtime discover --udpPort " + Math.Max(1, settings.DiscoveryUdpPort));
-            }
             EditorGUILayout.EndHorizontal();
         }
 
@@ -681,40 +616,6 @@ namespace AIBridge.Editor
             var path = AIBridgeRuntimeBridgeEditorUtility.GetRuntimeDirectory();
             Directory.CreateDirectory(path);
             EditorUtility.RevealInFinder(path);
-        }
-
-        private static void CopyLaunchArguments()
-        {
-            var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
-            var runtimeDirectory = AIBridgeRuntimeBridgeEditorUtility.GetRuntimeDirectory();
-            var targetId = string.IsNullOrWhiteSpace(settings.TargetId) ? "player1" : settings.TargetId.Trim();
-            EditorGUIUtility.systemCopyBuffer =
-                "--aibridge-runtime-dir " + AIBridgeRuntimeBridgeEditorUtility.Quote(runtimeDirectory)
-                + " --aibridge-target-id " + AIBridgeRuntimeBridgeEditorUtility.Quote(targetId);
-            Debug.Log(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeLaunchArgsCopied));
-        }
-
-        private static void WriteRuntimeConfig()
-        {
-            var path = AIBridgeRuntimeBridgeEditorUtility.WriteRuntimeConfig();
-            Debug.Log(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeConfigWritten, path));
-        }
-
-        private static void CopyHttpStatusCommand()
-        {
-            EditorGUIUtility.systemCopyBuffer = AIBridgeRuntimeBridgeEditorUtility.BuildCliCommand(
-                "runtime status --transport http --url " + AIBridgeRuntimeBridgeEditorUtility.Quote(AIBridgeRuntimeBridgeEditorUtility.BuildLocalHttpUrl()) + " --target latest",
-                includeRuntimeDirectory: false);
-            Debug.Log(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeHttpCliCopied));
-        }
-
-        private static void CopyDiscoverCommand()
-        {
-            var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
-            EditorGUIUtility.systemCopyBuffer = AIBridgeRuntimeBridgeEditorUtility.BuildCliCommand(
-                "runtime discover --udpPort " + Math.Max(1, settings.DiscoveryUdpPort),
-                includeRuntimeDirectory: false);
-            Debug.Log(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeDiscoveryCliCopied));
         }
 
         private static void CopyFileCommand(string commandBody)

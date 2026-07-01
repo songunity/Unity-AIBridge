@@ -48,14 +48,9 @@ namespace AIBridge.Editor
         Commands,
         CompileRuntimeBridge,
         CompileRuntimeBridgeHelp,
-        CliCommands,
         CopyAgent,
         CopyDiscoverCli,
-        CopyHttpCli,
         CopyHttpStatus,
-        CopyHttpStatusCli,
-        CopyLaunchArgs,
-        CopyListCli,
         CopyLogsCli,
         CopyScreenshotCli,
         CopyStatusCli,
@@ -148,11 +143,8 @@ namespace AIBridge.Editor
         InsecureBindWarning,
         RuntimeConfig,
         RuntimeConfigPath,
-        RuntimeConfigWritten,
         RuntimeDirectory,
-        RuntimeDiscoveryCliCopied,
         RuntimeHttpCliCopied,
-        RuntimeLaunchArgsCopied,
         RuntimeHttpEntry,
         RuntimeInfo,
         ScanAssemblies,
@@ -186,7 +178,6 @@ namespace AIBridge.Editor
         UseAllowedActionsWhitelist,
         Url,
         Warning,
-        WriteRuntimeConfig,
         Yes,
         No
     }
@@ -299,14 +290,9 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.Commands: return T("Commands", "命令");
                 case AIBridgeEditorTextKey.CompileRuntimeBridge: return T("Compile Runtime Bridge", "编译 Runtime Bridge");
                 case AIBridgeEditorTextKey.CompileRuntimeBridgeHelp: return T("Enable this to compile Runtime Bridge code and expose Runtime Bridge editor controls. Turn it off to remove the Runtime assembly from compilation.", "启用后编译 Runtime Bridge 代码并显示 Runtime Bridge 编辑器控制；关闭后从编译中剔除 Runtime assembly。");
-                case AIBridgeEditorTextKey.CliCommands: return T("CLI Commands", "CLI 命令");
                 case AIBridgeEditorTextKey.CopyAgent: return T("Copy to Agent", "复制到 Agent");
                 case AIBridgeEditorTextKey.CopyDiscoverCli: return T("Copy Discover CLI", "复制发现命令");
-                case AIBridgeEditorTextKey.CopyHttpCli: return T("Copy HTTP CLI", "复制 HTTP 命令");
                 case AIBridgeEditorTextKey.CopyHttpStatus: return T("Copy HTTP Status", "复制 HTTP 状态");
-                case AIBridgeEditorTextKey.CopyHttpStatusCli: return T("Copy HTTP Status CLI", "复制 HTTP 状态命令");
-                case AIBridgeEditorTextKey.CopyLaunchArgs: return T("Copy Launch Args", "复制启动参数");
-                case AIBridgeEditorTextKey.CopyListCli: return T("Copy List CLI", "复制列表命令");
                 case AIBridgeEditorTextKey.CopyLogsCli: return T("Copy Logs CLI", "复制日志命令");
                 case AIBridgeEditorTextKey.CopyScreenshotCli: return T("Copy Screenshot CLI", "复制截图命令");
                 case AIBridgeEditorTextKey.CopyStatusCli: return T("Copy Status CLI", "复制状态命令");
@@ -399,11 +385,8 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.InsecureBindWarning: return T("HTTP bind address is not loopback and no auth token is set: any host on the network can send Runtime commands (including code execution). Set an auth token or bind to 127.0.0.1.", "HTTP 绑定地址非本机回环且未设置鉴权 Token：局域网内任意主机均可发送 Runtime 命令（含代码执行）。请设置鉴权 Token 或绑定到 127.0.0.1。");
                 case AIBridgeEditorTextKey.RuntimeConfig: return T("Runtime Config", "Runtime 配置");
                 case AIBridgeEditorTextKey.RuntimeConfigPath: return T("Runtime Config path:", "Runtime 配置路径：");
-                case AIBridgeEditorTextKey.RuntimeConfigWritten: return T("[AIBridge] Runtime config written: {0}", "[AIBridge] Runtime 配置已写入：{0}");
                 case AIBridgeEditorTextKey.RuntimeDirectory: return T("Runtime Directory", "Runtime 目录");
-                case AIBridgeEditorTextKey.RuntimeDiscoveryCliCopied: return T("[AIBridge] Runtime discovery CLI command copied.", "[AIBridge] Runtime 自动发现 CLI 命令已复制。");
                 case AIBridgeEditorTextKey.RuntimeHttpCliCopied: return T("[AIBridge] Runtime HTTP CLI command copied.", "[AIBridge] Runtime HTTP CLI 命令已复制。");
-                case AIBridgeEditorTextKey.RuntimeLaunchArgsCopied: return T("[AIBridge] Runtime launch arguments copied.", "[AIBridge] Runtime 启动参数已复制。");
                 case AIBridgeEditorTextKey.RuntimeHttpEntry: return T("Runtime HTTP Entry", "Runtime HTTP 入口");
                 case AIBridgeEditorTextKey.RuntimeInfo: return T("Runtime Info", "Runtime 信息");
                 case AIBridgeEditorTextKey.ScanAssemblies: return T("Scan Assemblies", "扫描程序集");
@@ -437,7 +420,6 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.UseAllowedActionsWhitelist: return T("Use Action Whitelist", "启用 Action 白名单");
                 case AIBridgeEditorTextKey.Url: return T("URL", "URL");
                 case AIBridgeEditorTextKey.Warning: return T("Warning", "警告");
-                case AIBridgeEditorTextKey.WriteRuntimeConfig: return T("Write Runtime Config", "写入 Runtime 配置");
                 case AIBridgeEditorTextKey.Yes: return T("Yes", "是");
                 case AIBridgeEditorTextKey.No: return T("No", "否");
                 default: return key.ToString();

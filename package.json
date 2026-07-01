@@ -17,5 +17,7 @@
     "communication",
     "automation"
   ],
-  "dependencies": {}
+  "dependencies": {
+    "com.unity.ugui": "1.0.0"
+  }
 }

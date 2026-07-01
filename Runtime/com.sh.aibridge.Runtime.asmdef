@@ -1,7 +1,9 @@
 {
     "name": "com.sh.aibridge.Runtime",
     "rootNamespace": "AIBridge.Runtime",
-    "references": [],
+    "references": [
+        "com.sh.aibridge.Shared"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

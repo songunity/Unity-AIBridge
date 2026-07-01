@@ -227,6 +227,11 @@ namespace AIBridge.Editor
             RegisterCommand(inputSimulationCommandType.GetMethod("DragByInstanceId", flags));
             RegisterCommand(inputSimulationCommandType.GetMethod("LongPress", flags));
             RegisterCommand(inputSimulationCommandType.GetMethod("LongPressByInstanceId", flags));
+            var uIAutomationCommandType = loadedAssemblies["com.sh.aibridge.Editor"].GetType("AIBridge.Editor.UIAutomationCommand");
+            RegisterCommand(uIAutomationCommandType.GetMethod("Snapshot", flags));
+            RegisterCommand(uIAutomationCommandType.GetMethod("Find", flags));
+            RegisterCommand(uIAutomationCommandType.GetMethod("Raycast", flags));
+            RegisterCommand(uIAutomationCommandType.GetMethod("Click", flags));
             var inspectorCommandType = loadedAssemblies["com.sh.aibridge.Editor"].GetType("AIBridge.Editor.InspectorCommand");
             RegisterCommand(inspectorCommandType.GetMethod("AddComponent", flags));
             RegisterCommand(inspectorCommandType.GetMethod("GetComponents", flags));
@@ -273,6 +278,10 @@ namespace AIBridge.Editor
                 RegisterCommand(runtimeCommandType.GetMethod("Status", flags));
                 RegisterCommand(runtimeCommandType.GetMethod("Logs", flags));
                 RegisterCommand(runtimeCommandType.GetMethod("Screenshot", flags));
+                RegisterCommand(runtimeCommandType.GetMethod("UiSnapshot", flags));
+                RegisterCommand(runtimeCommandType.GetMethod("UiFind", flags));
+                RegisterCommand(runtimeCommandType.GetMethod("UiRaycast", flags));
+                RegisterCommand(runtimeCommandType.GetMethod("UiClick", flags));
                 RegisterCommand(runtimeCommandType.GetMethod("ExecDll", flags));
             }
 

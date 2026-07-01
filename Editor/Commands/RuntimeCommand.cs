@@ -72,6 +72,52 @@ namespace AIBridge.Editor
             return SendRuntimeAction("runtime.screenshot", transport, target, url, timeout, null);
         }
 
+        [AIBridge("获取 Runtime UGUI 控件快照", "AIBridgeCLI RuntimeCommand_UiSnapshot --transport http --url http://127.0.0.1:27182 --raw")]
+        public static IEnumerator UiSnapshot(string transport = "file", string target = "latest", string url = null, int timeout = 5000, int maxResults = 100, bool includeDisabled = false)
+        {
+            return SendRuntimeAction("runtime.ui.snapshot", transport, target, url, timeout, new Dictionary<string, object>
+            {
+                ["maxResults"] = maxResults,
+                ["includeDisabled"] = includeDisabled
+            });
+        }
+
+        [AIBridge("查找 Runtime UGUI Button", "AIBridgeCLI RuntimeCommand_UiFind --keyword \"Start\" --transport http --url http://127.0.0.1:27182 --raw")]
+        public static IEnumerator UiFind(string transport = "file", string target = "latest", string url = null, int timeout = 5000, string keyword = null, int maxResults = 100, bool includeDisabled = false)
+        {
+            return SendRuntimeAction("runtime.ui.find", transport, target, url, timeout, new Dictionary<string, object>
+            {
+                ["keyword"] = keyword,
+                ["maxResults"] = maxResults,
+                ["includeDisabled"] = includeDisabled
+            });
+        }
+
+        [AIBridge("对 Runtime UI 执行 EventSystem raycast", "AIBridgeCLI RuntimeCommand_UiRaycast --path \"Canvas/Button\" --transport http --url http://127.0.0.1:27182 --raw")]
+        public static IEnumerator UiRaycast(string transport = "file", string target = "latest", string url = null, int timeout = 5000, float x = 0f, float y = 0f, string path = null, int instanceId = 0, int maxResults = 20)
+        {
+            return SendRuntimeAction("runtime.ui.raycast", transport, target, url, timeout, new Dictionary<string, object>
+            {
+                ["x"] = x,
+                ["y"] = y,
+                ["path"] = path,
+                ["instanceId"] = instanceId,
+                ["maxResults"] = maxResults
+            });
+        }
+
+        [AIBridge("点击 Runtime UI 控件或屏幕坐标", "AIBridgeCLI RuntimeCommand_UiClick --path \"Canvas/Button\" --transport http --url http://127.0.0.1:27182 --raw")]
+        public static IEnumerator UiClick(string transport = "file", string target = "latest", string url = null, int timeout = 5000, float x = 0f, float y = 0f, string path = null, int instanceId = 0)
+        {
+            return SendRuntimeAction("runtime.ui.click", transport, target, url, timeout, new Dictionary<string, object>
+            {
+                ["x"] = x,
+                ["y"] = y,
+                ["path"] = path,
+                ["instanceId"] = instanceId
+            });
+        }
+
         [AIBridge("发送已编译 DLL 到 Runtime 执行", "AIBridgeCLI RuntimeCommand_ExecDll --dll probe.dll --transport http --url http://127.0.0.1:27182 --riskAccepted true --raw")]
         public static IEnumerator ExecDll(string dll, string transport = "http", string target = "latest", string url = null, bool riskAccepted = false, string entryType = null, string methodName = null, int timeout = 30000)
         {

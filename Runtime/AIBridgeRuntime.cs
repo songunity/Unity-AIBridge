@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using AIBridge.Internal.Json;
+using AIBridge.Shared;
 using AIBridge.Runtime.Diagnostics;
 using AIBridge.Runtime.Transports;
 using UnityEngine;
@@ -49,6 +50,10 @@ namespace AIBridge.Runtime
             "runtime.logs.clear",
             "runtime.perf",
             "runtime.screenshot",
+            "runtime.ui.snapshot",
+            "runtime.ui.find",
+            "runtime.ui.raycast",
+            "runtime.ui.click",
             RuntimeCodeExecuteAction,
             "runtime.handlers"
         };
@@ -470,6 +475,32 @@ namespace AIBridge.Runtime
                 case "runtime.screenshot":
                     StartCoroutine(CaptureScreenshot(cmd));
                     asyncStarted = true;
+                    return true;
+                case "runtime.ui.snapshot":
+                    result = AIBridgeRuntimeCommandResult.FromSuccess(cmd.Id, AIBridgeUiAutomation.Snapshot(
+                        ReadIntParam(cmd, "maxResults", 100),
+                        ReadBoolParam(cmd, "includeDisabled", false)));
+                    return true;
+                case "runtime.ui.find":
+                    result = AIBridgeRuntimeCommandResult.FromSuccess(cmd.Id, AIBridgeUiAutomation.Find(
+                        ReadStringParam(cmd, "keyword", null),
+                        ReadIntParam(cmd, "maxResults", 100),
+                        ReadBoolParam(cmd, "includeDisabled", false)));
+                    return true;
+                case "runtime.ui.raycast":
+                    result = AIBridgeRuntimeCommandResult.FromSuccess(cmd.Id, AIBridgeUiAutomation.Raycast(
+                        ReadFloatParam(cmd, "x", 0f),
+                        ReadFloatParam(cmd, "y", 0f),
+                        ReadStringParam(cmd, "path", null),
+                        ReadIntParam(cmd, "instanceId", 0),
+                        ReadIntParam(cmd, "maxResults", 20)));
+                    return true;
+                case "runtime.ui.click":
+                    result = AIBridgeRuntimeCommandResult.FromSuccess(cmd.Id, AIBridgeUiAutomation.Click(
+                        ReadFloatParam(cmd, "x", 0f),
+                        ReadFloatParam(cmd, "y", 0f),
+                        ReadStringParam(cmd, "path", null),
+                        ReadIntParam(cmd, "instanceId", 0)));
                     return true;
                 case RuntimeCodeExecuteAction:
                     return TryHandleRuntimeCodeExecute(cmd, out result, out asyncStarted);
@@ -1338,6 +1369,38 @@ namespace AIBridge.Runtime
             return int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
                 ? parsed
                 : (int?)null;
+        }
+
+        private static float ReadFloatParam(AIBridgeRuntimeCommand cmd, string key, float defaultValue)
+        {
+            if (!TryGetCommandParam(cmd, key, out var value) || value == null)
+            {
+                return defaultValue;
+            }
+
+            if (value is float floatValue)
+            {
+                return floatValue;
+            }
+
+            if (value is double doubleValue)
+            {
+                return (float)doubleValue;
+            }
+
+            if (value is int intValue)
+            {
+                return intValue;
+            }
+
+            if (value is long longValue)
+            {
+                return longValue;
+            }
+
+            return float.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                ? parsed
+                : defaultValue;
         }
 
         private static string ReadStringParam(AIBridgeRuntimeCommand cmd, string key, string defaultValue)

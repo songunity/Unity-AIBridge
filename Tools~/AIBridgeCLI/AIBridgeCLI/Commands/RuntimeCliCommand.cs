@@ -65,6 +65,14 @@ internal static class RuntimeCliCommand
                 return SendRuntimeAction(parsed, "runtime.logs");
             case "screenshot":
                 return SendRuntimeAction(parsed, "runtime.screenshot");
+            case "ui_snapshot":
+                return SendRuntimeAction(parsed, "runtime.ui.snapshot");
+            case "ui_find":
+                return SendRuntimeAction(parsed, "runtime.ui.find");
+            case "ui_raycast":
+                return SendRuntimeAction(parsed, "runtime.ui.raycast");
+            case "ui_click":
+                return SendRuntimeAction(parsed, "runtime.ui.click");
             case "exec":
                 return SendRuntimeAction(parsed, "runtime.code.execute", BuildExecDllParams(parsed));
             default:
@@ -572,6 +580,10 @@ internal static class RuntimeCliCommand
             + "  AIBridgeCLI runtime status --transport file|http [--target latest] [--url <url>]\n"
             + "  AIBridgeCLI runtime logs --transport file|http [--target latest] [--url <url>] [--logType Error] [--count 100]\n"
             + "  AIBridgeCLI runtime screenshot --transport file|http [--target latest] [--url <url>]\n"
+            + "  AIBridgeCLI runtime ui_snapshot --transport file|http [--target latest] [--url <url>] [--maxResults 100]\n"
+            + "  AIBridgeCLI runtime ui_find --transport file|http [--target latest] [--url <url>] [--keyword Start]\n"
+            + "  AIBridgeCLI runtime ui_raycast --transport file|http [--target latest] [--url <url>] [--path Canvas/Button]\n"
+            + "  AIBridgeCLI runtime ui_click --transport file|http [--target latest] [--url <url>] [--path Canvas/Button]\n"
             + "  AIBridgeCLI runtime exec --dll <path> --transport http --url <url> --riskAccepted true";
     }
 

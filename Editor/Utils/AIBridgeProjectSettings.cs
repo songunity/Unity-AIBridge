@@ -343,6 +343,9 @@ namespace AIBridge.Editor
                     runtimeBridge = new RuntimeBridgeSettingsData();
                 }
 
+                runtimeBridge.AllowedActions = string.Empty;
+                runtimeBridge.EnableRuntimeCodeExecution = DefaultRuntimeBridgeCodeExecutionEnabled;
+
                 if (runtimeBridge.HeartbeatIntervalSeconds <= 0f)
                 {
                     runtimeBridge.HeartbeatIntervalSeconds = DefaultRuntimeBridgeHeartbeatIntervalSeconds;

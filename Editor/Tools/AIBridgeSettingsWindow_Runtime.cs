@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -12,29 +11,6 @@ namespace AIBridge.Editor
         private const float RuntimeBridgeSettingsLabelWidthRatio = 0.28f;
         private const float RuntimeBridgeSettingsMinLabelWidth = 220f;
         private const float RuntimeBridgeSettingsMaxLabelWidth = 280f;
-        private const string RuntimeCodeExecuteAction = "runtime.code.execute";
-        private static readonly string[] BuiltInRuntimeActions =
-        {
-            "runtime.ping",
-            "runtime.status",
-            "runtime.logs",
-            "runtime.logs.clear",
-            "runtime.perf",
-            "runtime.screenshot",
-            "runtime.handlers"
-        };
-
-        private static readonly AIBridgeEditorTextKey[] BuiltInRuntimeActionHelpKeys =
-        {
-            AIBridgeEditorTextKey.AllowedActionPingHelp,
-            AIBridgeEditorTextKey.AllowedActionStatusHelp,
-            AIBridgeEditorTextKey.AllowedActionLogsHelp,
-            AIBridgeEditorTextKey.AllowedActionLogsClearHelp,
-            AIBridgeEditorTextKey.AllowedActionPerfHelp,
-            AIBridgeEditorTextKey.AllowedActionScreenshotHelp,
-            AIBridgeEditorTextKey.AllowedActionHandlersHelp
-        };
-
         private Vector2 _scrollPosition;
         private bool _cliCommandsExpanded;
 
@@ -135,32 +111,6 @@ namespace AIBridge.Editor
             {
                 EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.ReleaseWarning), MessageType.Warning);
             }
-
-            DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeCapabilities));
-
-            var hybridClrInstalled = AIBridgeHybridClrUtility.IsHybridClrInstalled();
-            using (new EditorGUI.DisabledScope(!hybridClrInstalled))
-            {
-                settings.EnableRuntimeCodeExecution = EditorGUILayout.Toggle(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.EnableRuntimeCodeExecution),
-                    settings.EnableRuntimeCodeExecution);
-            }
-
-            if (!hybridClrInstalled)
-            {
-                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.HybridClrHelp), MessageType.Info);
-            }
-            else if (settings.EnableRuntimeCodeExecution)
-            {
-                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeCodeWarning), MessageType.Warning);
-
-                settings.MaxRuntimeCodeExecutionSeconds = EditorGUILayout.FloatField(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.MaxCodeExecutionSeconds),
-                    settings.MaxRuntimeCodeExecutionSeconds);
-                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.MaxCodeExecutionSecondsHelp), MessageType.None);
-            }
-
-            DrawAllowedActionsField(settings);
 
             DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Transport));
 
@@ -350,131 +300,6 @@ namespace AIBridge.Editor
             EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
         }
 
-        private static void DrawAllowedActionsField(AIBridgeProjectSettings.RuntimeBridgeSettingsData settings)
-        {
-            var hasAllowedActions = !string.IsNullOrWhiteSpace(settings.AllowedActions);
-            var useWhitelist = EditorGUILayout.Toggle(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.UseAllowedActionsWhitelist),
-                hasAllowedActions);
-            var allowedActions = ParseAllowedActionNames(settings.AllowedActions);
-
-            if (!useWhitelist)
-            {
-                settings.AllowedActions = string.Empty;
-                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowedActionsHelp), MessageType.None);
-                return;
-            }
-
-            var mask = hasAllowedActions ? 0 : (1 << BuiltInRuntimeActions.Length) - 1;
-            var customActions = new List<string>();
-            for (var i = 0; i < allowedActions.Count; i++)
-            {
-                if (IsRuntimeCodeExecuteAction(allowedActions[i]))
-                {
-                    continue;
-                }
-
-                if (TryGetBuiltInActionIndex(allowedActions[i], out var builtInIndex))
-                {
-                    mask |= 1 << builtInIndex;
-                }
-                else
-                {
-                    customActions.Add(allowedActions[i]);
-                }
-            }
-
-            var nextMask = EditorGUILayout.MaskField(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowedActions),
-                mask,
-                GetBuiltInRuntimeActionLabels());
-            var nextCustomActions = EditorGUILayout.DelayedTextField(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowedActionsCustom),
-                string.Join("\n", customActions.ToArray()));
-
-            settings.AllowedActions = BuildAllowedActionsValue(nextMask, nextCustomActions);
-            EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AllowedActionsWhitelistHelp), MessageType.None);
-        }
-
-        private static string[] GetBuiltInRuntimeActionLabels()
-        {
-            var labels = new string[BuiltInRuntimeActions.Length];
-            for (var i = 0; i < BuiltInRuntimeActions.Length; i++)
-            {
-                labels[i] = BuiltInRuntimeActions[i] + " - " + AIBridgeEditorText.Get(BuiltInRuntimeActionHelpKeys[i]);
-            }
-
-            return labels;
-        }
-
-        private static List<string> ParseAllowedActionNames(string value)
-        {
-            var actions = new List<string>();
-            var seenActions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return actions;
-            }
-
-            var parts = value.Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-            for (var i = 0; i < parts.Length; i++)
-            {
-                var action = parts[i].Trim();
-                if (action.Length == 0 || !seenActions.Add(action))
-                {
-                    continue;
-                }
-
-                actions.Add(action);
-            }
-
-            return actions;
-        }
-
-        private static string BuildAllowedActionsValue(int builtInMask, string customActionsValue)
-        {
-            var actions = new List<string>();
-            for (var i = 0; i < BuiltInRuntimeActions.Length; i++)
-            {
-                if ((builtInMask & (1 << i)) != 0)
-                {
-                    actions.Add(BuiltInRuntimeActions[i]);
-                }
-            }
-
-            var customActions = ParseAllowedActionNames(customActionsValue);
-            for (var i = 0; i < customActions.Count; i++)
-            {
-                if (!TryGetBuiltInActionIndex(customActions[i], out _)
-                    && !IsRuntimeCodeExecuteAction(customActions[i]))
-                {
-                    actions.Add(customActions[i]);
-                }
-            }
-
-            return string.Join("\n", actions.ToArray());
-        }
-
-        private static bool TryGetBuiltInActionIndex(string action, out int index)
-        {
-            for (var i = 0; i < BuiltInRuntimeActions.Length; i++)
-            {
-                if (string.Equals(BuiltInRuntimeActions[i], action, StringComparison.OrdinalIgnoreCase))
-                {
-                    index = i;
-                    return true;
-                }
-            }
-
-            index = -1;
-            return false;
-        }
-
-        private static bool IsRuntimeCodeExecuteAction(string action)
-        {
-            return string.Equals(action, RuntimeCodeExecuteAction, StringComparison.OrdinalIgnoreCase);
-        }
-
         // 反向白名单:仅本机回环地址视为安全;其余(0.0.0.0、::、* 、具体网卡 IP 等)在无 Token 时均需警告。
         private static bool IsLoopbackBindAddress(string address)
         {
@@ -494,6 +319,8 @@ namespace AIBridge.Editor
         {
             var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
 
+            settings.AllowedActions = string.Empty;
+            settings.EnableRuntimeCodeExecution = AIBridgeProjectSettings.DefaultRuntimeBridgeCodeExecutionEnabled;
             settings.MaxResultBytes = Math.Max(1024, settings.MaxResultBytes);
             settings.HttpBindAddress = string.IsNullOrWhiteSpace(settings.HttpBindAddress)
                 ? AIBridgeProjectSettings.DefaultRuntimeBridgeHttpBindAddress

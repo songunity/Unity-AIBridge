@@ -77,6 +77,23 @@ public static class CompileUnityCommand
 
             if (!observedCompilationActivity && (string.IsNullOrEmpty(state) || state == "idle" || state == "unknown"))
             {
+                if (startCommunicationTimedOut)
+                {
+                    return new CommandResult()
+                    {
+                        id = stateResult.id,
+                        success = false,
+                        error = "Compile start was not confirmed, and Unity is idle now.",
+                        data = AddPollingMetadata(
+                            stateResult.data,
+                            startedByInvocation,
+                            attachedToExistingCompilation,
+                            statusConfirmed: true,
+                            startCommunicationTimedOut,
+                            lastCommunicationError)
+                    };
+                }
+
                 Thread.Sleep(DefaultPollInterval);
                 continue;
             }

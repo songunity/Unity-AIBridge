@@ -168,6 +168,20 @@ namespace AIBridge.Editor
             return "http://" + host.Trim() + ":" + port;
         }
 
+        private static bool IsLoopbackBindAddress(string address)
+        {
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                return false;
+            }
+
+            var trimmed = address.Trim();
+            return string.Equals(trimmed, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(trimmed, "::1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(trimmed, "[::1]", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(trimmed, "localhost", StringComparison.OrdinalIgnoreCase);
+        }
+
         public static string GetRuntimeConfigPath()
         {
             return Path.Combine(AIBridge.BridgeDirectory, RuntimeConfigFileName);
@@ -190,7 +204,7 @@ namespace AIBridge.Editor
                 ["token"] = settings.AuthToken ?? string.Empty,
                 ["discovery"] = new Dictionary<string, object>
                 {
-                    ["enabled"] = settings.EnableLanDiscovery,
+                    ["enabled"] = settings.EnableLanDiscovery && !IsLoopbackBindAddress(settings.HttpBindAddress),
                     ["udpPort"] = Math.Max(1, settings.DiscoveryUdpPort),
                     ["cacheSeconds"] = DiscoveryCacheFreshSeconds
                 }
@@ -400,7 +414,7 @@ namespace AIBridge.Editor
                     ? AIBridgeProjectSettings.DefaultRuntimeBridgeHttpBindAddress
                     : source.HttpBindAddress.Trim(),
                 httpPort = Math.Max(1, source.HttpPort),
-                enableLanDiscovery = source.EnableLanDiscovery,
+                enableLanDiscovery = source.EnableLanDiscovery && !IsLoopbackBindAddress(source.HttpBindAddress),
                 discoveryUdpPort = Math.Max(1, source.DiscoveryUdpPort)
             };
         }

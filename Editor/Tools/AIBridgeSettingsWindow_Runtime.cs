@@ -138,7 +138,6 @@ namespace AIBridge.Editor
                 if (networkMode != currentNetworkMode)
                 {
                     settings.HttpBindAddress = networkMode == 0 ? "127.0.0.1" : "0.0.0.0";
-                    settings.EnableLanDiscovery = networkMode == 1;
                 }
 
                 settings.AuthToken = EditorGUILayout.DelayedTextField(

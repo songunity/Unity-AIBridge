@@ -383,7 +383,6 @@ namespace AIBridge.Editor
             return new AIBridgeRuntimeSettings
             {
                 enableRuntimeBridge = source.EnableRuntimeBridge,
-                allowInReleaseBuild = source.AllowInReleaseBuild,
                 exchangeDirectory = source.ExchangeDirectory ?? string.Empty,
                 targetId = source.TargetId ?? string.Empty,
                 authToken = source.AuthToken ?? string.Empty,

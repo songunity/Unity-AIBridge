@@ -19,7 +19,9 @@ namespace AIBridge.Runtime.Transports
         private const int DefaultCommandTimeoutMs = 30000;
         private const int MinCommandTimeoutMs = 100;
         private const int MaxCommandTimeoutMs = 300000;
-        private const int MaxRequestBytes = 16 * 1024 * 1024;
+        private const int MaxRequestBytes = 12 * 1024 * 1024;
+        private const int MaxHeaderBytes = 64 * 1024;
+        private const int MaxConcurrentClients = 8;
         private const string HealthPath = "/aibridge/health";
         private const string CommandsPath = "/aibridge/commands";
         private const string ResultsPathPrefix = "/aibridge/results/";
@@ -27,6 +29,7 @@ namespace AIBridge.Runtime.Transports
 
         private readonly AIBridgeRuntime _runtime;
         private readonly AIBridgeRuntimeSettings _settings;
+        private readonly SemaphoreSlim _clientSlots = new SemaphoreSlim(MaxConcurrentClients, MaxConcurrentClients);
         private TcpListener _listener;
         private Thread _listenThread;
         private volatile bool _running;
@@ -146,7 +149,23 @@ namespace AIBridge.Runtime.Transports
                 try
                 {
                     var client = _listener.AcceptTcpClient();
-                    ThreadPool.QueueUserWorkItem(_ => HandleClient(client));
+                    if (!_clientSlots.Wait(0))
+                    {
+                        RejectBusyClient(client);
+                        continue;
+                    }
+
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        try
+                        {
+                            HandleClient(client);
+                        }
+                        finally
+                        {
+                            _clientSlots.Release();
+                        }
+                    });
                 }
                 catch
                 {
@@ -154,6 +173,25 @@ namespace AIBridge.Runtime.Transports
                     {
                         Thread.Sleep(50);
                     }
+                }
+            }
+        }
+
+        private static void RejectBusyClient(TcpClient client)
+        {
+            using (client)
+            {
+                try
+                {
+                    client.SendTimeout = 1000;
+                    WriteJson(client.GetStream(), 503, new Dictionary<string, object>
+                    {
+                        ["success"] = false,
+                        ["error"] = "too_many_connections"
+                    });
+                }
+                catch
+                {
                 }
             }
         }
@@ -166,9 +204,18 @@ namespace AIBridge.Runtime.Transports
                 {
                     client.ReceiveTimeout = 5000;
                     client.SendTimeout = 5000;
-                    var request = ReadRequest(client.GetStream());
+                    var request = ReadRequest(client.GetStream(), out var errorStatusCode, out var error);
                     if (request == null)
                     {
+                        if (errorStatusCode > 0)
+                        {
+                            WriteJson(client.GetStream(), errorStatusCode, new Dictionary<string, object>
+                            {
+                                ["success"] = false,
+                                ["error"] = error
+                            });
+                        }
+
                         return;
                     }
 
@@ -217,9 +264,17 @@ namespace AIBridge.Runtime.Transports
                 }
 
                 var commandId = Uri.UnescapeDataString(request.Path.Substring(ResultsPathPrefix.Length));
-                if (_runtime.TryGetHttpResult(commandId, false, out var result))
+                if (_runtime.TryGetHttpResult(commandId, true, out var result))
                 {
                     WriteJson(stream, 200, result);
+                    return;
+                }
+
+                var commandState = _runtime.GetHttpCommandState(commandId);
+                if (commandState == AIBridgeHttpCommandState.Queued
+                    || commandState == AIBridgeHttpCommandState.Executing)
+                {
+                    WriteJson(stream, 202, BuildPendingCommandResponse(commandId, commandState));
                     return;
                 }
 
@@ -291,6 +346,12 @@ namespace AIBridge.Runtime.Transports
                 command.Id = "http_" + Guid.NewGuid().ToString("N");
             }
 
+            if (!AIBridgeRuntime.IsValidCommandId(command.Id))
+            {
+                WriteJson(stream, 400, AIBridgeRuntimeCommandResult.FromFailure("http", "invalid_command_id"));
+                return;
+            }
+
             var bearerToken = ReadBearerToken(request);
             if (string.IsNullOrEmpty(command.Token))
             {
@@ -324,8 +385,21 @@ namespace AIBridge.Runtime.Transports
 
                 if (!TryValidateRuntimeReady(out notReadyReason, out mainThreadAgeMs))
                 {
-                    _runtime.RemovePendingHttpCommand(command.Id);
-                    WriteJson(stream, 503, BuildRuntimeNotReadyResult(command.Id, notReadyReason, mainThreadAgeMs));
+                    var state = _runtime.CancelQueuedHttpCommand(command.Id);
+                    if (state == AIBridgeHttpCommandState.Completed
+                        && _runtime.TryGetHttpResult(command.Id, true, out result))
+                    {
+                        WriteJson(stream, 200, result);
+                    }
+                    else if (state == AIBridgeHttpCommandState.Executing)
+                    {
+                        WriteJson(stream, 202, BuildPendingCommandResponse(command.Id, state));
+                    }
+                    else
+                    {
+                        WriteJson(stream, 503, BuildRuntimeNotReadyResult(command.Id, notReadyReason, mainThreadAgeMs));
+                    }
+
                     return;
                 }
 
@@ -333,8 +407,40 @@ namespace AIBridge.Runtime.Transports
                 Thread.Sleep(20);
             }
 
-            _runtime.RemovePendingHttpCommand(command.Id);
-            WriteJson(stream, 504, AIBridgeRuntimeCommandResult.FromFailure(command.Id, "handler_timeout"));
+            var timeoutState = _runtime.CancelQueuedHttpCommand(command.Id);
+            if (timeoutState == AIBridgeHttpCommandState.Completed
+                && _runtime.TryGetHttpResult(command.Id, true, out var completedResult))
+            {
+                WriteJson(stream, 200, completedResult);
+            }
+            else if (timeoutState == AIBridgeHttpCommandState.Executing)
+            {
+                WriteJson(stream, 202, BuildPendingCommandResponse(command.Id, timeoutState));
+            }
+            else
+            {
+                var timeoutResult = AIBridgeRuntimeCommandResult.FromFailure(command.Id, "handler_timeout");
+                timeoutResult.Data = new Dictionary<string, object>
+                {
+                    ["cancelled"] = timeoutState == AIBridgeHttpCommandState.Cancelled,
+                    ["status"] = timeoutState == AIBridgeHttpCommandState.Cancelled ? "cancelled" : "not_found"
+                };
+                WriteJson(stream, 504, timeoutResult);
+            }
+        }
+
+        private static Dictionary<string, object> BuildPendingCommandResponse(
+            string commandId,
+            AIBridgeHttpCommandState state)
+        {
+            return new Dictionary<string, object>
+            {
+                ["success"] = true,
+                ["commandId"] = commandId,
+                ["completed"] = false,
+                ["status"] = state == AIBridgeHttpCommandState.Executing ? "execution_started" : "queued",
+                ["resultUrl"] = ResultsPathPrefix + Uri.EscapeDataString(commandId)
+            };
         }
 
         private bool TryValidateRuntimeReady(out string reason, out long mainThreadAgeMs)
@@ -487,17 +593,29 @@ namespace AIBridge.Runtime.Transports
             return ex != null && ex.SocketErrorCode == SocketError.AddressAlreadyInUse;
         }
 
-        private static HttpRequestData ReadRequest(NetworkStream stream)
+        private static HttpRequestData ReadRequest(
+            NetworkStream stream,
+            out int errorStatusCode,
+            out string error)
         {
+            errorStatusCode = 0;
+            error = null;
             var bytes = new List<byte>(4096);
             var buffer = new byte[4096];
             var headerEnd = -1;
+            var headerSearchStart = 3;
             var contentLength = 0;
-            byte[] allBytes = null;
 
-            while (bytes.Count < MaxRequestBytes)
+            while (true)
             {
-                var read = stream.Read(buffer, 0, buffer.Length);
+                if (bytes.Count >= MaxRequestBytes)
+                {
+                    errorStatusCode = 413;
+                    error = "request_too_large";
+                    return null;
+                }
+
+                var read = stream.Read(buffer, 0, Math.Min(buffer.Length, MaxRequestBytes - bytes.Count));
                 if (read <= 0)
                 {
                     break;
@@ -507,12 +625,42 @@ namespace AIBridge.Runtime.Transports
 
                 if (headerEnd < 0)
                 {
-                    headerEnd = FindHeaderEnd(bytes);
+                    headerEnd = FindHeaderEnd(bytes, headerSearchStart);
                     if (headerEnd >= 0)
                     {
-                        allBytes = bytes.ToArray();
-                        var headerText = Encoding.ASCII.GetString(allBytes, 0, headerEnd);
-                        contentLength = ParseContentLength(headerText);
+                        if (headerEnd > MaxHeaderBytes)
+                        {
+                            errorStatusCode = 413;
+                            error = "headers_too_large";
+                            return null;
+                        }
+
+                        var headerBytes = bytes.ToArray();
+                        var headerText = Encoding.ASCII.GetString(headerBytes, 0, headerEnd);
+                        if (!TryParseContentLength(headerText, out contentLength))
+                        {
+                            errorStatusCode = 400;
+                            error = "invalid_content_length";
+                            return null;
+                        }
+
+                        if (contentLength > MaxRequestBytes - headerEnd - 4)
+                        {
+                            errorStatusCode = 413;
+                            error = "request_too_large";
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        if (bytes.Count > MaxHeaderBytes)
+                        {
+                            errorStatusCode = 413;
+                            error = "headers_too_large";
+                            return null;
+                        }
+
+                        headerSearchStart = Math.Max(3, bytes.Count - 3);
                     }
                 }
 
@@ -524,37 +672,38 @@ namespace AIBridge.Runtime.Transports
 
             if (headerEnd < 0)
             {
-                return null;
-            }
-
-            if (allBytes == null || allBytes.Length != bytes.Count)
-            {
-                allBytes = bytes.ToArray();
-            }
-
-            var headersText = Encoding.ASCII.GetString(allBytes, 0, headerEnd);
-            var request = ParseHeaders(headersText);
-            if (request == null)
-            {
+                errorStatusCode = 400;
+                error = "invalid_http_request";
                 return null;
             }
 
             var bodyStart = headerEnd + 4;
-            if (contentLength > 0 && bodyStart + contentLength <= allBytes.Length)
+            if (bytes.Count < bodyStart + contentLength)
             {
-                request.Body = Encoding.UTF8.GetString(allBytes, bodyStart, contentLength);
-            }
-            else
-            {
-                request.Body = string.Empty;
+                errorStatusCode = 400;
+                error = "incomplete_request_body";
+                return null;
             }
 
+            var allBytes = bytes.ToArray();
+            var headersText = Encoding.ASCII.GetString(allBytes, 0, headerEnd);
+            var request = ParseHeaders(headersText);
+            if (request == null)
+            {
+                errorStatusCode = 400;
+                error = "invalid_http_request";
+                return null;
+            }
+
+            request.Body = contentLength > 0
+                ? Encoding.UTF8.GetString(allBytes, bodyStart, contentLength)
+                : string.Empty;
             return request;
         }
 
-        private static int FindHeaderEnd(List<byte> bytes)
+        private static int FindHeaderEnd(List<byte> bytes, int startIndex)
         {
-            for (var i = 3; i < bytes.Count; i++)
+            for (var i = Math.Max(3, startIndex); i < bytes.Count; i++)
             {
                 if (bytes[i - 3] == 13 && bytes[i - 2] == 10 && bytes[i - 1] == 13 && bytes[i] == 10)
                 {
@@ -565,8 +714,9 @@ namespace AIBridge.Runtime.Transports
             return -1;
         }
 
-        private static int ParseContentLength(string headersText)
+        private static bool TryParseContentLength(string headersText, out int contentLength)
         {
+            contentLength = 0;
             var headers = headersText.Split(new[] { "\r\n" }, StringSplitOptions.None);
             for (var i = 1; i < headers.Length; i++)
             {
@@ -584,13 +734,11 @@ namespace AIBridge.Runtime.Transports
                 }
 
                 var value = line.Substring(colon + 1).Trim();
-                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
-                {
-                    return parsed;
-                }
+                return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out contentLength)
+                    && contentLength >= 0;
             }
 
-            return 0;
+            return true;
         }
 
         private static HttpRequestData ParseHeaders(string headersText)
@@ -694,12 +842,16 @@ namespace AIBridge.Runtime.Transports
             {
                 case 200:
                     return "OK";
+                case 202:
+                    return "Accepted";
                 case 400:
                     return "Bad Request";
                 case 401:
                     return "Unauthorized";
                 case 404:
                     return "Not Found";
+                case 413:
+                    return "Payload Too Large";
                 case 504:
                     return "Gateway Timeout";
                 case 503:

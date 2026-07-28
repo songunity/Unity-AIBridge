@@ -9,9 +9,6 @@ namespace AIBridge.Runtime
     public static class AIBridgeRuntimeBootstrap
     {
         private const string BootstrapObjectName = "AIBridgeRuntime (Bootstrap)";
-        private const string DefaultHttpBindAddress = "0.0.0.0";
-        private const int DefaultHttpPort = 27182;
-        private const int DefaultDiscoveryUdpPort = 27183;
 
         private static bool _initialized;
 
@@ -49,6 +46,12 @@ namespace AIBridge.Runtime
                 return;
             }
 
+            if (injectedSettings == null || !injectedSettings.enableRuntimeBridge)
+            {
+                Debug.Log("[AIBridgeRuntimeBootstrap] No enabled build settings were injected; bootstrap creation skipped. / 当前构建未注入已启用的 Runtime Bridge 设置，跳过自动创建。");
+                return;
+            }
+
             var gameObject = new GameObject(BootstrapObjectName);
             gameObject.SetActive(false);
             gameObject.hideFlags = HideFlags.HideInHierarchy;
@@ -66,23 +69,8 @@ namespace AIBridge.Runtime
 
         private static AIBridgeRuntimeSettings BuildBootstrapRuntimeSettings(AIBridgeRuntimeSettings injectedSettings)
         {
-            var settings = injectedSettings == null ? new AIBridgeRuntimeSettings() : injectedSettings.Clone();
-            if (injectedSettings == null)
-            {
-                settings.enableHttpTransport = true;
-                settings.httpBindAddress = DefaultHttpBindAddress;
-                settings.httpPort = DefaultHttpPort;
-                settings.enableLanDiscovery = true;
-                settings.discoveryUdpPort = DefaultDiscoveryUdpPort;
-                settings.enableRuntimeCodeExecution = IsRuntimeCodeExecutionAvailableByBuild();
-            }
-            else
-            {
-                settings.enableRuntimeCodeExecution = settings.enableRuntimeCodeExecution && IsRuntimeCodeExecutionAvailableByBuild();
-            }
-
-            settings.enableRuntimeBridge = true;
-            settings.allowInReleaseBuild = true;
+            var settings = injectedSettings.Clone();
+            settings.enableRuntimeCodeExecution = settings.enableRuntimeCodeExecution && IsRuntimeCodeExecutionAvailableByBuild();
             return settings;
         }
 

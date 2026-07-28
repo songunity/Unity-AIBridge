@@ -39,6 +39,7 @@ For longer code, save to `.aibridge/code/` and use the `--file` parameter.
 - **Input Simulation** - Click, drag, long press GameObjects (runtime)
 - **Log Capture** - Get console logs, precise timestamp capture mode
 - **Code Execution** - Execute C# code snippets dynamically in Editor or Runtime (even without built-in commands, any Unity API operation is possible via code)
+- **Runtime Bridge** - Connect to a built Player for runtime status, logs, screenshots, performance data, UI automation, and optional compiled DLL execution
 - **Batch Commands** - Execute multiple commands in a single call
 - **Menu Items** - Execute any Unity editor menu item
 - **Test Runner** - Integrated Unity TestRunner API
@@ -186,6 +187,10 @@ Use the CLI tool or let AI assistants call your commands:
 ```bash
 AIBridgeCLI.exe MyCustomCommand_CreateCustomCube --name "MyCube" --size 2.0
 ```
+
+### 4. Use Runtime Bridge
+
+Open `Window > AIBridge > Runtime`, enable **Compile Runtime Bridge**, then configure the transport and authorization settings. Enabling Runtime Bridge automatically injects `AIBridgeRuntime` into built Players; disabling it removes the compile define and skips injection. A runtime component placed manually in a scene remains explicit and unaffected.
 
 ## Command Registration
 

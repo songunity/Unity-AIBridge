@@ -47,7 +47,6 @@ namespace AIBridge.Editor
         CompileRuntimeBridgeHelp,
         CopyAgent,
         CopyDiscoverCli,
-        CopyHttpStatus,
         CopyLogsCli,
         CopyScreenshotCli,
         CopyStatusCli,
@@ -61,9 +60,9 @@ namespace AIBridge.Editor
         DeleteFailed,
         DeleteRuntimeTargetCache,
         DeleteRuntimeTargetCacheMessage,
+        Details,
         Device,
         DirectoryInformation,
-        DiscoverCache,
         Discovered,
         DiscoveryUdpPort,
         DurationSeconds,
@@ -72,7 +71,6 @@ namespace AIBridge.Editor
         EnableLanDiscovery,
         EnableRuntimeBridge,
         EnableRuntimeCodeExecution,
-        FileTransportTargets,
         Fps,
         FoundLanTargets,
         General,
@@ -84,9 +82,9 @@ namespace AIBridge.Editor
         Health,
         Heartbeat,
         HeartbeatInterval,
+        HideDetails,
         HttpBindAddress,
         HttpEntry,
-        HttpLanDiscoveredTargets,
         HttpPort,
         HttpTransportSettings,
         HttpUrl,
@@ -96,16 +94,18 @@ namespace AIBridge.Editor
         Kind,
         LanScan,
         LastSeen,
+        LocalAreaNetwork,
+        LocalOnly,
         Loading,
         LogBufferSize,
         Maintenance,
         MaxResultBytes,
         MaxCodeExecutionSeconds,
         MaxCodeExecutionSecondsHelp,
+        NetworkMode,
         OrphanResultRetentionSeconds,
         OrphanResultRetentionSecondsHelp,
-        NoFileTransportTargets,
-        NoLanDiscoveredTargets,
+        NoRuntimeTargets,
         NoToken,
         Now,
         Ok,
@@ -128,7 +128,6 @@ namespace AIBridge.Editor
         ResetAllSettings,
         ResetSettings,
         ResetSettingsConfirm,
-        ResolvedInfo,
         Runtime,
         RuntimeBridge,
         RuntimeBridgeHelp,
@@ -138,10 +137,8 @@ namespace AIBridge.Editor
         RuntimeCodeWarning,
         InsecureBindWarning,
         RuntimeConfig,
-        RuntimeConfigPath,
         RuntimeDirectory,
         RuntimeHttpCliCopied,
-        RuntimeHttpEntry,
         RuntimeInfo,
         ScanAssemblies,
         ScanAssembliesHelp,
@@ -150,6 +147,8 @@ namespace AIBridge.Editor
         ScanningUdp,
         Scale,
         Scene,
+        SceneDebug,
+        SceneDebugHelp,
         ScreenshotCacheCleared,
         Screenshots,
         Settings,
@@ -285,7 +284,6 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.CompileRuntimeBridgeHelp: return T("Enable this to compile Runtime Bridge code, expose Runtime Bridge editor controls, and auto-inject AIBridgeRuntime into built Players.", "启用后编译 Runtime Bridge 代码、显示 Runtime Bridge 编辑器控制，并在构建 Player 时自动注入 AIBridgeRuntime。");
                 case AIBridgeEditorTextKey.CopyAgent: return T("Copy to Agent", "复制到 Agent");
                 case AIBridgeEditorTextKey.CopyDiscoverCli: return T("Copy Discover CLI", "复制发现命令");
-                case AIBridgeEditorTextKey.CopyHttpStatus: return T("Copy HTTP Status", "复制 HTTP 状态");
                 case AIBridgeEditorTextKey.CopyLogsCli: return T("Copy Logs CLI", "复制日志命令");
                 case AIBridgeEditorTextKey.CopyScreenshotCli: return T("Copy Screenshot CLI", "复制截图命令");
                 case AIBridgeEditorTextKey.CopyStatusCli: return T("Copy Status CLI", "复制状态命令");
@@ -299,9 +297,9 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.DeleteFailed: return T("Delete Failed", "删除失败");
                 case AIBridgeEditorTextKey.DeleteRuntimeTargetCache: return T("Delete Runtime Target Cache", "删除 Runtime 目标缓存");
                 case AIBridgeEditorTextKey.DeleteRuntimeTargetCacheMessage: return T("Delete stale Runtime target cache for '{0}'?", "删除已过期 Runtime 目标 '{0}' 的缓存？");
+                case AIBridgeEditorTextKey.Details: return T("Details", "详情");
                 case AIBridgeEditorTextKey.Device: return T("Device", "设备");
                 case AIBridgeEditorTextKey.DirectoryInformation: return T("Directory Information", "目录信息");
-                case AIBridgeEditorTextKey.DiscoverCache: return T("Discovery Cache", "发现缓存");
                 case AIBridgeEditorTextKey.Discovered: return T("DISCOVERED", "已发现");
                 case AIBridgeEditorTextKey.DiscoveryUdpPort: return T("Discovery UDP Port", "发现 UDP 端口");
                 case AIBridgeEditorTextKey.DurationSeconds: return T("Duration (seconds)", "时长（秒）");
@@ -310,7 +308,6 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.EnableLanDiscovery: return T("Enable LAN Discovery", "启用局域网自动发现");
                 case AIBridgeEditorTextKey.EnableRuntimeBridge: return T("Enable Runtime Bridge", "启用 Runtime Bridge");
                 case AIBridgeEditorTextKey.EnableRuntimeCodeExecution: return T("Enable Runtime Code Execution", "启用 Runtime 代码执行");
-                case AIBridgeEditorTextKey.FileTransportTargets: return T("File Transport Targets", "File Transport 目标");
                 case AIBridgeEditorTextKey.Fps: return T("FPS", "帧率");
                 case AIBridgeEditorTextKey.FoundLanTargets: return T("Found {0} reachable / {1} discovered", "发现 {0} 个可达 / {1} 个响应");
                 case AIBridgeEditorTextKey.General: return T("General", "通用");
@@ -322,9 +319,9 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.Health: return T("Health", "Health");
                 case AIBridgeEditorTextKey.Heartbeat: return T("Heartbeat", "Heartbeat");
                 case AIBridgeEditorTextKey.HeartbeatInterval: return T("Heartbeat Interval", "Heartbeat 间隔");
+                case AIBridgeEditorTextKey.HideDetails: return T("Collapse", "收起");
                 case AIBridgeEditorTextKey.HttpBindAddress: return T("HTTP Bind Address", "HTTP 监听地址");
                 case AIBridgeEditorTextKey.HttpEntry: return T("HTTP Entry", "HTTP 入口");
-                case AIBridgeEditorTextKey.HttpLanDiscoveredTargets: return T("HTTP / LAN Discovered Targets", "HTTP / 局域网发现目标");
                 case AIBridgeEditorTextKey.HttpPort: return T("HTTP Port", "HTTP 端口");
                 case AIBridgeEditorTextKey.HttpTransportSettings: return T("HTTP Transport Settings", "HTTP Transport 设置");
                 case AIBridgeEditorTextKey.HttpUrl: return T("HTTP URL", "HTTP URL");
@@ -334,16 +331,18 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.Kind: return T("Kind", "类型");
                 case AIBridgeEditorTextKey.LanScan: return T("LAN Scan", "局域网扫描");
                 case AIBridgeEditorTextKey.LastSeen: return T("Last Seen", "最后发现");
+                case AIBridgeEditorTextKey.LocalAreaNetwork: return T("Local Area Network", "局域网");
+                case AIBridgeEditorTextKey.LocalOnly: return T("Local Only", "仅本机");
                 case AIBridgeEditorTextKey.Loading: return T("Loading...", "加载中...");
                 case AIBridgeEditorTextKey.LogBufferSize: return T("Log Buffer Size", "日志缓存数量");
                 case AIBridgeEditorTextKey.Maintenance: return T("Maintenance", "维护");
                 case AIBridgeEditorTextKey.MaxResultBytes: return T("Max Result Bytes", "最大结果字节数");
                 case AIBridgeEditorTextKey.MaxCodeExecutionSeconds: return T("Max Code Execution Seconds", "代码执行超时（秒）");
                 case AIBridgeEditorTextKey.MaxCodeExecutionSecondsHelp: return T("Async runtime code task timeout in seconds (0 = unlimited). Synchronous blocking code is not protected.", "异步 Runtime 代码任务的超时秒数（0 = 不限）。同步阻塞代码不受此保护。");
+                case AIBridgeEditorTextKey.NetworkMode: return T("Network Mode", "网络模式");
                 case AIBridgeEditorTextKey.OrphanResultRetentionSeconds: return T("Unread Result Cleanup Seconds", "未读取结果清理时间（秒）");
                 case AIBridgeEditorTextKey.OrphanResultRetentionSecondsHelp: return T("File transport result files not read within this time are cleaned up (0 = never). Keep it greater than the CLI --timeout to avoid deleting long-running command results before the client reads them.", "File transport 的结果文件超过该时间仍未被 CLI 读取就会被清理（0 = 不清理）。建议大于 CLI --timeout，避免长耗时命令的结果在读取前被删除。");
-                case AIBridgeEditorTextKey.NoFileTransportTargets: return T("No file transport Runtime targets found. Start Play Mode or a built Player with AIBridgeRuntime enabled, or run LAN discovery for phone targets.", "未找到 File transport Runtime 目标。请启动挂有 AIBridgeRuntime 的 Play Mode/Player，或对手机目标执行局域网发现。");
-                case AIBridgeEditorTextKey.NoLanDiscoveredTargets: return T("No LAN-discovered HTTP targets found. Keep Scan LAN checked and refresh after the Player is running on the same network.", "未发现局域网 HTTP 目标。请保持“扫描局域网”勾选，并在同一网络中的 Player 运行后刷新。");
+                case AIBridgeEditorTextKey.NoRuntimeTargets: return T("No Runtime targets found. Start Play Mode or a built Player with Runtime Bridge enabled, then refresh.", "未发现 Runtime 目标。请启动已启用 Runtime Bridge 的 Play Mode 或 Player，然后刷新。");
                 case AIBridgeEditorTextKey.NoToken: return T("No token", "无 Token");
                 case AIBridgeEditorTextKey.Now: return T("now", "刚刚");
                 case AIBridgeEditorTextKey.Ok: return T("OK", "确定");
@@ -366,7 +365,6 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.ResetAllSettings: return T("Reset All Settings", "重置所有设置");
                 case AIBridgeEditorTextKey.ResetSettings: return T("Reset Settings", "重置设置");
                 case AIBridgeEditorTextKey.ResetSettingsConfirm: return T("Are you sure you want to reset all settings to default?", "确定要将所有设置重置为默认值吗？");
-                case AIBridgeEditorTextKey.ResolvedInfo: return T("Resolved Info", "解析后的信息");
                 case AIBridgeEditorTextKey.Runtime: return T("Runtime", "Runtime");
                 case AIBridgeEditorTextKey.RuntimeBridge: return T("Runtime Bridge", "Runtime Bridge");
                 case AIBridgeEditorTextKey.RuntimeBridgeHelp: return T("Runtime Bridge lets AIBridgeCLI and agents connect to Play Mode or a built Player to read status, logs, screenshots, performance data, UI automation data, and run runtime code when available.", "Runtime Bridge 用于让 AIBridgeCLI 和 Agent 连接 Play Mode 或已编译 Player，读取状态、日志、截图、性能数据、UI 自动化数据，并在可用时执行 Runtime 代码。");
@@ -376,10 +374,8 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.RuntimeCodeWarning: return T("Runtime code execution loads Roslyn-compiled DLLs in Player by Assembly.Load. Keep it for trusted debugging builds only.", "Runtime 代码执行会在 Player 中通过 Assembly.Load 加载 Roslyn 编译的 DLL。仅用于可信调试构建。");
                 case AIBridgeEditorTextKey.InsecureBindWarning: return T("HTTP bind address is not loopback and no auth token is set: any host on the network can send Runtime commands (including code execution). Set an auth token or bind to 127.0.0.1.", "HTTP 绑定地址非本机回环且未设置鉴权 Token：局域网内任意主机均可发送 Runtime 命令（含代码执行）。请设置鉴权 Token 或绑定到 127.0.0.1。");
                 case AIBridgeEditorTextKey.RuntimeConfig: return T("Runtime Config", "Runtime 配置");
-                case AIBridgeEditorTextKey.RuntimeConfigPath: return T("Runtime Config path:", "Runtime 配置路径：");
                 case AIBridgeEditorTextKey.RuntimeDirectory: return T("Runtime Directory", "Runtime 目录");
                 case AIBridgeEditorTextKey.RuntimeHttpCliCopied: return T("[AIBridge] Runtime HTTP CLI command copied.", "[AIBridge] Runtime HTTP CLI 命令已复制。");
-                case AIBridgeEditorTextKey.RuntimeHttpEntry: return T("Runtime HTTP Entry", "Runtime HTTP 入口");
                 case AIBridgeEditorTextKey.RuntimeInfo: return T("Runtime Info", "Runtime 信息");
                 case AIBridgeEditorTextKey.ScanAssemblies: return T("Scan Assemblies", "扫描程序集");
                 case AIBridgeEditorTextKey.ScanAssembliesHelp: return T("Separate multiple assemblies with semicolons (e.g., Assembly-CSharp;Assembly-CSharp-Editor)", "多个程序集请用分号分隔（例如 Assembly-CSharp;Assembly-CSharp-Editor）");
@@ -388,6 +384,8 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.ScanningUdp: return T("Scanning UDP {0}...", "正在扫描 UDP {0}...");
                 case AIBridgeEditorTextKey.Scale: return T("Scale", "缩放");
                 case AIBridgeEditorTextKey.Scene: return T("Scene", "场景");
+                case AIBridgeEditorTextKey.SceneDebug: return T("Scene Debugging (Optional)", "场景调试（可选）");
+                case AIBridgeEditorTextKey.SceneDebugHelp: return T("These actions create or update AIBridgeRuntime in the current scene and may mark the scene dirty. Built Players are injected automatically.", "这些操作会在当前场景创建或更新 AIBridgeRuntime，并可能将场景标记为已修改；构建 Player 时会自动注入。");
                 case AIBridgeEditorTextKey.ScreenshotCacheCleared: return T("Screenshot cache cleared.", "截图缓存已清除。");
                 case AIBridgeEditorTextKey.Screenshots: return T("Screenshots:", "截图：");
                 case AIBridgeEditorTextKey.Settings: return T("Settings", "设置");

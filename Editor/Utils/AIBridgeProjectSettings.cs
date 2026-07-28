@@ -58,8 +58,6 @@ namespace AIBridge.Editor
         internal sealed class RuntimeBridgeSettingsData
         {
             public bool EnableRuntimeBridge = DefaultRuntimeBridgeEnabled;
-            public bool AutoInjectRuntimeBridgeInDevelopmentBuild = DefaultRuntimeBridgeAutoInjectInDevelopmentBuild;
-            public bool AllowInReleaseBuild = DefaultRuntimeBridgeAllowInReleaseBuild;
             public string ExchangeDirectory = DefaultRuntimeBridgeExchangeDirectory;
             public string TargetId = DefaultRuntimeBridgeTargetId;
             public string AuthToken = string.Empty;
@@ -77,11 +75,6 @@ namespace AIBridge.Editor
             public bool EnableLanDiscovery = DefaultRuntimeBridgeEnableLanDiscovery;
             public int DiscoveryUdpPort = DefaultRuntimeBridgeDiscoveryUdpPort;
 
-            public bool AllowRuntimeBridgeInReleaseBuild
-            {
-                get { return AllowInReleaseBuild; }
-                set { AllowInReleaseBuild = value; }
-            }
         }
 
         public const int CurrentDataVersion = 15;
@@ -99,8 +92,6 @@ namespace AIBridge.Editor
         public const bool DefaultEnableCodeExecution = true;
         public const bool DefaultCodeExecutionRiskAccepted = true;
         public const bool DefaultRuntimeBridgeEnabled = false;
-        public const bool DefaultRuntimeBridgeAutoInjectInDevelopmentBuild = true;
-        public const bool DefaultRuntimeBridgeAllowInReleaseBuild = true;
         public const string DefaultRuntimeBridgeExchangeDirectory = "";
         public const string DefaultRuntimeBridgeTargetId = "";
         public const bool DefaultRuntimeBridgeCodeExecutionEnabled = true;
@@ -343,8 +334,6 @@ namespace AIBridge.Editor
                     runtimeBridge = new RuntimeBridgeSettingsData();
                 }
 
-                runtimeBridge.AutoInjectRuntimeBridgeInDevelopmentBuild = DefaultRuntimeBridgeAutoInjectInDevelopmentBuild;
-                runtimeBridge.AllowRuntimeBridgeInReleaseBuild = DefaultRuntimeBridgeAllowInReleaseBuild;
                 runtimeBridge.ExchangeDirectory = DefaultRuntimeBridgeExchangeDirectory;
                 runtimeBridge.TargetId = DefaultRuntimeBridgeTargetId;
                 runtimeBridge.AllowedActions = string.Empty;
@@ -355,7 +344,6 @@ namespace AIBridge.Editor
                 runtimeBridge.MaxResultBytes = DefaultRuntimeBridgeMaxResultBytes;
                 runtimeBridge.OrphanResultRetentionSeconds = DefaultRuntimeBridgeOrphanResultRetentionSeconds;
                 runtimeBridge.EnableHttpTransport = DefaultRuntimeBridgeEnableHttpTransport;
-                runtimeBridge.HttpBindAddress = DefaultRuntimeBridgeHttpBindAddress;
 
                 if (runtimeBridge.HeartbeatIntervalSeconds <= 0f)
                 {
@@ -638,11 +626,6 @@ namespace AIBridge.Editor
             if (runtimeBridge == null)
             {
                 runtimeBridge = new RuntimeBridgeSettingsData();
-            }
-
-            if (dataVersion < 10)
-            {
-                runtimeBridge.AutoInjectRuntimeBridgeInDevelopmentBuild = DefaultRuntimeBridgeAutoInjectInDevelopmentBuild;
             }
 
             if (dataVersion < 11)

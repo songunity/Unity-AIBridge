@@ -11,21 +11,23 @@ namespace AIBridge.Shared
     {
         private const int DefaultMaxResults = 100;
         private const int DefaultRaycastMaxResults = 20;
+        private const int MaxResults = 500;
 
         public static object Snapshot(int maxResults = 100, bool includeDisabled = false)
         {
             var buttons = CollectButtons(null, includeDisabled, ResolveMaxResults(maxResults, DefaultMaxResults), true);
+            var canvases = BuildCanvasInfos(buttons.countsByCanvasPath, includeDisabled);
             return new
             {
                 action = "ui.snapshot",
                 screen = BuildScreenInfo(),
                 eventSystem = BuildEventSystemInfo(),
                 selected = BuildGameObjectInfo(GetSelectedGameObject()),
-                canvases = BuildCanvasInfos(buttons.countsByCanvasPath, includeDisabled),
+                canvases = canvases,
                 buttons = buttons.entries.ToArray(),
                 summary = new
                 {
-                    canvasCount = FindSceneObjects<Canvas>(includeDisabled).Length,
+                    canvasCount = canvases.Length,
                     buttonCount = buttons.totalCount,
                     returnedButtonCount = buttons.entries.Count,
                     clickableButtonCount = CountClickableButtons(buttons.entries),
@@ -771,7 +773,7 @@ namespace AIBridge.Shared
 
         private static int ResolveMaxResults(int requested, int fallback)
         {
-            return Math.Max(1, requested <= 0 ? fallback : requested);
+            return Math.Min(MaxResults, Math.Max(1, requested <= 0 ? fallback : requested));
         }
 
         private static int CompareButtonInfos(ButtonInfo left, ButtonInfo right)

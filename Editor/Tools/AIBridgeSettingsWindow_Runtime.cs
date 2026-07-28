@@ -14,17 +14,29 @@ namespace AIBridge.Editor
         private const float RuntimeBridgeSettingsLabelWidthRatio = 0.28f;
         private const float RuntimeBridgeSettingsMinLabelWidth = 220f;
         private const float RuntimeBridgeSettingsMaxLabelWidth = 280f;
+        private const double TargetCacheRefreshIntervalSeconds = 5d;
         private readonly List<AIBridgeRuntimePlayerInfo> _players = new List<AIBridgeRuntimePlayerInfo>();
         private readonly List<AIBridgeRuntimeDiscoveredTargetInfo> _discoveredTargets = new List<AIBridgeRuntimeDiscoveredTargetInfo>();
+        private readonly List<RuntimeTargetView> _targets = new List<RuntimeTargetView>();
+        private readonly HashSet<string> _expandedTargetIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private Vector2 _scrollPosition;
         private string _runtimeDirectory;
         private string _localHttpUrl;
-        private string _discoveryCachePath;
-        private bool _scanLanOnRefresh = true;
+        [SerializeField] private bool _sceneDebugExpanded;
+        [SerializeField] private bool _scanLanOnRefresh = true;
         private bool _lanScanRunning;
         private string _lanScanStatus;
         private int _lanScanGeneration;
         private double _lastRefreshTime;
+        private double _nextTargetCacheRefreshTime;
+        private double _nextUiRepaintTime;
+
+        private sealed class RuntimeTargetView
+        {
+            public string TargetId;
+            public AIBridgeRuntimePlayerInfo Player;
+            public AIBridgeRuntimeDiscoveredTargetInfo Discovery;
+        }
 
         [MenuItem("Window/AIBridge/Runtime")]
         private static void OpenWindow()
@@ -37,7 +49,23 @@ namespace AIBridge.Editor
 
         private void OnEnable()
         {
-            RefreshRuntimeTargets();
+            LoadRuntimeTargetsFromCache();
+        }
+
+        private void OnInspectorUpdate()
+        {
+            var now = EditorApplication.timeSinceStartup;
+            if (now >= _nextTargetCacheRefreshTime)
+            {
+                LoadRuntimeTargetsFromCache();
+                return;
+            }
+
+            if (now >= _nextUiRepaintTime)
+            {
+                _nextUiRepaintTime = now + 1d;
+                Repaint();
+            }
         }
 
         private void OnGUI()
@@ -94,44 +122,55 @@ namespace AIBridge.Editor
                 settings.EnableRuntimeBridge);
             EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CompileRuntimeBridgeHelp), MessageType.None);
 
-            if (!settings.EnableRuntimeBridge)
+            if (settings.EnableRuntimeBridge)
             {
-                var compileToggleChanged = EditorGUI.EndChangeCheck();
-                EditorGUIUtility.labelWidth = oldLabelWidth;
+                DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Transport));
 
-                if (compileToggleChanged)
+                var currentNetworkMode = IsLoopbackBindAddress(settings.HttpBindAddress) ? 0 : 1;
+                var networkMode = EditorGUILayout.Popup(
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.NetworkMode),
+                    currentNetworkMode,
+                    new[]
+                    {
+                        AIBridgeEditorText.Get(AIBridgeEditorTextKey.LocalOnly),
+                        AIBridgeEditorText.Get(AIBridgeEditorTextKey.LocalAreaNetwork)
+                    });
+                if (networkMode != currentNetworkMode)
                 {
-                    SaveRuntimeSettings();
+                    settings.HttpBindAddress = networkMode == 0 ? "127.0.0.1" : "0.0.0.0";
+                    if (networkMode == 0)
+                    {
+                        settings.EnableLanDiscovery = false;
+                    }
                 }
 
-                return;
-            }
+                settings.AuthToken = EditorGUILayout.DelayedTextField(
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.AuthToken),
+                    settings.AuthToken ?? string.Empty);
+                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AuthTokenHelp), MessageType.None);
 
-            DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Transport));
+                if (networkMode == 1 && string.IsNullOrEmpty(settings.AuthToken))
+                {
+                    EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.InsecureBindWarning), MessageType.Warning);
+                }
 
-            settings.AuthToken = EditorGUILayout.DelayedTextField(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.AuthToken),
-                settings.AuthToken ?? string.Empty);
-            EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AuthTokenHelp), MessageType.None);
+                settings.HttpPort = EditorGUILayout.DelayedIntField(
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpPort),
+                    settings.HttpPort);
 
-            if (!IsLoopbackBindAddress(settings.HttpBindAddress) && string.IsNullOrEmpty(settings.AuthToken))
-            {
-                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.InsecureBindWarning), MessageType.Warning);
-            }
+                if (networkMode == 1)
+                {
+                    settings.EnableLanDiscovery = EditorGUILayout.Toggle(
+                        AIBridgeEditorText.Get(AIBridgeEditorTextKey.EnableLanDiscovery),
+                        settings.EnableLanDiscovery);
 
-            settings.HttpPort = EditorGUILayout.IntField(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpPort),
-                settings.HttpPort);
-
-            settings.EnableLanDiscovery = EditorGUILayout.Toggle(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.EnableLanDiscovery),
-                settings.EnableLanDiscovery);
-
-            using (new EditorGUI.DisabledScope(!settings.EnableLanDiscovery))
-            {
-                settings.DiscoveryUdpPort = EditorGUILayout.IntField(
-                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.DiscoveryUdpPort),
-                    settings.DiscoveryUdpPort);
+                    using (new EditorGUI.DisabledScope(!settings.EnableLanDiscovery))
+                    {
+                        settings.DiscoveryUdpPort = EditorGUILayout.DelayedIntField(
+                            AIBridgeEditorText.Get(AIBridgeEditorTextKey.DiscoveryUdpPort),
+                            settings.DiscoveryUdpPort);
+                    }
+                }
             }
 
             var settingsChanged = EditorGUI.EndChangeCheck();
@@ -142,40 +181,27 @@ namespace AIBridge.Editor
                 SaveRuntimeSettings();
             }
 
-            DrawRuntimeInfo();
-            DrawRuntimeActions();
-            DrawRuntimeTargets();
-        }
-
-        private void DrawRuntimeInfo()
-        {
-            DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.ResolvedInfo));
-            DrawRuntimeDirectoryInfoBlock();
-            DrawInfoBlock(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeHttpEntry), AIBridgeRuntimeBridgeEditorUtility.BuildLocalHttpUrl());
-            DrawInfoBlock(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeConfigPath), AIBridgeRuntimeBridgeEditorUtility.GetRuntimeConfigPath());
-        }
-
-        private static void DrawRuntimeDirectoryInfoBlock()
-        {
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeDirectory), EditorStyles.miniBoldLabel, GUILayout.Width(120));
-            EditorGUILayout.SelectableLabel(AIBridgeRuntimeBridgeEditorUtility.GetRuntimeDirectory(), EditorStyles.wordWrappedMiniLabel, GUILayout.Height(20));
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Open), GUILayout.Width(58), GUILayout.Height(20)))
+            if (settings.EnableRuntimeBridge)
             {
-                OpenRuntimeDirectory();
+                DrawRuntimeActions();
             }
-            EditorGUILayout.EndHorizontal();
-        }
 
-        private static void DrawInfoBlock(string label, string value)
-        {
-            EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
-            EditorGUILayout.SelectableLabel(value ?? string.Empty, EditorStyles.wordWrappedMiniLabel, GUILayout.Height(20));
+            DrawRuntimeTargets();
         }
 
         private void DrawRuntimeActions()
         {
-            DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Actions));
+            EditorGUILayout.Space(8);
+            _sceneDebugExpanded = EditorGUILayout.Foldout(
+                _sceneDebugExpanded,
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.SceneDebug),
+                true);
+            if (!_sceneDebugExpanded)
+            {
+                return;
+            }
+
+            EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.SceneDebugHelp), MessageType.None);
             EditorGUILayout.BeginHorizontal();
 #if AIBRIDGE_RUNTIME_ENABLED
             if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CreateRuntimeObject), GUILayout.Height(28)))
@@ -195,37 +221,44 @@ namespace AIBridge.Editor
             }
 #endif
             EditorGUILayout.EndHorizontal();
-
         }
 
         private void DrawRuntimeTargets()
         {
             DrawRuntimeTargetsHeader();
             DrawRuntimeTargetsToolbar();
-            EditorGUILayout.Space(6);
-
-            EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeDirectory), _runtimeDirectory ?? string.Empty, EditorStyles.wordWrappedMiniLabel);
-            EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpEntry), _localHttpUrl ?? string.Empty, EditorStyles.wordWrappedMiniLabel);
-            EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.DiscoverCache), _discoveryCachePath ?? string.Empty, EditorStyles.wordWrappedMiniLabel);
+            DrawRuntimeSummary();
             if (_lanScanRunning || !string.IsNullOrEmpty(_lanScanStatus))
             {
                 EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.LanScan), _lanScanStatus ?? string.Empty, EditorStyles.wordWrappedMiniLabel);
             }
 
-            DrawDiscoveredTargets();
-
-            if (_players.Count == 0)
+            if (_targets.Count == 0)
             {
-                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.NoFileTransportTargets), MessageType.Info);
+                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.NoRuntimeTargets), MessageType.Info);
                 return;
             }
 
-            EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.FileTransportTargets), EditorStyles.boldLabel);
-            for (var i = 0; i < _players.Count; i++)
+            for (var i = 0; i < _targets.Count; i++)
             {
-                DrawPlayer(_players[i]);
+                DrawRuntimeTarget(_targets[i]);
                 EditorGUILayout.Space(5);
             }
+        }
+
+        private void DrawRuntimeSummary()
+        {
+            EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
+            EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeDirectory), EditorStyles.miniBoldLabel, GUILayout.Width(88));
+            EditorGUILayout.SelectableLabel(_runtimeDirectory ?? string.Empty, EditorStyles.miniLabel, GUILayout.Height(18));
+            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Open), GUILayout.Width(52), GUILayout.Height(18)))
+            {
+                OpenRuntimeDirectory();
+            }
+
+            EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpEntry), EditorStyles.miniBoldLabel, GUILayout.Width(68));
+            EditorGUILayout.SelectableLabel(_localHttpUrl ?? string.Empty, EditorStyles.miniLabel, GUILayout.Width(190), GUILayout.Height(18));
+            EditorGUILayout.EndHorizontal();
         }
 
         private static void DrawRuntimeTargetsHeader()
@@ -245,20 +278,16 @@ namespace AIBridge.Editor
                 RefreshRuntimeTargets();
             }
 
-            var previousScanLanOnRefresh = _scanLanOnRefresh;
-            _scanLanOnRefresh = EditorGUILayout.ToggleLeft(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.ScanLan),
-                _scanLanOnRefresh,
-                GUILayout.Width(96));
-            if (_scanLanOnRefresh && !previousScanLanOnRefresh)
+            var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
+            var canScanLan = settings.EnableRuntimeBridge
+                && !IsLoopbackBindAddress(settings.HttpBindAddress)
+                && settings.EnableLanDiscovery;
+            using (new EditorGUI.DisabledScope(!canScanLan))
             {
-                EditorApplication.delayCall += () =>
-                {
-                    if (this != null)
-                    {
-                        RefreshRuntimeTargets();
-                    }
-                };
+                _scanLanOnRefresh = EditorGUILayout.ToggleLeft(
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.ScanLan),
+                    _scanLanOnRefresh,
+                    GUILayout.Width(96));
             }
 
             if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.OpenDirectory), EditorStyles.toolbarButton, GUILayout.Width(110)))
@@ -268,7 +297,7 @@ namespace AIBridge.Editor
 
             GUILayout.FlexibleSpace();
             EditorGUILayout.LabelField(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.TargetCount, _players.Count + _discoveredTargets.Count),
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.TargetCount, _targets.Count),
                 EditorStyles.miniLabel,
                 GUILayout.Width(90));
             EditorGUILayout.LabelField(
@@ -278,136 +307,134 @@ namespace AIBridge.Editor
             EditorGUILayout.EndHorizontal();
         }
 
-        private void DrawPlayer(AIBridgeRuntimePlayerInfo player)
+        private void DrawRuntimeTarget(RuntimeTargetView target)
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(player.TargetId, EditorStyles.boldLabel);
-            GUILayout.FlexibleSpace();
-            var statusText = player.Stale
-                ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.Stale)
-                : AIBridgeEditorText.Get(AIBridgeEditorTextKey.Online);
-            var previousColor = GUI.color;
-            GUI.color = player.Stale ? new Color(1f, 0.72f, 0.25f) : new Color(0.55f, 1f, 0.55f);
-            GUILayout.Label(statusText, EditorStyles.boldLabel, GUILayout.Width(72));
-            GUI.color = previousColor;
-            if (player.Stale
-                && GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.DeleteCache), GUILayout.Width(92)))
+            EditorGUILayout.LabelField(target.TargetId, EditorStyles.boldLabel);
+            if (target.Player != null)
             {
-                DeletePlayerCache(player);
+                DrawTransportBadge("FILE");
+            }
+
+            if (HasHttpTransport(target))
+            {
+                DrawTransportBadge("HTTP");
+            }
+
+            if (target.Discovery != null)
+            {
+                DrawTransportBadge("LAN");
+            }
+
+            GUILayout.FlexibleSpace();
+            var statusText = GetTargetStatus(target);
+            var previousColor = GUI.color;
+            GUI.color = GetTargetStatusColor(target);
+            GUILayout.Label(statusText, EditorStyles.boldLabel, GUILayout.Width(76));
+            GUI.color = previousColor;
+            GUILayout.Label(FormatTargetAge(target), EditorStyles.miniLabel, GUILayout.Width(68));
+
+            var expanded = _expandedTargetIds.Contains(target.TargetId);
+            if (GUILayout.Button(
+                AIBridgeEditorText.Get(expanded ? AIBridgeEditorTextKey.HideDetails : AIBridgeEditorTextKey.Details),
+                GUILayout.Width(72)))
+            {
+                if (expanded)
+                {
+                    _expandedTargetIds.Remove(target.TargetId);
+                }
+                else
+                {
+                    _expandedTargetIds.Add(target.TargetId);
+                }
             }
             EditorGUILayout.EndHorizontal();
 
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Product), JoinNonEmpty(player.ProductName, player.ApplicationVersion));
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Transport), string.IsNullOrEmpty(player.Transport) ? "file" : player.Transport);
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpUrl), player.HttpUrl);
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Scene), player.ActiveScene);
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Platform), player.Platform);
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Runtime), player.RuntimeVersion);
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Process), player.ProcessId > 0 ? player.ProcessId.ToString() : "-");
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Heartbeat), FormatHeartbeat(player));
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Path), player.TargetPath);
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(BuildTargetSummary(target), EditorStyles.wordWrappedMiniLabel);
+            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyStatusCli), GUILayout.Width(96)))
+            {
+                CopyTargetCommand(target, "status");
+            }
+
+            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyLogsCli), GUILayout.Width(96)))
+            {
+                CopyTargetCommand(target, "logs --logType Error --count 100");
+            }
+
+            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyScreenshotCli), GUILayout.Width(96)))
+            {
+                CopyTargetCommand(target, "screenshot");
+            }
+            EditorGUILayout.EndHorizontal();
+
+            if (_expandedTargetIds.Contains(target.TargetId))
+            {
+                DrawRuntimeTargetDetails(target);
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        private static void DrawTransportBadge(string text)
+        {
+            GUILayout.Label(text, EditorStyles.miniButton, GUILayout.Width(42), GUILayout.Height(18));
+        }
+
+        private void DrawRuntimeTargetDetails(RuntimeTargetView target)
+        {
+            EditorGUILayout.Space(3);
+            var player = target.Player;
+            var discovery = target.Discovery;
+            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Product), GetTargetProject(target));
+            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Platform), GetTargetPlatform(target));
+            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpUrl), GetTargetUrl(target));
+
+            if (player != null)
+            {
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Scene), player.ActiveScene);
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Runtime), player.RuntimeVersion);
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Process), player.ProcessId > 0 ? player.ProcessId.ToString() : "-");
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Heartbeat), FormatHeartbeat(player));
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Path), player.TargetPath);
+            }
+
+            if (discovery != null)
+            {
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Device), discovery.DeviceName);
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.BindUrl), discovery.BindUrl);
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Kind), discovery.TargetKind);
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Auth), discovery.RequiresToken ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.TokenRequired) : AIBridgeEditorText.Get(AIBridgeEditorTextKey.NoToken));
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.LastSeen), FormatDiscoveryAge(discovery));
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Health), discovery.Reachable ? discovery.LastHealthCheckUtc : AIBridgeEditorText.Get(AIBridgeEditorTextKey.Unreachable));
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Remote), discovery.RemoteEndPoint);
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.SourceNic), JoinNonEmpty(discovery.SourceInterface, discovery.SourceInterfaceAddress));
+            }
 
             EditorGUILayout.BeginHorizontal();
-            if (!string.IsNullOrWhiteSpace(player.HttpUrl)
-                && GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyHttpStatus)))
-            {
-                CopyHttpCommand("runtime status --transport http --url " + Quote(player.HttpUrl) + " --target " + QuoteTarget(player.TargetId));
-            }
-
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyStatusCli)))
-            {
-                CopyFileCommand("runtime status --transport file --target " + QuoteTarget(player.TargetId));
-            }
-
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyLogsCli)))
-            {
-                CopyFileCommand("runtime logs --transport file --target " + QuoteTarget(player.TargetId) + " --logType Error --count 100");
-            }
-
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyScreenshotCli)))
-            {
-                CopyFileCommand("runtime screenshot --transport file --target " + QuoteTarget(player.TargetId));
-            }
-
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Open), GUILayout.Width(58)))
+            if (player != null && GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Open), GUILayout.Width(72)))
             {
                 if (Directory.Exists(player.TargetPath))
                 {
                     EditorUtility.RevealInFinder(player.TargetPath);
                 }
             }
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.EndVertical();
-        }
 
-        private void DrawDiscoveredTargets()
-        {
-            if (_discoveredTargets.Count == 0)
+            if (player != null && player.Stale
+                && GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.DeleteCache), GUILayout.Width(110)))
             {
-                EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.NoLanDiscoveredTargets), MessageType.None);
-                return;
+                DeletePlayerCache(player);
             }
 
-            EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.HttpLanDiscoveredTargets), EditorStyles.boldLabel);
-            for (var i = 0; i < _discoveredTargets.Count; i++)
+            if (discovery != null && discovery.Stale
+                && GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.DeleteCache), GUILayout.Width(110)))
             {
-                DrawDiscoveredTarget(_discoveredTargets[i]);
-                EditorGUILayout.Space(5);
+                DeleteDiscoveredTargetCache(discovery);
             }
-        }
 
-        private void DrawDiscoveredTarget(AIBridgeRuntimeDiscoveredTargetInfo target)
-        {
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(target.TargetId, EditorStyles.boldLabel);
             GUILayout.FlexibleSpace();
-            var statusText = target.Stale
-                ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.Cache)
-                : target.Reachable
-                    ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.Reachable)
-                    : AIBridgeEditorText.Get(AIBridgeEditorTextKey.Discovered);
-            var previousColor = GUI.color;
-            GUI.color = target.Stale ? new Color(1f, 0.72f, 0.25f) : target.Reachable ? new Color(0.55f, 1f, 0.55f) : new Color(0.65f, 0.8f, 1f);
-            GUILayout.Label(statusText, EditorStyles.boldLabel, GUILayout.Width(96));
-            GUI.color = previousColor;
-            if (target.Stale
-                && GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.DeleteCache), GUILayout.Width(92)))
-            {
-                DeleteDiscoveredTargetCache(target);
-            }
             EditorGUILayout.EndHorizontal();
-
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Url), target.Url);
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.BindUrl), target.BindUrl);
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Project), JoinNonEmpty(target.ProjectName, target.ApplicationVersion));
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Device), target.DeviceName);
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Platform), target.Platform);
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Kind), target.TargetKind);
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Auth), target.RequiresToken ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.TokenRequired) : AIBridgeEditorText.Get(AIBridgeEditorTextKey.NoToken));
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.LastSeen), FormatDiscoveryAge(target));
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Health), target.Reachable ? target.LastHealthCheckUtc : AIBridgeEditorText.Get(AIBridgeEditorTextKey.Unreachable));
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Remote), target.RemoteEndPoint);
-            DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.SourceNic), JoinNonEmpty(target.SourceInterface, target.SourceInterfaceAddress));
-
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyStatusCli)))
-            {
-                CopyDiscoveredCommand(target, "status");
-            }
-
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyLogsCli)))
-            {
-                CopyDiscoveredCommand(target, "logs --logType Error --count 100");
-            }
-
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CopyScreenshotCli)))
-            {
-                CopyDiscoveredCommand(target, "screenshot");
-            }
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.EndVertical();
         }
 
         private static void DrawInfoLine(string label, string value)
@@ -418,10 +445,141 @@ namespace AIBridge.Editor
             EditorGUILayout.EndHorizontal();
         }
 
+        private static bool HasHttpTransport(RuntimeTargetView target)
+        {
+            return target != null
+                && ((target.Player != null && !string.IsNullOrWhiteSpace(target.Player.HttpUrl))
+                    || (target.Discovery != null && !string.IsNullOrWhiteSpace(GetDiscoveryUrl(target.Discovery))));
+        }
+
+        private static string GetTargetStatus(RuntimeTargetView target)
+        {
+            if (target.Player != null && !target.Player.Stale)
+            {
+                return AIBridgeEditorText.Get(AIBridgeEditorTextKey.Online);
+            }
+
+            if (target.Discovery != null && !target.Discovery.Stale && target.Discovery.Reachable)
+            {
+                return AIBridgeEditorText.Get(AIBridgeEditorTextKey.Reachable);
+            }
+
+            if ((target.Player != null && target.Player.Stale)
+                || (target.Discovery != null && target.Discovery.Stale))
+            {
+                return AIBridgeEditorText.Get(AIBridgeEditorTextKey.Stale);
+            }
+
+            return AIBridgeEditorText.Get(AIBridgeEditorTextKey.Discovered);
+        }
+
+        private static Color GetTargetStatusColor(RuntimeTargetView target)
+        {
+            if ((target.Player != null && !target.Player.Stale)
+                || (target.Discovery != null && !target.Discovery.Stale && target.Discovery.Reachable))
+            {
+                return new Color(0.55f, 1f, 0.55f);
+            }
+
+            if ((target.Player != null && target.Player.Stale)
+                || (target.Discovery != null && target.Discovery.Stale))
+            {
+                return new Color(1f, 0.72f, 0.25f);
+            }
+
+            return new Color(0.65f, 0.8f, 1f);
+        }
+
+        private string FormatTargetAge(RuntimeTargetView target)
+        {
+            double? ageSeconds = null;
+            if (target.Player != null && target.Player.AgeSeconds.HasValue)
+            {
+                ageSeconds = target.Player.AgeSeconds.Value;
+            }
+
+            if (target.Discovery != null && target.Discovery.AgeSeconds.HasValue
+                && (!ageSeconds.HasValue || target.Discovery.AgeSeconds.Value < ageSeconds.Value))
+            {
+                ageSeconds = target.Discovery.AgeSeconds.Value;
+            }
+
+            if (!ageSeconds.HasValue)
+            {
+                return "-";
+            }
+
+            var elapsed = Math.Max(0d, EditorApplication.timeSinceStartup - _lastRefreshTime);
+            return (ageSeconds.Value + elapsed).ToString("F0") + "s";
+        }
+
+        private static string BuildTargetSummary(RuntimeTargetView target)
+        {
+            var parts = new List<string>();
+            AddSummaryPart(parts, GetTargetProject(target));
+            AddSummaryPart(parts, GetTargetPlatform(target));
+            if (target.Player != null)
+            {
+                AddSummaryPart(parts, target.Player.ActiveScene);
+            }
+
+            AddSummaryPart(parts, GetTargetUrl(target));
+            return parts.Count == 0 ? "-" : string.Join("  •  ", parts.ToArray());
+        }
+
+        private static void AddSummaryPart(List<string> parts, string value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                parts.Add(value);
+            }
+        }
+
+        private static string GetTargetProject(RuntimeTargetView target)
+        {
+            if (target.Player != null)
+            {
+                return JoinNonEmpty(target.Player.ProductName, target.Player.ApplicationVersion);
+            }
+
+            return target.Discovery == null
+                ? null
+                : JoinNonEmpty(target.Discovery.ProjectName, target.Discovery.ApplicationVersion);
+        }
+
+        private static string GetTargetPlatform(RuntimeTargetView target)
+        {
+            return target.Player != null && !string.IsNullOrWhiteSpace(target.Player.Platform)
+                ? target.Player.Platform
+                : target.Discovery == null ? null : target.Discovery.Platform;
+        }
+
+        private static string GetTargetUrl(RuntimeTargetView target)
+        {
+            var discoveryUrl = target.Discovery == null ? null : GetDiscoveryUrl(target.Discovery);
+            if (!string.IsNullOrWhiteSpace(discoveryUrl))
+            {
+                return discoveryUrl;
+            }
+
+            return target.Player == null ? null : target.Player.HttpUrl;
+        }
+
+        private static string GetDiscoveryUrl(AIBridgeRuntimeDiscoveredTargetInfo target)
+        {
+            return target != null && !string.IsNullOrWhiteSpace(target.ReachableUrl)
+                ? target.ReachableUrl
+                : target == null ? null : target.Url;
+        }
+
         private void RefreshRuntimeTargets()
         {
             LoadRuntimeTargetsFromCache();
-            if (_scanLanOnRefresh)
+            var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
+            if (_scanLanOnRefresh
+                && settings.EnableRuntimeBridge
+                && !IsLoopbackBindAddress(settings.HttpBindAddress)
+                && settings.EnableLanDiscovery)
             {
                 BeginLanScan();
             }
@@ -431,13 +589,102 @@ namespace AIBridge.Editor
         {
             _runtimeDirectory = AIBridgeRuntimeBridgeEditorUtility.GetRuntimeDirectory();
             _localHttpUrl = AIBridgeRuntimeBridgeEditorUtility.BuildLocalHttpUrl();
-            _discoveryCachePath = AIBridgeRuntimeBridgeEditorUtility.GetDiscoveryCachePath();
             _players.Clear();
             _players.AddRange(AIBridgeRuntimeBridgeEditorUtility.ListPlayers());
             _discoveredTargets.Clear();
             _discoveredTargets.AddRange(AIBridgeRuntimeBridgeEditorUtility.ListDiscoveredTargets());
+            RebuildRuntimeTargets();
             _lastRefreshTime = EditorApplication.timeSinceStartup;
+            _nextTargetCacheRefreshTime = _lastRefreshTime + TargetCacheRefreshIntervalSeconds;
+            _nextUiRepaintTime = _lastRefreshTime + 1d;
             Repaint();
+        }
+
+        private void RebuildRuntimeTargets()
+        {
+            var targetsById = new Dictionary<string, RuntimeTargetView>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < _players.Count; i++)
+            {
+                var player = _players[i];
+                var targetId = string.IsNullOrWhiteSpace(player.TargetId) ? "file-" + i : player.TargetId;
+                if (!targetsById.TryGetValue(targetId, out var target))
+                {
+                    target = new RuntimeTargetView { TargetId = targetId };
+                    targetsById.Add(targetId, target);
+                }
+
+                target.Player = player;
+            }
+
+            for (var i = 0; i < _discoveredTargets.Count; i++)
+            {
+                var discovery = _discoveredTargets[i];
+                var targetId = string.IsNullOrWhiteSpace(discovery.TargetId)
+                    ? GetDiscoveryUrl(discovery) ?? "lan-" + i
+                    : discovery.TargetId;
+                if (!targetsById.TryGetValue(targetId, out var target))
+                {
+                    target = new RuntimeTargetView { TargetId = targetId };
+                    targetsById.Add(targetId, target);
+                }
+
+                if (ShouldPreferDiscovery(discovery, target.Discovery))
+                {
+                    target.Discovery = discovery;
+                }
+            }
+
+            _targets.Clear();
+            _targets.AddRange(targetsById.Values);
+            _targets.Sort(CompareRuntimeTargets);
+        }
+
+        private static bool ShouldPreferDiscovery(
+            AIBridgeRuntimeDiscoveredTargetInfo candidate,
+            AIBridgeRuntimeDiscoveredTargetInfo current)
+        {
+            if (current == null)
+            {
+                return true;
+            }
+
+            if (candidate.Reachable != current.Reachable)
+            {
+                return candidate.Reachable;
+            }
+
+            if (candidate.Stale != current.Stale)
+            {
+                return !candidate.Stale;
+            }
+
+            return candidate.AgeSeconds.HasValue
+                && (!current.AgeSeconds.HasValue || candidate.AgeSeconds.Value < current.AgeSeconds.Value);
+        }
+
+        private static int CompareRuntimeTargets(RuntimeTargetView left, RuntimeTargetView right)
+        {
+            var statusCompare = GetTargetSortOrder(left).CompareTo(GetTargetSortOrder(right));
+            return statusCompare != 0
+                ? statusCompare
+                : string.Compare(left.TargetId, right.TargetId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int GetTargetSortOrder(RuntimeTargetView target)
+        {
+            if ((target.Player != null && !target.Player.Stale)
+                || (target.Discovery != null && !target.Discovery.Stale && target.Discovery.Reachable))
+            {
+                return 0;
+            }
+
+            if ((target.Player != null && target.Player.Stale)
+                || (target.Discovery != null && target.Discovery.Stale))
+            {
+                return 2;
+            }
+
+            return 1;
         }
 
         private void BeginLanScan()
@@ -539,8 +786,6 @@ namespace AIBridge.Editor
         {
             var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
 
-            settings.AutoInjectRuntimeBridgeInDevelopmentBuild = AIBridgeProjectSettings.DefaultRuntimeBridgeAutoInjectInDevelopmentBuild;
-            settings.AllowRuntimeBridgeInReleaseBuild = AIBridgeProjectSettings.DefaultRuntimeBridgeAllowInReleaseBuild;
             settings.ExchangeDirectory = AIBridgeProjectSettings.DefaultRuntimeBridgeExchangeDirectory;
             settings.TargetId = AIBridgeProjectSettings.DefaultRuntimeBridgeTargetId;
             settings.AllowedActions = string.Empty;
@@ -551,7 +796,6 @@ namespace AIBridge.Editor
             settings.MaxResultBytes = AIBridgeProjectSettings.DefaultRuntimeBridgeMaxResultBytes;
             settings.OrphanResultRetentionSeconds = AIBridgeProjectSettings.DefaultRuntimeBridgeOrphanResultRetentionSeconds;
             settings.EnableHttpTransport = AIBridgeProjectSettings.DefaultRuntimeBridgeEnableHttpTransport;
-            settings.HttpBindAddress = AIBridgeProjectSettings.DefaultRuntimeBridgeHttpBindAddress;
             settings.MaxResultBytes = Math.Max(1024, settings.MaxResultBytes);
             settings.HttpPort = Math.Max(1, settings.HttpPort);
             settings.DiscoveryUdpPort = Math.Max(1, settings.DiscoveryUdpPort);
@@ -620,16 +864,24 @@ namespace AIBridge.Editor
             Debug.Log(AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeHttpCliCopied));
         }
 
-        private static void CopyDiscoveredCommand(AIBridgeRuntimeDiscoveredTargetInfo target, string action)
+        private static void CopyTargetCommand(RuntimeTargetView target, string action)
         {
             if (target == null)
             {
                 return;
             }
 
-            CopyHttpCommand("runtime " + action
-                + " --transport http --url " + Quote(target.Url)
-                + " --target " + QuoteTarget(target.TargetId));
+            var url = GetTargetUrl(target);
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                CopyHttpCommand("runtime " + action
+                    + " --transport http --url " + Quote(url)
+                    + " --target " + QuoteTarget(target.TargetId));
+                return;
+            }
+
+            CopyFileCommand("runtime " + action
+                + " --transport file --target " + QuoteTarget(target.TargetId));
         }
 
         private void DeletePlayerCache(AIBridgeRuntimePlayerInfo player)

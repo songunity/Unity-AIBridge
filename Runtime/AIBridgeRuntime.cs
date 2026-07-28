@@ -18,6 +18,15 @@ using UnityEngine.SceneManagement;
 
 namespace AIBridge.Runtime
 {
+    internal enum AIBridgeHttpCommandState
+    {
+        NotFound,
+        Queued,
+        Executing,
+        Completed,
+        Cancelled
+    }
+
     /// <summary>
     /// AIBridge Runtime MonoBehaviour singleton.
     /// Receives and processes commands from AI Code assistants during Play mode or built Player runtime.
@@ -36,11 +45,12 @@ namespace AIBridge.Runtime
         private const string ScreenshotsDirectoryName = "screenshots";
         private const string HeartbeatFileName = "heartbeat.json";
         private const string RuntimeCodeExecuteAction = "runtime.code.execute";
-        private const int MaxRuntimeCodeAssemblyBytes = 16 * 1024 * 1024;
+        private const int MaxRuntimeCodeAssemblyBytes = 8 * 1024 * 1024;
         private const int MaxRuntimeCodeResultDepth = 8;
         private const int MaxRuntimeCodeCollectionItems = 512;
-        private const int MaxCachedAssemblies = 64;
+        private const int MaxRetainedScreenshots = 20;
         private const int CommandPumpStaleMilliseconds = 3000;
+        private const int MaxCommandIdLength = 128;
 
         private static readonly string[] BuiltInActions =
         {
@@ -106,6 +116,8 @@ namespace AIBridge.Runtime
         private readonly object _pendingHttpResultsSyncRoot = new object();
         private readonly Dictionary<string, AIBridgeRuntimeCommandResult> _pendingHttpResults = new Dictionary<string, AIBridgeRuntimeCommandResult>();
         private readonly HashSet<string> _httpCommandIds = new HashSet<string>();
+        private readonly HashSet<string> _executingHttpCommandIds = new HashSet<string>();
+        private readonly HashSet<string> _cancelledHttpCommandIds = new HashSet<string>();
         private HttpRuntimeTransportServer _httpTransportServer;
         private LanRuntimeDiscoveryServer _lanDiscoveryServer;
 
@@ -202,6 +214,12 @@ namespace AIBridge.Runtime
                     }
 
                     cmd = _commandQueue.Dequeue();
+                }
+
+                if (!TryBeginCommand(cmd))
+                {
+                    processed++;
+                    continue;
                 }
 
                 Interlocked.Increment(ref _processingCommands);
@@ -597,6 +615,7 @@ namespace AIBridge.Runtime
                     var path = Path.Combine(_screenshotsPath, filename);
                     var bytes = texture.EncodeToPNG();
                     File.WriteAllBytes(path, bytes);
+                    CleanupOldScreenshots();
                     result = AIBridgeRuntimeCommandResult.FromSuccess(cmd.Id, new
                     {
                         action = "runtime.screenshot",
@@ -638,6 +657,22 @@ namespace AIBridge.Runtime
             }
 
             WriteResult(result);
+        }
+
+        private void CleanupOldScreenshots()
+        {
+            try
+            {
+                var files = new DirectoryInfo(_screenshotsPath).GetFiles("runtime_screenshot_*.png");
+                Array.Sort(files, (left, right) => right.LastWriteTimeUtc.CompareTo(left.LastWriteTimeUtc));
+                for (var i = MaxRetainedScreenshots; i < files.Length; i++)
+                {
+                    files[i].Delete();
+                }
+            }
+            catch
+            {
+            }
         }
 
         private bool TryHandleRuntimeCodeExecute(AIBridgeRuntimeCommand cmd, out AIBridgeRuntimeCommandResult result, out bool asyncStarted)
@@ -784,11 +819,6 @@ namespace AIBridge.Runtime
             var assembly = Assembly.Load(assemblyBytes);
             if (!string.IsNullOrEmpty(sha256))
             {
-                if (_assemblyCache.Count >= MaxCachedAssemblies)
-                {
-                    _assemblyCache.Clear();
-                }
-
                 _assemblyCache[sha256] = assembly;
             }
 
@@ -1571,9 +1601,9 @@ namespace AIBridge.Runtime
                 return false;
             }
 
-            if (string.IsNullOrEmpty(cmd.Id))
+            if (!IsValidCommandId(cmd.Id))
             {
-                error = "Runtime command id is required.";
+                error = "Runtime command id is invalid.";
                 return false;
             }
 
@@ -1639,6 +1669,29 @@ namespace AIBridge.Runtime
             }
 
             return false;
+        }
+
+        internal static bool IsValidCommandId(string commandId)
+        {
+            if (string.IsNullOrEmpty(commandId) || commandId.Length > MaxCommandIdLength)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < commandId.Length; i++)
+            {
+                var c = commandId[i];
+                if ((c < 'a' || c > 'z')
+                    && (c < 'A' || c > 'Z')
+                    && (c < '0' || c > '9')
+                    && c != '_'
+                    && c != '-')
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         // File 传输下 CLI 超时或异步晚到的 result 文件无人取走会持续堆积;低频清理超龄文件。
@@ -1801,6 +1854,7 @@ namespace AIBridge.Runtime
             {
                 _pendingHttpResults.Clear();
                 _httpCommandIds.Clear();
+                _executingHttpCommandIds.Clear();
             }
 
             MarkMainThreadTick();
@@ -1925,6 +1979,10 @@ namespace AIBridge.Runtime
                 {
                     var commandId = commandIds[i];
                     _pendingHttpResults[commandId] = AIBridgeRuntimeCommandResult.FromFailure(commandId, error);
+                    if (!_executingHttpCommandIds.Contains(commandId))
+                    {
+                        _cancelledHttpCommandIds.Add(commandId);
+                    }
                 }
 
                 Monitor.PulseAll(_pendingHttpResultsSyncRoot);
@@ -1935,6 +1993,12 @@ namespace AIBridge.Runtime
         {
             if (result == null || string.IsNullOrEmpty(_resultsPath))
             {
+                return;
+            }
+
+            if (!IsValidCommandId(result.CommandId))
+            {
+                Debug.LogError("[AIBridgeRuntime] Refused to write result with invalid command id.");
                 return;
             }
 
@@ -2194,23 +2258,100 @@ namespace AIBridge.Runtime
                 {
                     _pendingHttpResults.Remove(commandId);
                     _httpCommandIds.Remove(commandId);
+                    _executingHttpCommandIds.Remove(commandId);
                 }
 
                 return true;
             }
         }
 
-        internal void RemovePendingHttpCommand(string commandId)
+        internal AIBridgeHttpCommandState GetHttpCommandState(string commandId)
         {
             if (string.IsNullOrEmpty(commandId))
             {
-                return;
+                return AIBridgeHttpCommandState.NotFound;
             }
 
             lock (_pendingHttpResultsSyncRoot)
             {
+                if (_pendingHttpResults.ContainsKey(commandId))
+                {
+                    return AIBridgeHttpCommandState.Completed;
+                }
+
+                if (_executingHttpCommandIds.Contains(commandId))
+                {
+                    return AIBridgeHttpCommandState.Executing;
+                }
+
+                if (_httpCommandIds.Contains(commandId))
+                {
+                    return AIBridgeHttpCommandState.Queued;
+                }
+
+                return _cancelledHttpCommandIds.Contains(commandId)
+                    ? AIBridgeHttpCommandState.Cancelled
+                    : AIBridgeHttpCommandState.NotFound;
+            }
+        }
+
+        internal AIBridgeHttpCommandState CancelQueuedHttpCommand(string commandId)
+        {
+            if (string.IsNullOrEmpty(commandId))
+            {
+                return AIBridgeHttpCommandState.NotFound;
+            }
+
+            lock (_pendingHttpResultsSyncRoot)
+            {
+                if (_pendingHttpResults.ContainsKey(commandId))
+                {
+                    return AIBridgeHttpCommandState.Completed;
+                }
+
+                if (_executingHttpCommandIds.Contains(commandId))
+                {
+                    return AIBridgeHttpCommandState.Executing;
+                }
+
+                if (!_httpCommandIds.Remove(commandId))
+                {
+                    return _cancelledHttpCommandIds.Contains(commandId)
+                        ? AIBridgeHttpCommandState.Cancelled
+                        : AIBridgeHttpCommandState.NotFound;
+                }
+
                 _pendingHttpResults.Remove(commandId);
-                _httpCommandIds.Remove(commandId);
+                _cancelledHttpCommandIds.Add(commandId);
+                return AIBridgeHttpCommandState.Cancelled;
+            }
+        }
+
+        private bool TryBeginCommand(AIBridgeRuntimeCommand command)
+        {
+            if (command == null || string.IsNullOrEmpty(command.Id))
+            {
+                return true;
+            }
+
+            lock (_pendingHttpResultsSyncRoot)
+            {
+                if (_cancelledHttpCommandIds.Remove(command.Id))
+                {
+                    if (!_pendingHttpResults.ContainsKey(command.Id))
+                    {
+                        _httpCommandIds.Remove(command.Id);
+                    }
+
+                    return false;
+                }
+
+                if (_httpCommandIds.Contains(command.Id))
+                {
+                    _executingHttpCommandIds.Add(command.Id);
+                }
+
+                return true;
             }
         }
 
@@ -2366,6 +2507,7 @@ namespace AIBridge.Runtime
                     return;
                 }
 
+                _executingHttpCommandIds.Remove(result.CommandId);
                 _pendingHttpResults[result.CommandId] = result;
                 Monitor.PulseAll(_pendingHttpResultsSyncRoot);
             }

@@ -206,10 +206,10 @@ Unity Editor 下的 Play Mode 仍然推荐使用原来的 `CodeExecuteCommand_Ex
 
 1. 打开 `Window > AIBridge > Runtime`
 2. 勾选 **Compile Runtime Bridge**
-3. 按需要配置 **启用 Bootstrap 自动注入**、HTTP、Token、Allowed Actions 等选项
+3. 按需要配置 HTTP、Token、Allowed Actions 等选项
 4. 打开 `Window > AIBridge > Players` 查看 File Transport / HTTP / LAN 发现到的 Runtime targets
 
-Development Build 在启用 Bootstrap 自动注入后会自动创建 `AIBridgeRuntime`；Release Build 默认不启用，只有勾选 **Release Build 自动注入** 后才会自动创建。Editor Play Mode 如需调试 Runtime Bridge 链路，可以在 Runtime 面板中手动创建或应用场景 Runtime 对象。
+启用 **Compile Runtime Bridge** 后，构建 Player 时会自动注入并创建 `AIBridgeRuntime`；关闭后不编译、不注入。Editor Play Mode 如需调试 Runtime Bridge 链路，可以在 Runtime 面板中手动创建或应用场景 Runtime 对象。
 
 Runtime 代码执行依赖 HybridCLR。调用方可以自行组织 C# 代码、编译成 DLL，再通过 Runtime Bridge 发送到 Player 中加载执行；`runtime exec --dll` 只负责发送已编译 DLL，不负责在 CLI 侧编译源码。
 

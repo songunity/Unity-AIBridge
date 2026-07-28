@@ -19,5 +19,25 @@
   ],
   "dependencies": {
     "com.unity.ugui": "1.0.0"
-  }
+  },
+  "files": [
+    "Editor",
+    "Editor.meta",
+    "Runtime",
+    "Runtime.meta",
+    "Shared",
+    "Shared.meta",
+    "Skill~/SKILL.md",
+    "Tools~/CLI/win-x64/AIBridgeCLI.exe",
+    "Tools~/CLI/linux-x64/AIBridgeCLI",
+    "Tools~/CLI/osx-x64/AIBridgeCLI",
+    "Tools~/CLI/osx-arm64/AIBridgeCLI",
+    "README.md",
+    "README.md.meta",
+    "README_EN.md",
+    "README_EN.md.meta",
+    "LICENSE",
+    "LICENSE.meta",
+    "package.json.meta"
+  ]
 }

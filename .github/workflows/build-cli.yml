@@ -3,6 +3,9 @@ name: Build CLI Multi-Platform
 on:
   push:
     branches: [main]
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
     paths:
       - 'Tools~/AIBridgeCLI/AIBridgeCLI/**'
       - '.github/workflows/build-cli.yml'
@@ -109,4 +112,101 @@ jobs:
           else
             git commit -m "chore: update CLI binaries for all platforms"
             git push
+          fi
+
+  package-release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all CLI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: .release-cli
+
+      - name: Prepare package CLI files
+        shell: bash
+        run: |
+          rm -rf Tools~/CLI
+
+          mkdir -p \
+            Tools~/CLI/win-x64 \
+            Tools~/CLI/linux-x64 \
+            Tools~/CLI/osx-x64 \
+            Tools~/CLI/osx-arm64
+
+          install -m 644 \
+            .release-cli/cli-win-x64/AIBridgeCLI.exe \
+            Tools~/CLI/win-x64/AIBridgeCLI.exe
+
+          install -m 755 \
+            .release-cli/cli-linux-x64/AIBridgeCLI \
+            Tools~/CLI/linux-x64/AIBridgeCLI
+
+          install -m 755 \
+            .release-cli/cli-osx-x64/AIBridgeCLI \
+            Tools~/CLI/osx-x64/AIBridgeCLI
+
+          install -m 755 \
+            .release-cli/cli-osx-arm64/AIBridgeCLI \
+            Tools~/CLI/osx-arm64/AIBridgeCLI
+
+      - name: Validate version
+        shell: bash
+        run: |
+          package_version="$(node -p "require('./package.json').version")"
+          tag_version="${GITHUB_REF_NAME#v}"
+
+          if [ "$package_version" != "$tag_version" ]; then
+            echo "package.json version $package_version does not match tag $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+      - name: Build UPM tarball
+        shell: bash
+        run: |
+          mkdir -p dist
+
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          package_file="${package_name}-${package_version}.tgz"
+
+          npm pack --pack-destination dist
+          test -f "dist/$package_file"
+
+          tar -tzf "dist/$package_file" \
+            "package/Tools~/CLI/win-x64/AIBridgeCLI.exe" >/dev/null
+          tar -tzf "dist/$package_file" \
+            "package/Tools~/CLI/linux-x64/AIBridgeCLI" >/dev/null
+          tar -tzf "dist/$package_file" \
+            "package/Tools~/CLI/osx-x64/AIBridgeCLI" >/dev/null
+          tar -tzf "dist/$package_file" \
+            "package/Tools~/CLI/osx-arm64/AIBridgeCLI" >/dev/null
+
+          cd dist
+          sha256sum "$package_file" > "$package_file.sha256"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          package_file="dist/${package_name}-${package_version}.tgz"
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" \
+              "$package_file" \
+              "$package_file.sha256" \
+              --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              "$package_file" \
+              "$package_file.sha256" \
+              --verify-tag \
+              --generate-notes
           fi

@@ -133,12 +133,7 @@ namespace AIBridge.Editor
         private static bool ShouldInjectRuntimeSettingsCarrier(
             AIBridgeProjectSettings.RuntimeBridgeSettingsData settings)
         {
-            if (settings == null || !settings.EnableRuntimeBridge)
-            {
-                return false;
-            }
-
-            return true;
+            return settings != null && settings.EnableRuntimeBridge;
         }
 
         private static AIBridgeRuntimeSettingsCarrier FindCarrierInScene(Scene scene)
@@ -222,8 +217,8 @@ namespace AIBridge.Editor
             }
 
             Debug.Log(AIBridgeEditorText.T(
-                "[AIBridge] Runtime Bridge is enabled; builds will auto inject AIBridgeRuntime bootstrap.",
-                "[AIBridge] Runtime Bridge 已启用，构建时会自动注入 AIBridgeRuntime bootstrap。"));
+                "[AIBridge] Runtime Bridge is enabled; AIBridgeRuntime will be auto-injected.",
+                "[AIBridge] Runtime Bridge 已启用，将自动注入 AIBridgeRuntime。"));
         }
     }
 }

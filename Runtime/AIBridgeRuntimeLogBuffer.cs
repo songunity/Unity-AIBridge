@@ -18,10 +18,14 @@ namespace AIBridge.Runtime
     public sealed class AIBridgeRuntimeLogBuffer : IDisposable
     {
         private const int UnknownFrame = -1;
+        private const int MaxRegexPatternLength = 256;
+        private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(25);
 
         private readonly object _syncRoot = new object();
-        private readonly List<AIBridgeRuntimeLogEntry> _entries = new List<AIBridgeRuntimeLogEntry>();
+        private AIBridgeRuntimeLogEntry[] _entries = new AIBridgeRuntimeLogEntry[500];
         private int _capacity = 500;
+        private int _start;
+        private int _count;
         private bool _initialized;
         private int _mainThreadId;
 
@@ -31,19 +35,22 @@ namespace AIBridge.Runtime
             {
                 lock (_syncRoot)
                 {
-                    return _entries.Count;
+                    return _count;
                 }
             }
         }
 
         public void Initialize(int capacity)
         {
-            _capacity = Math.Max(1, capacity);
             if (_initialized)
             {
                 return;
             }
 
+            _capacity = Math.Max(1, capacity);
+            _entries = new AIBridgeRuntimeLogEntry[_capacity];
+            _start = 0;
+            _count = 0;
             _mainThreadId = Environment.CurrentManagedThreadId;
             Application.logMessageReceivedThreaded += OnLogMessageReceived;
             _initialized = true;
@@ -64,8 +71,10 @@ namespace AIBridge.Runtime
         {
             lock (_syncRoot)
             {
-                var count = _entries.Count;
-                _entries.Clear();
+                var count = _count;
+                Array.Clear(_entries, 0, _entries.Length);
+                _start = 0;
+                _count = 0;
                 return count;
             }
         }
@@ -87,15 +96,30 @@ namespace AIBridge.Runtime
             Regex regex = null;
             if (!string.IsNullOrEmpty(regexPattern))
             {
-                regex = new Regex(regexPattern);
+                if (regexPattern.Length > MaxRegexPatternLength)
+                {
+                    throw new ArgumentException("regex_pattern_too_long", nameof(regexPattern));
+                }
+
+                regex = new Regex(regexPattern, RegexOptions.None, RegexMatchTimeout);
+            }
+
+            AIBridgeRuntimeLogEntry[] snapshot;
+            lock (_syncRoot)
+            {
+                snapshot = new AIBridgeRuntimeLogEntry[_count];
+                for (var i = 0; i < _count; i++)
+                {
+                    snapshot[i] = _entries[(_start + i) % _capacity];
+                }
             }
 
             var results = new List<AIBridgeRuntimeLogEntry>();
-            lock (_syncRoot)
+            try
             {
-                for (var i = _entries.Count - 1; i >= 0 && results.Count < count; i--)
+                for (var i = snapshot.Length - 1; i >= 0 && results.Count < count; i--)
                 {
-                    var entry = _entries[i];
+                    var entry = snapshot[i];
                     if (!MatchesLogType(logType, entry.type))
                     {
                         continue;
@@ -119,6 +143,10 @@ namespace AIBridge.Runtime
                     results.Add(CloneEntry(entry, includeStackTrace));
                 }
             }
+            catch (RegexMatchTimeoutException ex)
+            {
+                throw new ArgumentException("regex_match_timeout", nameof(regexPattern), ex);
+            }
 
             results.Reverse();
             return results.ToArray();
@@ -137,11 +165,18 @@ namespace AIBridge.Runtime
 
             lock (_syncRoot)
             {
-                _entries.Add(entry);
-                while (_entries.Count > _capacity)
+                var index = (_start + _count) % _capacity;
+                if (_count == _capacity)
                 {
-                    _entries.RemoveAt(0);
+                    index = _start;
+                    _start = (_start + 1) % _capacity;
                 }
+                else
+                {
+                    _count++;
+                }
+
+                _entries[index] = entry;
             }
         }
 

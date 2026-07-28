@@ -6,7 +6,6 @@ namespace AIBridge.Runtime
     public class AIBridgeRuntimeSettings
     {
         public bool enableRuntimeBridge = true;
-        public bool allowInReleaseBuild = false;
         public string exchangeDirectory;
         public string targetId;
         public string authToken;
@@ -39,7 +38,6 @@ namespace AIBridge.Runtime
             }
 
             enableRuntimeBridge = source.enableRuntimeBridge;
-            allowInReleaseBuild = source.allowInReleaseBuild;
             exchangeDirectory = source.exchangeDirectory;
             targetId = source.targetId;
             authToken = source.authToken;

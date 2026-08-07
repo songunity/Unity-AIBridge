@@ -1,21 +1,13 @@
 ---
 name: aibridge
-description: 通过 AI Bridge CLI 自动化 Unity Editor 操作 - 管理 GameObject、场景、资源、预制体、组件，执行 C# 代码，截图和控制播放模式。当用户需要以编程方式与 Unity 项目交互时使用。
+description: 通过 AI Bridge CLI 自动化已打开的 Unity Editor，管理 GameObject、场景、资源、预制体和组件，执行 Editor C# 代码、控制 Play Mode、模拟 Play Mode UI 输入并捕获 Game 视图。当任务需要操作 Unity Editor 或其 Play Mode 时使用；连接独立 Player Runtime Bridge 时改用 aibridge-runtime。
 ---
 
-# AI Bridge Unity Skill
+# AI Bridge Editor Skill
 
 ## 概述
 
-通过 AI Bridge CLI 以编程方式控制 Unity Editor，用于快速原型开发、测试和自动化。
-
-## 何时使用此 Skill
-
-- 测试 UI 交互（按钮、滑块、输入框）
-- 调试场景对象和组件
-- 使用代码执行进行快速原型开发
-- 自动化重复的 Editor 任务
-- 为文档捕获截图或 GIF
+通过 AI Bridge CLI 控制已打开的 Unity Editor。保持 Editor、Editor Play Mode 与独立 Player Runtime Bridge 的连接链路分离。
 
 ## 前置条件
 
@@ -23,7 +15,7 @@ description: 通过 AI Bridge CLI 自动化 Unity Editor 操作 - 管理 GameObj
 - CLI 位置：`<UnityProjectRoot>/.aibridge/cli/AIBridgeCLI`（Windows 为 `AIBridgeCLI.exe`）
 - 如果工作目录不在 Unity 项目根目录（如 monorepo），需要先定位 Unity 项目路径再拼接 CLI 路径
 - 始终添加 `--raw` 标志以获取 JSON 输出
-- `<CLI路径> Compile --help` 查看全局帮助
+- `<CLI路径> --help` 查看全局帮助
 
 常用全局参数：
 
@@ -77,6 +69,8 @@ CLI 可执行文件位于 Unity 项目根目录下的 `.aibridge/cli/` 中。定
 
 **注意：** UI 点击需要场景中有 EventSystem。
 
+这些命令仍由 Unity Editor 接收，只是要求 Editor 处于 Play Mode。不要将其与独立 Player 的 `AIBridgeCLI runtime ...` 命令混用。
+
 ### 工作流 2：调试场景对象
 
 1. 获取场景层级：`SceneCommand_GetHierarchy`
@@ -101,7 +95,7 @@ CLI 可执行文件位于 Unity 项目根目录下的 `.aibridge/cli/` 中。定
 
 ### 工作流 5：编译验证代码是否有报错
 
-1. 编译unity：`Compile`
+1. 编译 Unity：`Compile`
 2. 查看返回值是否有报错
 
 ## 如何查询命令详情
@@ -118,8 +112,7 @@ AIBridgeCLI Help --command "GameObjectCommand_Find" --raw
 - 参数列表（名称、类型、是否必需、描述、默认值）
 - 使用示例
 
-通常来说使用一个命令前，你都要查询一下该命令的详细用法（除非你之前查询过）
-Compile没有Help，直接使用即可
+首次使用某个命令前先查询详细用法；`Compile` 直接调用即可。
 
 <!-- AUTO-GENERATED-COMMANDS-START -->
 ## 命令分类
@@ -137,7 +130,7 @@ Compile没有Help，直接使用即可
 
 ### CodeExecute
 
-- **CodeExecuteCommand_Execute** - 执行C#代码片段或脚本文件，支持编辑器或运行时。如果脚本内容过多更建议写入文件来运行，脚本文件放到.aibridge/code中
+- **CodeExecuteCommand_Execute** - 在 Unity Editor（包括 Play Mode）执行 C# 代码片段或脚本文件。如果脚本内容过多更建议写入文件来运行，脚本文件放到.aibridge/code中
 
 ### Editor
 
@@ -167,13 +160,13 @@ Compile没有Help，直接使用即可
 
 ### InputSimulation
 
-- **InputSimulationCommand_Click** - 通过路径模拟点击 GameObject (Only Runtime)
-- **InputSimulationCommand_ClickAt** - 在屏幕坐标处模拟点击 (Only Runtime)
-- **InputSimulationCommand_ClickByInstanceId** - 通过实例 ID 模拟点击 GameObject (Only Runtime)
-- **InputSimulationCommand_Drag** - 通过路径模拟从一个对象拖动到另一个对象 (Only Runtime)
-- **InputSimulationCommand_DragByInstanceId** - 通过实例 ID 模拟从一个对象拖动到另一个对象 (Only Runtime)
-- **InputSimulationCommand_LongPress** - 通过路径模拟长按 GameObject (Only Runtime)
-- **InputSimulationCommand_LongPressByInstanceId** - 通过实例 ID 模拟长按 GameObject (Only Runtime)
+- **InputSimulationCommand_Click** - 通过路径模拟点击 GameObject（仅 Editor Play Mode）
+- **InputSimulationCommand_ClickAt** - 在屏幕坐标处模拟点击（仅 Editor Play Mode）
+- **InputSimulationCommand_ClickByInstanceId** - 通过实例 ID 模拟点击 GameObject（仅 Editor Play Mode）
+- **InputSimulationCommand_Drag** - 通过路径模拟从一个对象拖动到另一个对象（仅 Editor Play Mode）
+- **InputSimulationCommand_DragByInstanceId** - 通过实例 ID 模拟从一个对象拖动到另一个对象（仅 Editor Play Mode）
+- **InputSimulationCommand_LongPress** - 通过路径模拟长按 GameObject（仅 Editor Play Mode）
+- **InputSimulationCommand_LongPressByInstanceId** - 通过实例 ID 模拟长按 GameObject（仅 Editor Play Mode）
 
 ### Inspector
 

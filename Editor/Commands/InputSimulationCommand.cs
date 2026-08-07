@@ -12,7 +12,7 @@ namespace AIBridge.Editor
     /// </summary>
     public static class InputSimulationCommand
     {
-        [AIBridge("通过路径模拟点击 GameObject (Only Runtime)",
+        [AIBridge("通过路径模拟点击 GameObject（仅 Editor Play Mode）",
             "AIBridgeCLI InputSimulationCommand_Click --path \"Canvas/Button\"")]
         public static IEnumerator Click(
             [Description("GameObject 的层级路径")] string path)
@@ -36,7 +36,7 @@ namespace AIBridge.Editor
             yield return PerformClick(go);
         }
 
-        [AIBridge("通过实例 ID 模拟点击 GameObject (Only Runtime)",
+        [AIBridge("通过实例 ID 模拟点击 GameObject（仅 Editor Play Mode）",
             "AIBridgeCLI InputSimulationCommand_ClickByInstanceId --instanceId 12345")]
         public static IEnumerator ClickByInstanceId(
             [Description("GameObject 的实例 ID")] int instanceId)
@@ -80,7 +80,7 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("在屏幕坐标处模拟点击 (Only Runtime)",
+        [AIBridge("在屏幕坐标处模拟点击（仅 Editor Play Mode）",
             "AIBridgeCLI InputSimulationCommand_ClickAt --x 100 --y 200")]
         public static IEnumerator ClickAt(
             [Description("屏幕 X 坐标")] float x,
@@ -114,7 +114,7 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("通过路径模拟从一个对象拖动到另一个对象 (Only Runtime)",
+        [AIBridge("通过路径模拟从一个对象拖动到另一个对象（仅 Editor Play Mode）",
             "AIBridgeCLI InputSimulationCommand_Drag --path \"Canvas/Item\" --toPath \"Canvas/Slot\" --frames 10")]
         public static IEnumerator Drag(
             [Description("源 GameObject 路径")] string path,
@@ -178,7 +178,7 @@ namespace AIBridge.Editor
             yield return PerformDrag(go, startPos.Value, endPos, frames);
         }
 
-        [AIBridge("通过实例 ID 模拟从一个对象拖动到另一个对象 (Only Runtime)",
+        [AIBridge("通过实例 ID 模拟从一个对象拖动到另一个对象（仅 Editor Play Mode）",
             "AIBridgeCLI InputSimulationCommand_DragByInstanceId --instanceId 12345 --toInstanceId 67890 --frames 10")]
         public static IEnumerator DragByInstanceId(
             [Description("源 GameObject 实例 ID")] int instanceId,
@@ -293,7 +293,7 @@ namespace AIBridge.Editor
             });
         }
 
-        [AIBridge("通过路径模拟长按 GameObject (Only Runtime)",
+        [AIBridge("通过路径模拟长按 GameObject（仅 Editor Play Mode）",
             "AIBridgeCLI InputSimulationCommand_LongPress --path \"Canvas/Button\" --duration 1000")]
         public static IEnumerator LongPress(
             [Description("GameObject 的层级路径")] string path,
@@ -318,7 +318,7 @@ namespace AIBridge.Editor
             yield return PerformLongPress(go, duration);
         }
 
-        [AIBridge("通过实例 ID 模拟长按 GameObject (Only Runtime)",
+        [AIBridge("通过实例 ID 模拟长按 GameObject（仅 Editor Play Mode）",
             "AIBridgeCLI InputSimulationCommand_LongPressByInstanceId --instanceId 12345 --duration 1000")]
         public static IEnumerator LongPressByInstanceId(
             [Description("GameObject 的实例 ID")] int instanceId,

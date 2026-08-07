@@ -175,7 +175,7 @@ public static class MyCustomCommand
 **这个操作会：**
 - 扫描指定程序集中的所有命令
 - 更新命令注册表
-- 自动重新生成 `Skill~/SKILL.md` 文档
+- 自动重新生成 `Skill~/aibridge/SKILL.md` 的 Editor 命令清单
 - 自动更新已安装的 Agent Skill 文档
 
 **重要：** 每次添加或修改自定义命令后，都需要点击此按钮来更新 Skill 文档，这样 AI 助手才能识别你的新命令。
@@ -259,14 +259,12 @@ AIBridgeCLI.exe runtime exec --dll probe.dll --transport http --url http://127.0
 
 ## Skill 文档
 
-`Skill~/SKILL.md` 文件是为 AI 助手（如 Droid、Claude、GPT 等）自动生成的文档。包含：
+包内提供两个独立 Skill：
 
-- 所有已注册命令的名称和描述（内置 + 自定义）
-- 每个命令的参数详情（类型和描述）
-- 使用示例
-- CLI 语法
+- `Skill~/aibridge/SKILL.md`：连接并自动化已打开的 Unity Editor，包括 Editor Play Mode。
+- `Skill~/aibridge-runtime/SKILL.md`：无需 Unity Editor，直接连接正在运行的 Player Runtime Bridge。
 
-你可以自己添加需要的内容，但是不要在 <!-- AUTO-GENERATED-COMMANDS-START --> <!-- AUTO-GENERATED-COMMANDS-END -->之中添加
+Editor Skill 的命令清单会自动生成。可以编辑其他内容，但不要修改 `<!-- AUTO-GENERATED-COMMANDS-START -->` 与 `<!-- AUTO-GENERATED-COMMANDS-END -->` 之间的内容。Runtime Skill 根据独立 `runtime` CLI 命令面维护，不参与 Editor 命令扫描。
 
 ### 安装 Skill 到 Agent 目录
 
@@ -277,14 +275,14 @@ AIBridgeCLI.exe runtime exec --dll probe.dll --transport http --url http://127.0
 3. 点击 **"Copy To Agent"** 按钮
 
 **复制逻辑：**
-- 系统会先扫描项目根目录中已存在的 AI 编辑器目录（`.cursor`、`.agent`、`.factory`、`.claude`、`.codex` 等）
-- 如果找到任何已存在的目录，会将 Skill 文档复制到这些目录的 `skills/aibridge/` 子目录中
-- 如果没有找到任何 AI 编辑器目录，会自动创建 `.agent` 目录并复制 Skill 文档
+- 系统会先扫描项目根目录中已存在的 AI 编辑器目录（`.agents`、`.cursor`、`.factory`、`.claude`、`.codex` 等）
+- 如果找到任何已存在的目录，会分别复制到 `skills/aibridge/` 和 `skills/aibridge-runtime/`
+- 如果没有找到任何 AI 编辑器目录，会自动创建 `.agents` 和 `.claude` 目录并复制两个 Skill
 
 **示例：**
-- 如果项目中已有 `.factory` 目录，Skill 会被复制到 `.factory/skills/aibridge/SKILL.md`
+- 如果项目中已有 `.factory` 目录，两个 Skill 会被复制到 `.factory/skills/aibridge/` 和 `.factory/skills/aibridge-runtime/`
 - 如果项目中同时有 `.factory` 和 `.cursor` 目录，两个目录都会被更新
-- 如果项目中没有任何 AI 编辑器目录，会创建 `.agent/skills/aibridge/SKILL.md`
+- 如果项目中没有任何 AI 编辑器目录，会创建 `.agents/skills/` 和 `.claude/skills/` 下的两个 Skill
 
 ### 更新 Skill 文档
 
@@ -298,7 +296,7 @@ AIBridgeCLI.exe runtime exec --dll probe.dll --transport http --url http://127.0
 - 在 `Tools` 标签点击 **"Generate Skill"** 按钮重新生成文档
 - 然后点击 **"Copy To Agent"** 按钮更新 Agent 目录
 
-**使用方法：** AI 助手会自动读取 `.factory/skills/aibridge/SKILL.md` 文件，从而识别所有可用的 Unity Editor 控制命令。
+**使用方法：** Editor 操作使用 `aibridge`；独立 Player Runtime Bridge 操作使用 `aibridge-runtime`。
 
 ## 许可证
 

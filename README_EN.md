@@ -175,7 +175,7 @@ After adding custom commands, you need to rescan and regenerate the Skill docume
 **This operation will:**
 - Scan all commands in the specified assemblies
 - Update the command registry
-- Automatically regenerate the `Skill~/SKILL.md` documentation
+- Automatically regenerate the Editor command list in `Skill~/aibridge/SKILL.md`
 - Automatically update the installed Agent Skill documentation
 
 **Important:** Every time you add or modify custom commands, you need to click this button to update the Skill documentation so that AI assistants can recognize your new commands.
@@ -215,14 +215,12 @@ If auto-scan is disabled:
 
 ## Skill Documentation
 
-The `Skill~/SKILL.md` file is auto-generated documentation for AI assistants (like Droid, Claude, GPT, etc.). It includes:
+The package provides two independent skills:
 
-- All registered command names and descriptions (built-in + custom)
-- Parameter details for each command (types and descriptions)
-- Usage examples
-- CLI syntax
+- `Skill~/aibridge/SKILL.md`: connects to and automates an open Unity Editor, including Editor Play Mode.
+- `Skill~/aibridge-runtime/SKILL.md`: connects directly to a running Player Runtime Bridge without Unity Editor.
 
-You can add your own content, but do not add anything between `<!-- AUTO-GENERATED-COMMANDS-START -->` and `<!-- AUTO-GENERATED-COMMANDS-END -->`
+The Editor skill command list is generated automatically. You can edit other content, but do not modify anything between `<!-- AUTO-GENERATED-COMMANDS-START -->` and `<!-- AUTO-GENERATED-COMMANDS-END -->`. The Runtime skill follows the standalone `runtime` CLI surface and is not generated from Editor commands.
 
 ### Install Skill to Agent Directory
 
@@ -233,14 +231,14 @@ You can add your own content, but do not add anything between `<!-- AUTO-GENERAT
 3. Click the **"Copy To Agent"** button
 
 **Copy Logic:**
-- The system will first scan for existing AI editor directories in the project root (`.cursor`, `.agent`, `.factory`, `.claude`, `.codex`, etc.)
-- If any existing directories are found, the Skill documentation will be copied to the `skills/aibridge/` subdirectory of these directories
-- If no AI editor directories are found, it will automatically create a `.agent` directory and copy the Skill documentation
+- The system will first scan for existing AI editor directories in the project root (`.agents`, `.cursor`, `.factory`, `.claude`, `.codex`, etc.)
+- If any existing directories are found, both skills are copied to `skills/aibridge/` and `skills/aibridge-runtime/`
+- If no AI editor directories are found, `.agents` and `.claude` are created and both skills are copied
 
 **Examples:**
-- If the project already has a `.factory` directory, the Skill will be copied to `.factory/skills/aibridge/SKILL.md`
+- If the project already has a `.factory` directory, both skills are copied to `.factory/skills/aibridge/` and `.factory/skills/aibridge-runtime/`
 - If the project has both `.factory` and `.cursor` directories, both will be updated
-- If the project has no AI editor directories, it will create `.agent/skills/aibridge/SKILL.md`
+- If the project has no AI editor directories, both skills are created under `.agents/skills/` and `.claude/skills/`
 
 ### Update Skill Documentation
 
@@ -254,7 +252,7 @@ When you add or modify custom commands:
 - Click the **"Generate Skill"** button in the `Tools` tab to regenerate the documentation
 - Then click the **"Copy To Agent"** button to update the Agent directories
 
-**Usage:** AI assistants will automatically read the `.factory/skills/aibridge/SKILL.md` file to recognize all available Unity Editor control commands.
+**Usage:** Use `aibridge` for Editor operations and `aibridge-runtime` for a standalone Player Runtime Bridge.
 
 ## License
 

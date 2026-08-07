@@ -354,7 +354,7 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.Process: return T("Process", "进程");
                 case AIBridgeEditorTextKey.Product: return T("Product", "产品");
                 case AIBridgeEditorTextKey.Project: return T("Project", "项目");
-                case AIBridgeEditorTextKey.QuickSkillHelp: return T("Generate SKILL.md and copy to selected agent directories", "生成 SKILL.md 并复制到选定的 Agent 目录");
+                case AIBridgeEditorTextKey.QuickSkillHelp: return T("Generate the Editor skill and copy both skills to selected agent directories", "生成 Editor Skill，并将两个 Skill 复制到选定的 Agent 目录");
                 case AIBridgeEditorTextKey.QuickSkillInstall: return T("Quick Skill Install", "快速 Skill 安装");
                 case AIBridgeEditorTextKey.Reachable: return T("REACHABLE", "可达");
                 case AIBridgeEditorTextKey.RefreshedCount: return T("Refreshed: {0}", "刷新：{0}");
@@ -392,7 +392,7 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.SettingsReset: return T("Settings reset to default.", "设置已重置为默认值。");
                 case AIBridgeEditorTextKey.Shortcuts: return T("Shortcuts", "快捷键");
                 case AIBridgeEditorTextKey.ShortcutsHelp: return T("F12 - Screenshot Game View (Play Mode)\nF11 - Start/Stop GIF Recording (Play Mode)", "F12 - 截取 Game View（播放模式）\nF11 - 开始/停止 GIF 录制（播放模式）");
-                case AIBridgeEditorTextKey.SkillDocHelp: return T("Generate SKILL.md file for Droid integration", "为 Droid 集成生成 SKILL.md 文件");
+                case AIBridgeEditorTextKey.SkillDocHelp: return T("Regenerate the Editor skill command list", "重新生成 Editor Skill 命令清单");
                 case AIBridgeEditorTextKey.SkillDocumentation: return T("Skill Documentation", "Skill 文档");
                 case AIBridgeEditorTextKey.SkillGeneratedInstalled: return T("Skill generated and installed to: {0}", "Skill 已生成并安装到：{0}");
                 case AIBridgeEditorTextKey.SkillInstallation: return T("Skill Installation", "Skill 安装");

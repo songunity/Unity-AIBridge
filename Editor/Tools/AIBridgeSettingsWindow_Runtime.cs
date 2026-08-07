@@ -117,19 +117,14 @@ namespace AIBridge.Editor
 
             DrawSectionHeader(AIBridgeEditorText.Get(AIBridgeEditorTextKey.BuildInjectionSettings));
 
+            EditorGUILayout.BeginHorizontal();
             settings.EnableRuntimeBridge = EditorGUILayout.Toggle(
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.CompileRuntimeBridge),
                 settings.EnableRuntimeBridge);
-
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeEnabledDefine),
-                GUILayout.Width(EditorGUIUtility.labelWidth));
-            EditorGUILayout.SelectableLabel(
-                AIBridgeRuntimeBuildProcessor.RuntimeEnabledDefine,
-                EditorStyles.textField,
-                GUILayout.Height(EditorGUIUtility.singleLineHeight));
-            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Copy), GUILayout.Width(58)))
+            if (GUILayout.Button(
+                    new GUIContent(AIBridgeRuntimeBuildProcessor.RuntimeEnabledDefine, AIBridgeEditorText.T("Click to copy", "点击复制")),
+                    EditorStyles.miniButton,
+                    GUILayout.ExpandWidth(false)))
             {
                 EditorGUIUtility.systemCopyBuffer = AIBridgeRuntimeBuildProcessor.RuntimeEnabledDefine;
             }

@@ -45,7 +45,6 @@ namespace AIBridge.Editor
         Commands,
         CompileRuntimeBridge,
         CompileRuntimeBridgeHelp,
-        Copy,
         CopyAgent,
         CopyDiscoverCli,
         CopyLogsCli,
@@ -141,7 +140,6 @@ namespace AIBridge.Editor
         RuntimeDirectory,
         RuntimeHttpCliCopied,
         RuntimeInfo,
-        RuntimeEnabledDefine,
         ScanAssemblies,
         ScanAssembliesHelp,
         ScanFailed,
@@ -284,7 +282,6 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.Commands: return T("Commands", "命令");
                 case AIBridgeEditorTextKey.CompileRuntimeBridge: return T("Enable Runtime Bridge", "启用 Runtime Bridge");
                 case AIBridgeEditorTextKey.CompileRuntimeBridgeHelp: return T("Enable this to compile Runtime Bridge code, expose Runtime Bridge editor controls, and auto-inject AIBridgeRuntime into built Players.", "启用后编译 Runtime Bridge 代码、显示 Runtime Bridge 编辑器控制，并在构建 Player 时自动注入 AIBridgeRuntime。");
-                case AIBridgeEditorTextKey.Copy: return T("Copy", "复制");
                 case AIBridgeEditorTextKey.CopyAgent: return T("Copy to Agent", "复制到 Agent");
                 case AIBridgeEditorTextKey.CopyDiscoverCli: return T("Copy Discover CLI", "复制发现命令");
                 case AIBridgeEditorTextKey.CopyLogsCli: return T("Copy Logs CLI", "复制日志命令");
@@ -380,7 +377,6 @@ namespace AIBridge.Editor
                 case AIBridgeEditorTextKey.RuntimeDirectory: return T("Runtime Directory", "Runtime 目录");
                 case AIBridgeEditorTextKey.RuntimeHttpCliCopied: return T("[AIBridge] Runtime HTTP CLI command copied.", "[AIBridge] Runtime HTTP CLI 命令已复制。");
                 case AIBridgeEditorTextKey.RuntimeInfo: return T("Runtime Info", "Runtime 信息");
-                case AIBridgeEditorTextKey.RuntimeEnabledDefine: return T("Scripting Define", "脚本宏");
                 case AIBridgeEditorTextKey.ScanAssemblies: return T("Scan Assemblies", "扫描程序集");
                 case AIBridgeEditorTextKey.ScanAssembliesHelp: return T("Separate multiple assemblies with semicolons (e.g., Assembly-CSharp;Assembly-CSharp-Editor)", "多个程序集请用分号分隔（例如 Assembly-CSharp;Assembly-CSharp-Editor）");
                 case AIBridgeEditorTextKey.ScanFailed: return T("Scan failed: {0}", "扫描失败：{0}");

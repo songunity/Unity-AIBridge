@@ -8,7 +8,7 @@ using UnityEngine;
 namespace AIBridge.Editor
 {
     /// <summary>
-    /// Installs the AIBridge Editor and Runtime skills to supported agent directories.
+    /// Installs the aibridge and aibridge-runtime skills to supported agent directories.
     /// </summary>
     public static class SkillInstaller
     {
@@ -141,7 +141,7 @@ namespace AIBridge.Editor
             AssetDatabase.Refresh();
 
             EditorUtility.DisplayDialog("Success",
-                $"Updated Editor SKILL.md with {skillEntries.Count} commands.\n\n" +
+                $"Updated aibridge SKILL.md with {skillEntries.Count} commands.\n\n" +
                 $"Command categories section has been regenerated.\n\n" +
                 $"Location: {skillDir}",
                 "OK");

@@ -1,4 +1,4 @@
 interface:
-  display_name: "AI Bridge Editor"
+  display_name: "AI Bridge"
   short_description: "Automate Unity Editor scenes, assets, UI, and Play Mode"
   default_prompt: "Use $aibridge to automate the open Unity Editor project."

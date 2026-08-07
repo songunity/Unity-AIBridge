@@ -220,7 +220,7 @@ The package provides two independent skills:
 - `Skill~/aibridge/SKILL.md`: connects to and automates an open Unity Editor, including Editor Play Mode.
 - `Skill~/aibridge-runtime/SKILL.md`: connects directly to a running Player Runtime Bridge without Unity Editor.
 
-The Editor skill command list is generated automatically. You can edit other content, but do not modify anything between `<!-- AUTO-GENERATED-COMMANDS-START -->` and `<!-- AUTO-GENERATED-COMMANDS-END -->`. The Runtime skill follows the standalone `runtime` CLI surface and is not generated from Editor commands.
+The `aibridge` skill command list is generated automatically. You can edit other content, but do not modify anything between `<!-- AUTO-GENERATED-COMMANDS-START -->` and `<!-- AUTO-GENERATED-COMMANDS-END -->`. The Runtime skill follows the standalone `runtime` CLI surface and is not generated from Editor commands.
 
 ### Install Skill to Agent Directory
 

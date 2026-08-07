@@ -3,7 +3,7 @@ name: aibridge
 description: 通过 AI Bridge CLI 自动化已打开的 Unity Editor，管理 GameObject、场景、资源、预制体和组件，执行 Editor C# 代码、控制 Play Mode、模拟 Play Mode UI 输入并捕获 Game 视图。当任务需要操作 Unity Editor 或其 Play Mode 时使用；连接独立 Player Runtime Bridge 时改用 aibridge-runtime。
 ---
 
-# AI Bridge Editor Skill
+# AI Bridge Skill
 
 ## 概述
 

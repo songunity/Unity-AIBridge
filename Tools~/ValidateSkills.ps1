@@ -3,24 +3,24 @@ param(
 )
 
 $failures = [System.Collections.Generic.List[string]]::new()
-$editorSkillPath = Join-Path $RepoRoot 'Skill~/aibridge/SKILL.md'
+$aibridgeSkillPath = Join-Path $RepoRoot 'Skill~/aibridge/SKILL.md'
 $runtimeSkillPath = Join-Path $RepoRoot 'Skill~/aibridge-runtime/SKILL.md'
 $installerPath = Join-Path $RepoRoot 'Editor/Utils/SkillInstaller.cs'
 $packagePath = Join-Path $RepoRoot 'package.json'
 
-foreach ($path in @($editorSkillPath, $runtimeSkillPath, $installerPath, $packagePath)) {
+foreach ($path in @($aibridgeSkillPath, $runtimeSkillPath, $installerPath, $packagePath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         $failures.Add("Missing file: $path")
     }
 }
 
-if (Test-Path -LiteralPath $editorSkillPath -PathType Leaf) {
-    $editorSkill = Get-Content -LiteralPath $editorSkillPath -Raw
-    if ($editorSkill -notmatch '(?m)^name: aibridge\r?$') {
-        $failures.Add('Editor skill name must be aibridge.')
+if (Test-Path -LiteralPath $aibridgeSkillPath -PathType Leaf) {
+    $aibridgeSkill = Get-Content -LiteralPath $aibridgeSkillPath -Raw
+    if ($aibridgeSkill -notmatch '(?m)^name: aibridge\r?$') {
+        $failures.Add('aibridge skill name must be aibridge.')
     }
-    if ($editorSkill -match '(?m)^\s*AIBridgeCLI runtime\s') {
-        $failures.Add('Editor skill must not document the standalone Runtime CLI surface.')
+    if ($aibridgeSkill -match '(?m)^\s*AIBridgeCLI runtime\s') {
+        $failures.Add('aibridge skill must not document the standalone Runtime CLI surface.')
     }
 }
 

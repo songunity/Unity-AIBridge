@@ -264,7 +264,7 @@ AIBridgeCLI.exe runtime exec --dll probe.dll --transport http --url http://127.0
 - `Skill~/aibridge/SKILL.md`：连接并自动化已打开的 Unity Editor，包括 Editor Play Mode。
 - `Skill~/aibridge-runtime/SKILL.md`：无需 Unity Editor，直接连接正在运行的 Player Runtime Bridge。
 
-Editor Skill 的命令清单会自动生成。可以编辑其他内容，但不要修改 `<!-- AUTO-GENERATED-COMMANDS-START -->` 与 `<!-- AUTO-GENERATED-COMMANDS-END -->` 之间的内容。Runtime Skill 根据独立 `runtime` CLI 命令面维护，不参与 Editor 命令扫描。
+`aibridge` Skill 的命令清单会自动生成。可以编辑其他内容，但不要修改 `<!-- AUTO-GENERATED-COMMANDS-START -->` 与 `<!-- AUTO-GENERATED-COMMANDS-END -->` 之间的内容。Runtime Skill 根据独立 `runtime` CLI 命令面维护，不参与 Editor 命令扫描。
 
 ### 安装 Skill 到 Agent 目录
 

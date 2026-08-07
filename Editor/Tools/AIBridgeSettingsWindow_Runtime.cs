@@ -120,6 +120,21 @@ namespace AIBridge.Editor
             settings.EnableRuntimeBridge = EditorGUILayout.Toggle(
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.CompileRuntimeBridge),
                 settings.EnableRuntimeBridge);
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.RuntimeEnabledDefine),
+                GUILayout.Width(EditorGUIUtility.labelWidth));
+            EditorGUILayout.SelectableLabel(
+                AIBridgeRuntimeBuildProcessor.RuntimeEnabledDefine,
+                EditorStyles.textField,
+                GUILayout.Height(EditorGUIUtility.singleLineHeight));
+            if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Copy), GUILayout.Width(58)))
+            {
+                EditorGUIUtility.systemCopyBuffer = AIBridgeRuntimeBuildProcessor.RuntimeEnabledDefine;
+            }
+
+            EditorGUILayout.EndHorizontal();
             EditorGUILayout.HelpBox(AIBridgeEditorText.Get(AIBridgeEditorTextKey.CompileRuntimeBridgeHelp), MessageType.None);
 
             if (settings.EnableRuntimeBridge)

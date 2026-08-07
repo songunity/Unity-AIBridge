@@ -14,7 +14,7 @@ namespace AIBridge.Editor
     [InitializeOnLoad]
     internal sealed class AIBridgeRuntimeBuildProcessor : IPreprocessBuildWithReport, IProcessSceneWithReport
     {
-        private const string RuntimeEnabledDefine = "AIBRIDGE_RUNTIME_ENABLED";
+        internal const string RuntimeEnabledDefine = "AIBRIDGE_RUNTIME_ENABLED";
 
         private static bool _runtimeSettingsCarrierInjected;
 

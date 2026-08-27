@@ -370,6 +370,7 @@ namespace AIBridge.Editor
                 target.deviceName = GetString(health, "deviceName") ?? target.deviceName;
                 target.bindUrl = NormalizeUrl(GetString(health, "bindUrl") ?? GetString(health, "httpUrl") ?? target.bindUrl);
                 target.reachableUrl = target.url;
+                target.uptimeSeconds = GetDouble(health, "uptimeSeconds");
                 target.capabilities = GetValue(health, "capabilities") ?? target.capabilities;
                 target.targetKind = ResolveLanDiscoveryTargetKind(target.platform, target.isLocal, target.isVirtualInterface);
             }
@@ -419,6 +420,7 @@ namespace AIBridge.Editor
             target.BindUrl = NormalizeUrl(GetString(health, "bindUrl") ?? GetString(health, "httpUrl") ?? target.BindUrl);
             target.ReachableUrl = url;
             target.TargetKind = ResolveLanDiscoveryTargetKind(target.Platform, false, false);
+            target.UptimeSeconds = GetDouble(health, "uptimeSeconds");
             return true;
         }
 
@@ -460,6 +462,7 @@ namespace AIBridge.Editor
                         item["deviceName"] = GetString(health, "deviceName") ?? GetString(item, "deviceName");
                         item["bindUrl"] = NormalizeUrl(GetString(health, "bindUrl") ?? GetString(health, "httpUrl") ?? GetString(item, "bindUrl"));
                         item["reachableUrl"] = targetUrl;
+                        item["uptimeSeconds"] = GetDouble(health, "uptimeSeconds");
                     }
 
                     cache["updatedAtUtc"] = now;
@@ -966,6 +969,7 @@ namespace AIBridge.Editor
             public string lastSeenUtc;
             public string lastHealthCheckUtc;
             public bool reachable;
+            public double? uptimeSeconds;
             public string healthUrl;
             public string healthError;
             public string remoteEndPoint;

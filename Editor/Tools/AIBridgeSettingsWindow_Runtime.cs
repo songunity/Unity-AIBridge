@@ -441,6 +441,7 @@ namespace AIBridge.Editor
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Process), player.ProcessId > 0 ? player.ProcessId.ToString() : "-");
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Device), player.DeviceName);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Heartbeat), FormatHeartbeat(player));
+                DrawInfoLine(AIBridgeEditorText.T("Online Time", "在线时长"), FormatUptime(player.UptimeSeconds));
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Path), player.TargetPath);
             }
 
@@ -450,8 +451,10 @@ namespace AIBridge.Editor
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.BindUrl), discovery.BindUrl);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Kind), discovery.TargetKind);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Auth), discovery.RequiresToken ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.TokenRequired) : AIBridgeEditorText.Get(AIBridgeEditorTextKey.NoToken));
-                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.LastSeen), FormatDiscoveryAge(discovery));
-                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Health), discovery.Reachable ? discovery.LastHealthCheckUtc : AIBridgeEditorText.Get(AIBridgeEditorTextKey.Unreachable));
+                DrawInfoLine(AIBridgeEditorText.T("Online Time", "在线时长"), FormatUptime(discovery.UptimeSeconds));
+                DrawInfoLine(AIBridgeEditorText.T("Last Online", "上次在线"), FormatUtcLocalMinute(discovery.LastSeenUtc));
+                DrawInfoLine(AIBridgeEditorText.T("Last Check", "上次检测"), FormatUtcLocalMinute(discovery.LastHealthCheckUtc));
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Health), discovery.Reachable ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.Online) : AIBridgeEditorText.Get(AIBridgeEditorTextKey.Unreachable));
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Remote), discovery.RemoteEndPoint);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.SourceNic), JoinNonEmpty(discovery.SourceInterface, discovery.SourceInterfaceAddress));
             }
@@ -471,7 +474,7 @@ namespace AIBridge.Editor
                 DeletePlayerCache(player);
             }
 
-            if (discovery != null && discovery.Stale
+            if (discovery != null && discovery.Stale && !IsReachableDiscovery(discovery)
                 && GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.DeleteCache), GUILayout.Width(110)))
             {
                 DeleteDiscoveredTargetCache(discovery);
@@ -1319,22 +1322,50 @@ namespace AIBridge.Editor
 
         private static string FormatHeartbeat(AIBridgeRuntimePlayerInfo player)
         {
-            if (!player.AgeSeconds.HasValue)
-            {
-                return "-";
-            }
-
-            return player.AgeSeconds.Value.ToString("F1") + "s ago / " + player.LastHeartbeatUtc;
+            return player == null ? "-" : FormatUtcLocalMinute(player.LastHeartbeatUtc);
         }
 
-        private static string FormatDiscoveryAge(AIBridgeRuntimeDiscoveredTargetInfo target)
+        private static string FormatUtcLocalMinute(string value)
         {
-            if (target == null || !target.AgeSeconds.HasValue)
+            DateTimeOffset timestamp;
+            if (string.IsNullOrWhiteSpace(value)
+                || !DateTimeOffset.TryParse(value, out timestamp))
             {
                 return "-";
             }
 
-            return target.AgeSeconds.Value.ToString("F1") + "s ago / " + target.LastSeenUtc;
+            return timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        }
+
+        private static string FormatUptime(double? uptimeSeconds)
+        {
+            if (!uptimeSeconds.HasValue)
+            {
+                return "-";
+            }
+
+            var seconds = Math.Max(0d, uptimeSeconds.Value);
+            if (seconds < 60d)
+            {
+                return AIBridgeEditorText.T("<1m", "小于1分钟");
+            }
+
+            var totalMinutes = (int)Math.Floor(seconds / 60d);
+            if (totalMinutes < 60)
+            {
+                return AIBridgeEditorText.T(totalMinutes + "m", totalMinutes + "分钟");
+            }
+
+            var hours = totalMinutes / 60;
+            var minutes = totalMinutes % 60;
+            if (hours < 24)
+            {
+                return AIBridgeEditorText.T(hours + "h " + minutes + "m", hours + "小时 " + minutes + "分钟");
+            }
+
+            var days = hours / 24;
+            hours %= 24;
+            return AIBridgeEditorText.T(days + "d " + hours + "h", days + "天 " + hours + "小时");
         }
 
         private static string JoinNonEmpty(string left, string right)

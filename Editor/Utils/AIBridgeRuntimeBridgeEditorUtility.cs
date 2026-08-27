@@ -32,6 +32,7 @@ namespace AIBridge.Editor
         public int LanDiscoveryUdpPort;
         public bool Stale;
         public double? AgeSeconds;
+        public double? UptimeSeconds;
     }
 
     internal sealed class AIBridgeRuntimeDiscoveredTargetInfo
@@ -55,6 +56,7 @@ namespace AIBridge.Editor
         public bool Reachable;
         public bool Stale;
         public double? AgeSeconds;
+        public double? UptimeSeconds;
     }
 
     internal static partial class AIBridgeRuntimeBridgeEditorUtility
@@ -135,7 +137,8 @@ namespace AIBridge.Editor
                     HttpPort = GetInt(heartbeat, "httpPort"),
                     LanDiscoveryUdpPort = GetInt(heartbeat, "lanDiscoveryUdpPort"),
                     Stale = !lastHeartbeat.HasValue || DateTime.UtcNow - lastHeartbeat.Value > StaleHeartbeatTimeout,
-                    AgeSeconds = ageSeconds
+                    AgeSeconds = ageSeconds,
+                    UptimeSeconds = GetDouble(heartbeat, "uptimeSeconds")
                 });
             }
 
@@ -274,7 +277,8 @@ namespace AIBridge.Editor
                     RequiresToken = GetBool(item, "requiresToken"),
                     Reachable = !item.ContainsKey("reachable") || GetBool(item, "reachable"),
                     Stale = !lastSeen.HasValue || DateTime.UtcNow - lastSeen.Value > DiscoveryCacheStaleTimeout,
-                    AgeSeconds = ageSeconds
+                    AgeSeconds = ageSeconds,
+                    UptimeSeconds = GetDouble(item, "uptimeSeconds")
                 });
             }
 
@@ -549,6 +553,26 @@ namespace AIBridge.Editor
             }
 
             return int.TryParse(value.ToString(), out var parsed) ? parsed : 0;
+        }
+
+        private static double? GetDouble(Dictionary<string, object> data, string key)
+        {
+            if (data == null || !data.TryGetValue(key, out var value) || value == null)
+            {
+                return null;
+            }
+
+            if (value is double doubleValue)
+            {
+                return doubleValue;
+            }
+
+            if (value is long longValue)
+            {
+                return longValue;
+            }
+
+            return double.TryParse(value.ToString(), out var parsed) ? (double?)parsed : null;
         }
 
         private static bool GetBool(Dictionary<string, object> data, string key)

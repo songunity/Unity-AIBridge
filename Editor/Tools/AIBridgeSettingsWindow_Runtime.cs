@@ -440,7 +440,6 @@ namespace AIBridge.Editor
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Runtime), player.RuntimeVersion);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Process), player.ProcessId > 0 ? player.ProcessId.ToString() : "-");
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Device), player.DeviceName);
-                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Heartbeat), FormatHeartbeat(player));
                 DrawInfoLine(AIBridgeEditorText.T("Online Time", "在线时长"), FormatUptime(player.UptimeSeconds));
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Path), player.TargetPath);
             }
@@ -452,11 +451,17 @@ namespace AIBridge.Editor
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Kind), discovery.TargetKind);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Auth), discovery.RequiresToken ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.TokenRequired) : AIBridgeEditorText.Get(AIBridgeEditorTextKey.NoToken));
                 DrawInfoLine(AIBridgeEditorText.T("Online Time", "在线时长"), FormatUptime(discovery.UptimeSeconds));
-                DrawInfoLine(AIBridgeEditorText.T("Last Online", "上次在线"), FormatUtcLocalMinute(discovery.LastSeenUtc));
-                DrawInfoLine(AIBridgeEditorText.T("Last Check", "上次检测"), FormatUtcLocalMinute(discovery.LastHealthCheckUtc));
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Health), discovery.Reachable ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.Online) : AIBridgeEditorText.Get(AIBridgeEditorTextKey.Unreachable));
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Remote), discovery.RemoteEndPoint);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.SourceNic), JoinNonEmpty(discovery.SourceInterface, discovery.SourceInterfaceAddress));
+            }
+
+            if (!IsConnectedTarget(target))
+            {
+                var lastOnlineUtc = discovery != null && !string.IsNullOrWhiteSpace(discovery.LastSeenUtc)
+                    ? discovery.LastSeenUtc
+                    : player == null ? null : player.LastHeartbeatUtc;
+                DrawInfoLine(AIBridgeEditorText.T("Last Online", "上次在线"), FormatUtcLocalMinute(lastOnlineUtc));
             }
 
             EditorGUILayout.BeginHorizontal();
@@ -1318,11 +1323,6 @@ namespace AIBridge.Editor
         {
             var age = Math.Max(0, EditorApplication.timeSinceStartup - _lastRefreshTime);
             return age < 1 ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.Now) : age.ToString("F0") + "s";
-        }
-
-        private static string FormatHeartbeat(AIBridgeRuntimePlayerInfo player)
-        {
-            return player == null ? "-" : FormatUtcLocalMinute(player.LastHeartbeatUtc);
         }
 
         private static string FormatUtcLocalMinute(string value)

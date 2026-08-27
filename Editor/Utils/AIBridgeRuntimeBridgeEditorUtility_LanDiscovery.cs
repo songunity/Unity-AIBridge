@@ -375,6 +375,95 @@ namespace AIBridge.Editor
             }
         }
 
+        public static bool TryRefreshDiscoveredTargetHealth(
+            AIBridgeRuntimeDiscoveredTargetInfo target,
+            int timeoutMs,
+            string authToken,
+            out string error)
+        {
+            error = null;
+            var url = target == null ? null : NormalizeUrl(target.ReachableUrl ?? target.Url);
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                error = "Discovered target URL is empty.";
+                return false;
+            }
+
+            Dictionary<string, object> health;
+            var now = DateTime.UtcNow.ToString("o");
+            var ok = TryGetLanDiscoveryHealth(url, timeoutMs, authToken, out health, out error);
+            UpdateDiscoveredTargetCacheHealth(target, health, ok, now);
+
+            target.LastHealthCheckUtc = now;
+            target.Reachable = ok;
+            if (!ok)
+            {
+                return false;
+            }
+
+            target.LastSeenUtc = now;
+            target.Stale = false;
+            target.AgeSeconds = 0d;
+            target.TargetId = GetString(health, "targetId") ?? target.TargetId;
+            target.Platform = GetString(health, "platform") ?? target.Platform;
+            target.ProjectName = GetString(health, "productName") ?? target.ProjectName;
+            target.ApplicationVersion = GetString(health, "applicationVersion") ?? target.ApplicationVersion;
+            target.DeviceName = GetString(health, "deviceName") ?? target.DeviceName;
+            target.BindUrl = NormalizeUrl(GetString(health, "bindUrl") ?? GetString(health, "httpUrl") ?? target.BindUrl);
+            target.ReachableUrl = url;
+            target.TargetKind = ResolveLanDiscoveryTargetKind(target.Platform, false, false);
+            return true;
+        }
+
+        private static void UpdateDiscoveredTargetCacheHealth(
+            AIBridgeRuntimeDiscoveredTargetInfo target,
+            Dictionary<string, object> health,
+            bool reachable,
+            string now)
+        {
+            try
+            {
+                var cache = ReadDiscoveryCache();
+                var rawTargets = GetList(cache, "targets");
+                if (cache == null || rawTargets == null)
+                {
+                    return;
+                }
+
+                var targetUrl = NormalizeUrl(target == null ? null : target.ReachableUrl ?? target.Url);
+                for (var i = 0; i < rawTargets.Count; i++)
+                {
+                    var item = rawTargets[i] as Dictionary<string, object>;
+                    var itemUrl = NormalizeUrl(item == null ? null : GetString(item, "reachableUrl") ?? GetString(item, "url"));
+                    if (item == null || !string.Equals(itemUrl, targetUrl, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    item["reachable"] = reachable;
+                    item["lastHealthCheckUtc"] = now;
+                    if (reachable)
+                    {
+                        item["lastSeenUtc"] = now;
+                        item["targetId"] = GetString(health, "targetId") ?? GetString(item, "targetId");
+                        item["platform"] = GetString(health, "platform") ?? GetString(item, "platform");
+                        item["projectName"] = GetString(health, "productName") ?? GetString(item, "projectName");
+                        item["applicationVersion"] = GetString(health, "applicationVersion") ?? GetString(item, "applicationVersion");
+                        item["deviceName"] = GetString(health, "deviceName") ?? GetString(item, "deviceName");
+                        item["bindUrl"] = NormalizeUrl(GetString(health, "bindUrl") ?? GetString(health, "httpUrl") ?? GetString(item, "bindUrl"));
+                        item["reachableUrl"] = targetUrl;
+                    }
+
+                    cache["updatedAtUtc"] = now;
+                    File.WriteAllText(GetDiscoveryCachePath(), SerializeJson(cache, pretty: true));
+                    return;
+                }
+            }
+            catch
+            {
+            }
+        }
+
         private static List<AIBridgeRuntimeLanDiscoveryTarget> CollapseLanDiscoveryTargets(
             List<AIBridgeRuntimeLanDiscoveryTarget> targets)
         {

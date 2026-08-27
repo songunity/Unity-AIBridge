@@ -20,6 +20,7 @@ namespace AIBridge.Editor
         private readonly List<AIBridgeRuntimeDiscoveredTargetInfo> _discoveredTargets = new List<AIBridgeRuntimeDiscoveredTargetInfo>();
         private readonly List<RuntimeTargetView> _targets = new List<RuntimeTargetView>();
         private readonly HashSet<string> _expandedTargetIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _refreshingHealthUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private Vector2 _scrollPosition;
         private string _runtimeDirectory;
         private string _localHttpUrl;
@@ -27,6 +28,7 @@ namespace AIBridge.Editor
         [SerializeField] private bool _scanLanOnRefresh = true;
         private bool _lanScanRunning;
         private string _lanScanStatus;
+        private double _lanScanStatusTime;
         private int _lanScanGeneration;
         private double _lastRefreshTime;
         private double _nextTargetCacheRefreshTime;
@@ -238,7 +240,7 @@ namespace AIBridge.Editor
             DrawRuntimeSummary();
             if (_lanScanRunning || !string.IsNullOrEmpty(_lanScanStatus))
             {
-                EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.LanScan), _lanScanStatus ?? string.Empty, EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField(AIBridgeEditorText.Get(AIBridgeEditorTextKey.LanScan), FormatLanScanStatus(), EditorStyles.wordWrappedMiniLabel);
             }
 
             if (_targets.Count == 0)
@@ -666,7 +668,9 @@ namespace AIBridge.Editor
             _players.AddRange(AIBridgeRuntimeBridgeEditorUtility.ListPlayers());
             _discoveredTargets.Clear();
             _discoveredTargets.AddRange(AIBridgeRuntimeBridgeEditorUtility.ListDiscoveredTargets());
+            ClearExpiredLanScanStatus();
             RebuildRuntimeTargets();
+            BeginStaleDiscoveryHealthRefresh();
             _lastRefreshTime = EditorApplication.timeSinceStartup;
             _nextTargetCacheRefreshTime = _lastRefreshTime + TargetCacheRefreshIntervalSeconds;
             _nextUiRepaintTime = _lastRefreshTime + 1d;
@@ -940,6 +944,7 @@ namespace AIBridge.Editor
             var synchronizationContext = SynchronizationContext.Current;
             _lanScanRunning = true;
             _lanScanStatus = AIBridgeEditorText.Get(AIBridgeEditorTextKey.ScanningUdp, udpPort);
+            _lanScanStatusTime = EditorApplication.timeSinceStartup;
             Repaint();
 
             Task.Run(() =>
@@ -997,7 +1002,44 @@ namespace AIBridge.Editor
                 _lanScanStatus = AIBridgeEditorText.Get(AIBridgeEditorTextKey.FoundLanTargets, result.ReachableCount, result.Count);
             }
 
+            _lanScanStatusTime = EditorApplication.timeSinceStartup;
             LoadRuntimeTargetsFromCache();
+        }
+
+        private void ClearExpiredLanScanStatus()
+        {
+            if (_lanScanRunning || string.IsNullOrEmpty(_lanScanStatus))
+            {
+                return;
+            }
+
+            var age = EditorApplication.timeSinceStartup - _lanScanStatusTime;
+            if (age > AIBridgeRuntimeBridgeEditorUtility.DiscoveryCacheFreshSeconds)
+            {
+                _lanScanStatus = null;
+                return;
+            }
+
+            if (_discoveredTargets.Count > 0 && _discoveredTargets.All(target => target.Stale))
+            {
+                _lanScanStatus = null;
+            }
+        }
+
+        private string FormatLanScanStatus()
+        {
+            if (string.IsNullOrEmpty(_lanScanStatus))
+            {
+                return string.Empty;
+            }
+
+            if (_lanScanRunning)
+            {
+                return _lanScanStatus;
+            }
+
+            var age = Math.Max(0d, EditorApplication.timeSinceStartup - _lanScanStatusTime);
+            return _lanScanStatus + AIBridgeEditorText.T(" (" + FormatDuration(age) + " ago)", "（" + FormatDuration(age) + "前）");
         }
 
         private static void DrawSectionHeader(string label)
@@ -1019,6 +1061,63 @@ namespace AIBridge.Editor
                 || string.Equals(trimmed, "::1", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(trimmed, "[::1]", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(trimmed, "localhost", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void BeginStaleDiscoveryHealthRefresh()
+        {
+            if (_lanScanRunning || _discoveredTargets.Count == 0)
+            {
+                return;
+            }
+
+            var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
+            var authToken = settings.AuthToken;
+            for (var i = 0; i < _discoveredTargets.Count; i++)
+            {
+                var target = _discoveredTargets[i];
+                if (target == null || !target.Stale || string.IsNullOrWhiteSpace(GetDiscoveryUrl(target)))
+                {
+                    continue;
+                }
+
+                var url = GetDiscoveryUrl(target);
+                if (!_refreshingHealthUrls.Add(url))
+                {
+                    continue;
+                }
+
+                var synchronizationContext = SynchronizationContext.Current;
+                Task.Run(() =>
+                {
+                    string error;
+                    return AIBridgeRuntimeBridgeEditorUtility.TryRefreshDiscoveredTargetHealth(
+                        target,
+                        timeoutMs: 500,
+                        authToken: authToken,
+                        error: out error);
+                }).ContinueWith(task =>
+                {
+                    if (synchronizationContext != null)
+                    {
+                        synchronizationContext.Post(_ => CompleteStaleDiscoveryHealthRefresh(url, task.Status == TaskStatus.RanToCompletion && task.Result), null);
+                    }
+                    else
+                    {
+                        EditorApplication.delayCall += () => CompleteStaleDiscoveryHealthRefresh(url, task.Status == TaskStatus.RanToCompletion && task.Result);
+                    }
+                }, TaskScheduler.Default);
+            }
+        }
+
+        private void CompleteStaleDiscoveryHealthRefresh(string url, bool refreshed)
+        {
+            _refreshingHealthUrls.Remove(url);
+            if (this == null || !refreshed)
+            {
+                return;
+            }
+
+            LoadRuntimeTargetsFromCache();
         }
 
         private static void SaveRuntimeSettings()

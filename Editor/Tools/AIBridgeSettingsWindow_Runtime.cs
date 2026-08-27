@@ -357,7 +357,6 @@ namespace AIBridge.Editor
             GUILayout.FlexibleSpace();
             var statusText = GetTargetStatus(target);
             DrawStatusBadge(statusText, GetTargetStatusColor(target));
-            GUILayout.Label(FormatTargetAge(target), EditorStyles.miniLabel, GUILayout.Width(110));
             if (CanDeleteTargetCache(target)
                 && GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Delete), GUILayout.Width(52)))
             {
@@ -534,32 +533,6 @@ namespace AIBridge.Editor
             return target != null
                 && ((target.Player != null && target.Player.Stale)
                     || (target.Discovery != null && target.Discovery.Stale && !IsReachableDiscovery(target.Discovery)));
-        }
-
-        private string FormatTargetAge(RuntimeTargetView target)
-        {
-            double? ageSeconds = null;
-            if (target.Player != null && target.Player.AgeSeconds.HasValue)
-            {
-                ageSeconds = target.Player.AgeSeconds.Value;
-            }
-
-            if (target.Discovery != null && target.Discovery.AgeSeconds.HasValue
-                && (!ageSeconds.HasValue || target.Discovery.AgeSeconds.Value < ageSeconds.Value))
-            {
-                ageSeconds = target.Discovery.AgeSeconds.Value;
-            }
-
-            if (!ageSeconds.HasValue)
-            {
-                return "-";
-            }
-
-            var elapsed = Math.Max(0d, EditorApplication.timeSinceStartup - _lastRefreshTime);
-            var totalSeconds = ageSeconds.Value + elapsed;
-            return IsConnectedTarget(target)
-                ? AIBridgeEditorText.T("seen " + FormatDuration(totalSeconds), "心跳 " + FormatDuration(totalSeconds))
-                : AIBridgeEditorText.T("offline " + FormatDuration(totalSeconds), "离线 " + FormatDuration(totalSeconds));
         }
 
         private static string FormatDuration(double seconds)

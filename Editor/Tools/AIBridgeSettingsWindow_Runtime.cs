@@ -247,9 +247,22 @@ namespace AIBridge.Editor
                 return;
             }
 
-            for (var i = 0; i < _targets.Count; i++)
+            var onlineTargets = _targets.Where(IsConnectedTarget).ToList();
+            var offlineTargets = _targets.Where(target => !IsConnectedTarget(target)).ToList();
+            for (var i = 0; i < onlineTargets.Count; i++)
             {
-                DrawRuntimeTarget(_targets[i]);
+                DrawRuntimeTarget(onlineTargets[i]);
+                EditorGUILayout.Space(5);
+            }
+
+            if (offlineTargets.Count == 0)
+            {
+                return;
+            }
+
+            for (var i = 0; i < offlineTargets.Count; i++)
+            {
+                DrawRuntimeTarget(offlineTargets[i]);
                 EditorGUILayout.Space(5);
             }
         }
@@ -304,10 +317,14 @@ namespace AIBridge.Editor
             }
 
             GUILayout.FlexibleSpace();
+            var connectedCount = _targets.Count(IsConnectedTarget);
+            var cacheCount = _targets.Count - connectedCount;
             EditorGUILayout.LabelField(
-                AIBridgeEditorText.Get(AIBridgeEditorTextKey.TargetCount, _targets.Count),
+                AIBridgeEditorText.T(
+                    "Online: " + connectedCount + " / Offline: " + cacheCount,
+                    "在线：" + connectedCount + " / 离线：" + cacheCount),
                 EditorStyles.miniLabel,
-                GUILayout.Width(90));
+                GUILayout.Width(130));
             EditorGUILayout.LabelField(
                 AIBridgeEditorText.Get(AIBridgeEditorTextKey.RefreshedCount, FormatRefreshAge()),
                 EditorStyles.miniLabel,
@@ -337,11 +354,13 @@ namespace AIBridge.Editor
 
             GUILayout.FlexibleSpace();
             var statusText = GetTargetStatus(target);
-            var previousColor = GUI.color;
-            GUI.color = GetTargetStatusColor(target);
-            GUILayout.Label(statusText, EditorStyles.boldLabel, GUILayout.Width(76));
-            GUI.color = previousColor;
-            GUILayout.Label(FormatTargetAge(target), EditorStyles.miniLabel, GUILayout.Width(68));
+            DrawStatusBadge(statusText, GetTargetStatusColor(target));
+            GUILayout.Label(FormatTargetAge(target), EditorStyles.miniLabel, GUILayout.Width(110));
+            if (CanDeleteTargetCache(target)
+                && GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Delete), GUILayout.Width(52)))
+            {
+                DeleteTargetCache(target);
+            }
 
             var expanded = _expandedTargetIds.Contains(target.TargetId);
             if (GUILayout.Button(
@@ -390,6 +409,19 @@ namespace AIBridge.Editor
             var content = new GUIContent(text);
             var width = Mathf.Ceil(EditorStyles.miniButton.CalcSize(content).x) + 12f;
             GUILayout.Label(content, EditorStyles.miniButton, GUILayout.Width(Mathf.Max(48f, width)), GUILayout.Height(18));
+        }
+
+        private static void DrawStatusBadge(string text, Color backgroundColor)
+        {
+            var style = new GUIStyle(EditorStyles.miniBoldLabel)
+            {
+                alignment = TextAnchor.MiddleCenter
+            };
+            style.normal.textColor = Color.white;
+            var width = Mathf.Max(72f, Mathf.Ceil(style.CalcSize(new GUIContent(text)).x) + 18f);
+            var rect = GUILayoutUtility.GetRect(width, 18f, GUILayout.Width(width), GUILayout.Height(18f));
+            EditorGUI.DrawRect(rect, backgroundColor);
+            EditorGUI.LabelField(rect, text, style);
         }
 
         private void DrawRuntimeTargetDetails(RuntimeTargetView target)
@@ -472,33 +504,39 @@ namespace AIBridge.Editor
 
             if (target.Discovery != null && !target.Discovery.Stale && target.Discovery.Reachable)
             {
-                return AIBridgeEditorText.Get(AIBridgeEditorTextKey.Reachable);
+                return AIBridgeEditorText.Get(AIBridgeEditorTextKey.Online);
             }
 
-            if ((target.Player != null && target.Player.Stale)
-                || (target.Discovery != null && target.Discovery.Stale))
-            {
-                return AIBridgeEditorText.Get(AIBridgeEditorTextKey.Stale);
-            }
-
-            return AIBridgeEditorText.Get(AIBridgeEditorTextKey.Discovered);
+            return AIBridgeEditorText.T("OFFLINE", "离线");
         }
 
         private static Color GetTargetStatusColor(RuntimeTargetView target)
         {
-            if ((target.Player != null && !target.Player.Stale)
-                || (target.Discovery != null && !target.Discovery.Stale && target.Discovery.Reachable))
+            if (target.Player != null && !target.Player.Stale)
             {
-                return new Color(0.55f, 1f, 0.55f);
+                return new Color(0.16f, 0.56f, 0.28f);
             }
 
-            if ((target.Player != null && target.Player.Stale)
-                || (target.Discovery != null && target.Discovery.Stale))
+            if (target.Discovery != null && !target.Discovery.Stale && target.Discovery.Reachable)
             {
-                return new Color(1f, 0.72f, 0.25f);
+                return new Color(0.16f, 0.56f, 0.28f);
             }
 
-            return new Color(0.65f, 0.8f, 1f);
+            return new Color(0.43f, 0.43f, 0.43f);
+        }
+
+        private static bool IsConnectedTarget(RuntimeTargetView target)
+        {
+            return target != null
+                && ((target.Player != null && !target.Player.Stale)
+                    || (target.Discovery != null && !target.Discovery.Stale && target.Discovery.Reachable));
+        }
+
+        private static bool CanDeleteTargetCache(RuntimeTargetView target)
+        {
+            return target != null
+                && ((target.Player != null && target.Player.Stale)
+                    || (target.Discovery != null && target.Discovery.Stale));
         }
 
         private string FormatTargetAge(RuntimeTargetView target)
@@ -521,7 +559,31 @@ namespace AIBridge.Editor
             }
 
             var elapsed = Math.Max(0d, EditorApplication.timeSinceStartup - _lastRefreshTime);
-            return (ageSeconds.Value + elapsed).ToString("F0") + "s";
+            var totalSeconds = ageSeconds.Value + elapsed;
+            return IsConnectedTarget(target)
+                ? AIBridgeEditorText.T("seen " + FormatDuration(totalSeconds), "心跳 " + FormatDuration(totalSeconds))
+                : AIBridgeEditorText.T("offline " + FormatDuration(totalSeconds), "离线 " + FormatDuration(totalSeconds));
+        }
+
+        private static string FormatDuration(double seconds)
+        {
+            seconds = Math.Max(0d, seconds);
+            if (seconds < 60d)
+            {
+                return seconds.ToString("F0") + "s";
+            }
+
+            if (seconds < 3600d)
+            {
+                return Math.Floor(seconds / 60d).ToString("F0") + "m";
+            }
+
+            if (seconds < 86400d)
+            {
+                return Math.Floor(seconds / 3600d).ToString("F0") + "h";
+            }
+
+            return Math.Floor(seconds / 86400d).ToString("F0") + "d";
         }
 
         private static string BuildTargetSummary(RuntimeTargetView target)
@@ -1059,6 +1121,69 @@ namespace AIBridge.Editor
 
             CopyFileCommand("runtime " + action
                 + " --transport file --target " + QuoteTarget(target.TargetId));
+        }
+
+        private void DeleteTargetCache(RuntimeTargetView target)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            if (!EditorUtility.DisplayDialog(
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.DeleteRuntimeTargetCache),
+                AIBridgeEditorText.T(
+                    "Delete offline Runtime connection '" + target.TargetId + "'?",
+                    "删除离线 Runtime 连接 '" + target.TargetId + "'？"),
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.Delete),
+                AIBridgeEditorText.Get(AIBridgeEditorTextKey.Cancel)))
+            {
+                return;
+            }
+
+            var errors = new List<string>();
+            var deleted = false;
+            if (target.Player != null && target.Player.Stale)
+            {
+                if (AIBridgeRuntimeBridgeEditorUtility.TryDeletePlayerCache(target.Player, out var error))
+                {
+                    deleted = true;
+                }
+                else
+                {
+                    errors.Add(error);
+                }
+            }
+
+            if (target.Discovery != null && target.Discovery.Stale)
+            {
+                if (AIBridgeRuntimeBridgeEditorUtility.TryDeleteDiscoveredTargetCache(target.Discovery, out var error))
+                {
+                    deleted = true;
+                }
+                else
+                {
+                    errors.Add(error);
+                }
+            }
+
+            if (errors.Count > 0)
+            {
+                EditorUtility.DisplayDialog(
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.DeleteFailed),
+                    string.Join("\n", errors.ToArray()),
+                    AIBridgeEditorText.Get(AIBridgeEditorTextKey.Ok));
+            }
+
+            if (deleted)
+            {
+                Debug.Log(AIBridgeEditorText.T(
+                    "[AIBridge] Offline Runtime connection deleted: " + target.TargetId,
+                    "[AIBridge] 已删除离线 Runtime 连接：" + target.TargetId));
+            }
+
+            RefreshRuntimeTargets();
+            GUIUtility.ExitGUI();
         }
 
         private void DeletePlayerCache(AIBridgeRuntimePlayerInfo player)

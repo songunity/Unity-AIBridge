@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEditor;
@@ -34,6 +35,7 @@ namespace AIBridge.Editor
         private sealed class RuntimeTargetView
         {
             public string TargetId;
+            public string IdentityKey;
             public AIBridgeRuntimePlayerInfo Player;
             public AIBridgeRuntimeDiscoveredTargetInfo Discovery;
         }
@@ -385,7 +387,9 @@ namespace AIBridge.Editor
 
         private static void DrawTransportBadge(string text)
         {
-            GUILayout.Label(text, EditorStyles.miniButton, GUILayout.Width(42), GUILayout.Height(18));
+            var content = new GUIContent(text);
+            var width = Mathf.Ceil(EditorStyles.miniButton.CalcSize(content).x) + 12f;
+            GUILayout.Label(content, EditorStyles.miniButton, GUILayout.Width(Mathf.Max(48f, width)), GUILayout.Height(18));
         }
 
         private void DrawRuntimeTargetDetails(RuntimeTargetView target)
@@ -402,6 +406,7 @@ namespace AIBridge.Editor
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Scene), player.ActiveScene);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Runtime), player.RuntimeVersion);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Process), player.ProcessId > 0 ? player.ProcessId.ToString() : "-");
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Device), player.DeviceName);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Heartbeat), FormatHeartbeat(player));
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Path), player.TargetPath);
             }
@@ -613,13 +618,25 @@ namespace AIBridge.Editor
             {
                 var player = _players[i];
                 var targetId = string.IsNullOrWhiteSpace(player.TargetId) ? "file-" + i : player.TargetId;
-                if (!targetsById.TryGetValue(targetId, out var target))
+                var identityKey = BuildPlayerIdentityKey(player);
+                var viewKey = player.Stale ? identityKey : targetId;
+                if (string.IsNullOrWhiteSpace(viewKey))
                 {
-                    target = new RuntimeTargetView { TargetId = targetId };
-                    targetsById.Add(targetId, target);
+                    viewKey = targetId;
                 }
 
-                target.Player = player;
+                if (!targetsById.TryGetValue(viewKey, out var target))
+                {
+                    target = new RuntimeTargetView { TargetId = targetId, IdentityKey = identityKey };
+                    targetsById.Add(viewKey, target);
+                }
+
+                if (ShouldPreferPlayer(player, target.Player))
+                {
+                    target.TargetId = targetId;
+                    target.IdentityKey = identityKey;
+                    target.Player = player;
+                }
             }
 
             for (var i = 0; i < _discoveredTargets.Count; i++)
@@ -628,21 +645,175 @@ namespace AIBridge.Editor
                 var targetId = string.IsNullOrWhiteSpace(discovery.TargetId)
                     ? GetDiscoveryUrl(discovery) ?? "lan-" + i
                     : discovery.TargetId;
-                if (!targetsById.TryGetValue(targetId, out var target))
+                var identityKey = BuildDiscoveryIdentityKey(discovery);
+                var viewKey = discovery.Stale ? identityKey : targetId;
+                if (string.IsNullOrWhiteSpace(viewKey))
                 {
-                    target = new RuntimeTargetView { TargetId = targetId };
-                    targetsById.Add(targetId, target);
+                    viewKey = targetId;
+                }
+
+                if (!targetsById.TryGetValue(viewKey, out var target))
+                {
+                    target = new RuntimeTargetView { TargetId = targetId, IdentityKey = identityKey };
+                    targetsById.Add(viewKey, target);
                 }
 
                 if (ShouldPreferDiscovery(discovery, target.Discovery))
                 {
+                    if (string.IsNullOrWhiteSpace(target.TargetId) || target.Player == null)
+                    {
+                        target.TargetId = targetId;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(target.IdentityKey))
+                    {
+                        target.IdentityKey = identityKey;
+                    }
+
                     target.Discovery = discovery;
                 }
             }
 
             _targets.Clear();
-            _targets.AddRange(targetsById.Values);
+            var targets = targetsById.Values.ToList();
+            RemoveStaleTargetsShadowedByLiveTarget(targets);
+            _targets.AddRange(targets);
             _targets.Sort(CompareRuntimeTargets);
+        }
+
+        private static bool ShouldPreferPlayer(
+            AIBridgeRuntimePlayerInfo candidate,
+            AIBridgeRuntimePlayerInfo current)
+        {
+            if (current == null)
+            {
+                return true;
+            }
+
+            if (candidate.Stale != current.Stale)
+            {
+                return !candidate.Stale;
+            }
+
+            return candidate.AgeSeconds.HasValue
+                && (!current.AgeSeconds.HasValue || candidate.AgeSeconds.Value < current.AgeSeconds.Value);
+        }
+
+        private static void RemoveStaleTargetsShadowedByLiveTarget(List<RuntimeTargetView> targets)
+        {
+            var liveIdentities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < targets.Count; i++)
+            {
+                var target = targets[i];
+                if (!IsStaleTarget(target) && !string.IsNullOrWhiteSpace(target.IdentityKey))
+                {
+                    liveIdentities.Add(target.IdentityKey);
+                }
+            }
+
+            if (liveIdentities.Count == 0)
+            {
+                return;
+            }
+
+            for (var i = targets.Count - 1; i >= 0; i--)
+            {
+                var target = targets[i];
+                if (IsStaleTarget(target)
+                    && !string.IsNullOrWhiteSpace(target.IdentityKey)
+                    && liveIdentities.Contains(target.IdentityKey))
+                {
+                    targets.RemoveAt(i);
+                }
+            }
+        }
+
+        private static bool IsStaleTarget(RuntimeTargetView target)
+        {
+            if (target == null)
+            {
+                return true;
+            }
+
+            var hasPlayer = target.Player != null;
+            var hasDiscovery = target.Discovery != null;
+            return (!hasPlayer || target.Player.Stale)
+                && (!hasDiscovery || target.Discovery.Stale || !target.Discovery.Reachable);
+        }
+
+        private static string BuildPlayerIdentityKey(AIBridgeRuntimePlayerInfo player)
+        {
+            if (player == null)
+            {
+                return null;
+            }
+
+            return BuildRuntimeIdentityKey(
+                player.ProductName,
+                player.ApplicationVersion,
+                player.Platform,
+                player.DeviceName,
+                player.HttpUrl);
+        }
+
+        private static string BuildDiscoveryIdentityKey(AIBridgeRuntimeDiscoveredTargetInfo target)
+        {
+            if (target == null)
+            {
+                return null;
+            }
+
+            return BuildRuntimeIdentityKey(
+                target.ProjectName,
+                target.ApplicationVersion,
+                target.Platform,
+                target.DeviceName,
+                GetDiscoveryUrl(target));
+        }
+
+        private static string BuildRuntimeIdentityKey(
+            string projectName,
+            string applicationVersion,
+            string platform,
+            string deviceName,
+            string url)
+        {
+            var normalizedUrl = NormalizeIdentityUrl(url);
+            if (!string.IsNullOrWhiteSpace(normalizedUrl))
+            {
+                return "url:" + normalizedUrl;
+            }
+
+            var parts = new[]
+            {
+                NormalizeIdentityPart(projectName),
+                NormalizeIdentityPart(applicationVersion),
+                NormalizeIdentityPart(platform),
+                NormalizeIdentityPart(deviceName)
+            };
+            if (parts.All(string.IsNullOrEmpty))
+            {
+                return null;
+            }
+
+            return "meta:" + string.Join("|", parts);
+        }
+
+        private static string NormalizeIdentityUrl(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            return value.Trim().TrimEnd('/').ToLowerInvariant();
+        }
+
+        private static string NormalizeIdentityPart(string value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? string.Empty
+                : value.Trim().ToLowerInvariant();
         }
 
         private static bool ShouldPreferDiscovery(

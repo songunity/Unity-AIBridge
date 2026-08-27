@@ -73,6 +73,7 @@ namespace AIBridge.Editor
 
                 ReceiveLanDiscoveryResponses(sockets, targets, requestId, timeoutMs);
                 ApplyLanDiscoveryHealthChecks(targets, timeoutMs, authToken);
+                targets = CollapseLanDiscoveryTargets(targets);
                 targets.Sort(CompareLanDiscoveryTargets);
 
                 var reachableTargets = targets.Where(target => target.reachable).ToList();
@@ -374,6 +375,45 @@ namespace AIBridge.Editor
             }
         }
 
+        private static List<AIBridgeRuntimeLanDiscoveryTarget> CollapseLanDiscoveryTargets(
+            List<AIBridgeRuntimeLanDiscoveryTarget> targets)
+        {
+            var collapsed = new Dictionary<string, AIBridgeRuntimeLanDiscoveryTarget>(StringComparer.OrdinalIgnoreCase);
+            var unnamed = new List<AIBridgeRuntimeLanDiscoveryTarget>();
+            if (targets == null)
+            {
+                return unnamed;
+            }
+
+            for (var i = 0; i < targets.Count; i++)
+            {
+                var target = targets[i];
+                if (target == null)
+                {
+                    continue;
+                }
+
+                var key = string.IsNullOrWhiteSpace(target.targetId)
+                    ? NormalizeUrl(target.reachableUrl ?? target.url)
+                    : target.targetId;
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    unnamed.Add(target);
+                    continue;
+                }
+
+                AIBridgeRuntimeLanDiscoveryTarget existing;
+                if (!collapsed.TryGetValue(key, out existing) || CompareLanDiscoveryTargets(target, existing) < 0)
+                {
+                    collapsed[key] = target;
+                }
+            }
+
+            var result = collapsed.Values.ToList();
+            result.AddRange(unnamed);
+            return result;
+        }
+
         private static bool TryGetLanDiscoveryHealth(
             string baseUrl,
             int timeoutMs,
@@ -521,8 +561,11 @@ namespace AIBridge.Editor
                     continue;
                 }
 
-                if (string.Equals(itemTargetId, target.targetId, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(itemUrl, NormalizeUrl(target.reachableUrl ?? target.url), StringComparison.OrdinalIgnoreCase))
+                var targetUrl = NormalizeUrl(target.reachableUrl ?? target.url);
+                if ((!string.IsNullOrWhiteSpace(itemTargetId)
+                        && string.Equals(itemTargetId, target.targetId, StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrWhiteSpace(itemUrl)
+                        && string.Equals(itemUrl, targetUrl, StringComparison.OrdinalIgnoreCase)))
                 {
                     return true;
                 }

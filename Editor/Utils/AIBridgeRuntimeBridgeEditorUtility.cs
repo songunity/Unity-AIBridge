@@ -21,6 +21,7 @@ namespace AIBridge.Editor
         public string RuntimeVersion;
         public string Platform;
         public string ActiveScene;
+        public string DeviceName;
         public string TargetPath;
         public string CommandsPath;
         public string ResultsPath;
@@ -122,6 +123,7 @@ namespace AIBridge.Editor
                     RuntimeVersion = GetString(heartbeat, "runtimeVersion"),
                     Platform = GetString(heartbeat, "platform"),
                     ActiveScene = GetString(heartbeat, "activeScene"),
+                    DeviceName = GetString(heartbeat, "deviceName"),
                     TargetPath = targetPath,
                     CommandsPath = GetString(heartbeat, "commandsPath") ?? Path.Combine(targetPath, CommandsDirectoryName),
                     ResultsPath = GetString(heartbeat, "resultsPath") ?? Path.Combine(targetPath, ResultsDirectoryName),

@@ -499,12 +499,7 @@ namespace AIBridge.Editor
 
         private static string GetTargetStatus(RuntimeTargetView target)
         {
-            if (target.Player != null && !target.Player.Stale)
-            {
-                return AIBridgeEditorText.Get(AIBridgeEditorTextKey.Online);
-            }
-
-            if (target.Discovery != null && !target.Discovery.Stale && target.Discovery.Reachable)
+            if (IsConnectedTarget(target))
             {
                 return AIBridgeEditorText.Get(AIBridgeEditorTextKey.Online);
             }
@@ -514,12 +509,7 @@ namespace AIBridge.Editor
 
         private static Color GetTargetStatusColor(RuntimeTargetView target)
         {
-            if (target.Player != null && !target.Player.Stale)
-            {
-                return new Color(0.16f, 0.56f, 0.28f);
-            }
-
-            if (target.Discovery != null && !target.Discovery.Stale && target.Discovery.Reachable)
+            if (IsConnectedTarget(target))
             {
                 return new Color(0.16f, 0.56f, 0.28f);
             }
@@ -531,14 +521,19 @@ namespace AIBridge.Editor
         {
             return target != null
                 && ((target.Player != null && !target.Player.Stale)
-                    || (target.Discovery != null && !target.Discovery.Stale && target.Discovery.Reachable));
+                    || IsReachableDiscovery(target.Discovery));
+        }
+
+        private static bool IsReachableDiscovery(AIBridgeRuntimeDiscoveredTargetInfo target)
+        {
+            return target != null && target.Reachable;
         }
 
         private static bool CanDeleteTargetCache(RuntimeTargetView target)
         {
             return target != null
                 && ((target.Player != null && target.Player.Stale)
-                    || (target.Discovery != null && target.Discovery.Stale));
+                    || (target.Discovery != null && target.Discovery.Stale && !IsReachableDiscovery(target.Discovery)));
         }
 
         private string FormatTargetAge(RuntimeTargetView target)
@@ -804,7 +799,7 @@ namespace AIBridge.Editor
             var hasPlayer = target.Player != null;
             var hasDiscovery = target.Discovery != null;
             return (!hasPlayer || target.Player.Stale)
-                && (!hasDiscovery || target.Discovery.Stale || !target.Discovery.Reachable);
+                && (!hasDiscovery || !IsReachableDiscovery(target.Discovery));
         }
 
         private static string BuildPlayerIdentityKey(AIBridgeRuntimePlayerInfo player)
@@ -915,14 +910,12 @@ namespace AIBridge.Editor
 
         private static int GetTargetSortOrder(RuntimeTargetView target)
         {
-            if ((target.Player != null && !target.Player.Stale)
-                || (target.Discovery != null && !target.Discovery.Stale && target.Discovery.Reachable))
+            if (IsConnectedTarget(target))
             {
                 return 0;
             }
 
-            if ((target.Player != null && target.Player.Stale)
-                || (target.Discovery != null && target.Discovery.Stale))
+            if (CanDeleteTargetCache(target))
             {
                 return 2;
             }

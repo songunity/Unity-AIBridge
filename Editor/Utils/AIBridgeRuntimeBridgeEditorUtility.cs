@@ -67,8 +67,10 @@ namespace AIBridge.Editor
         public const string RuntimeConfigFileName = "runtime-config.json";
         public const string DiscoveryCacheFileName = "discovery-cache.json";
         public const int DiscoveryCacheFreshSeconds = 30;
+        public const int DiscoveryOfflineGraceSeconds = 120;
         private static readonly TimeSpan StaleHeartbeatTimeout = TimeSpan.FromSeconds(15);
         private static readonly TimeSpan DiscoveryCacheStaleTimeout = TimeSpan.FromSeconds(DiscoveryCacheFreshSeconds);
+        private static readonly TimeSpan DiscoveryOfflineGraceTimeout = TimeSpan.FromSeconds(DiscoveryOfflineGraceSeconds);
 
         public static string GetDefaultRuntimeDirectory()
         {

@@ -391,14 +391,21 @@ namespace AIBridge.Editor
 
             Dictionary<string, object> health;
             var now = DateTime.UtcNow.ToString("o");
+            var previousReachable = target.Reachable;
             var ok = TryGetLanDiscoveryHealth(url, timeoutMs, authToken, out health, out error);
-            UpdateDiscoveredTargetCacheHealth(target, health, ok, now);
+            var lastSeen = ParseHeartbeatTime(target.LastSeenUtc);
+            var keepReachable = !ok
+                && previousReachable
+                && lastSeen.HasValue
+                && DateTime.UtcNow - lastSeen.Value <= DiscoveryOfflineGraceTimeout;
+            var reachable = ok || keepReachable;
+            UpdateDiscoveredTargetCacheHealth(target, health, reachable, ok, now);
 
             target.LastHealthCheckUtc = now;
-            target.Reachable = ok;
+            target.Reachable = reachable;
             if (!ok)
             {
-                return false;
+                return previousReachable != reachable;
             }
 
             target.LastSeenUtc = now;
@@ -419,6 +426,7 @@ namespace AIBridge.Editor
             AIBridgeRuntimeDiscoveredTargetInfo target,
             Dictionary<string, object> health,
             bool reachable,
+            bool updateLastSeen,
             string now)
         {
             try
@@ -442,7 +450,7 @@ namespace AIBridge.Editor
 
                     item["reachable"] = reachable;
                     item["lastHealthCheckUtc"] = now;
-                    if (reachable)
+                    if (updateLastSeen)
                     {
                         item["lastSeenUtc"] = now;
                         item["targetId"] = GetString(health, "targetId") ?? GetString(item, "targetId");

@@ -16,7 +16,7 @@ namespace AIBridge.Editor
         private static readonly string[] SkillNames = { "aibridge", "aibridge-runtime" };
         private static readonly string[] SkillRelativeFiles = { SkillFileName, "agents/openai.yaml" };
         private static readonly string[] AIDirectories = { ".agents", ".claude", ".cursor", ".factory", ".codex", ".kiro" };
-        private static readonly string[] DefaultCreateDirs = { ".agents", ".claude" };
+        private static readonly string[] DefaultCreateDirs = { ".agents" };
         private static string SkillSourceDir(string skillName) => Path.Combine(AIBridge.PackageRoot, "Skill~", skillName);
         private static string SkillSourceFile(string skillName) => Path.Combine(SkillSourceDir(skillName), SkillFileName);
         private static string AgentSkillDir(string root, string agentName, string skillName) => Path.Combine(root, agentName, "skills", skillName);

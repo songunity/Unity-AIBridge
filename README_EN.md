@@ -233,12 +233,12 @@ The `aibridge` skill command list is generated automatically. You can edit other
 **Copy Logic:**
 - The system will first scan for existing AI editor directories in the project root (`.agents`, `.cursor`, `.factory`, `.claude`, `.codex`, etc.)
 - If any existing directories are found, both skills are copied to `skills/aibridge/` and `skills/aibridge-runtime/`
-- If no AI editor directories are found, `.agents` and `.claude` are created and both skills are copied
+- If no AI editor directories are found, `.agents` is created and both skills are copied
 
 **Examples:**
 - If the project already has a `.factory` directory, both skills are copied to `.factory/skills/aibridge/` and `.factory/skills/aibridge-runtime/`
 - If the project has both `.factory` and `.cursor` directories, both will be updated
-- If the project has no AI editor directories, both skills are created under `.agents/skills/` and `.claude/skills/`
+- If the project has no AI editor directories, both skills are created under `.agents/skills/`
 
 ### Update Skill Documentation
 

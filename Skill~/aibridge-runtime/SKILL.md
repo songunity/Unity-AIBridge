@@ -9,7 +9,8 @@ description: 通过 AI Bridge CLI 直接连接正在运行的 Unity Player（无
 
 - 直接使用 `AIBridgeCLI runtime <subcommand>` 连接 Runtime Bridge，不经过 Unity Editor 命令队列。
 - 先证明 target 在线，再执行操作；命令存在不代表 Player 正在运行。
-- `runtime exec` 只发送已编译 DLL，不编译 C# 源码。不要把 `RuntimeExecuteCommand_Execute` 当作独立 Runtime 路径。
+- `runtime exec` 只发送已编译 DLL，不编译 C# 源码。
+- 不要把 `RuntimeExecuteCommand_Execute`、`RuntimeCommand_ExecDll` 当作独立 Player Runtime 路径；它们可能仍依赖 Unity Editor 元数据。
 - 需要操作 Unity Editor、资源、场景或普通 Editor Play Mode 命令面时改用 `$aibridge`；验证 Play Mode 中的 Runtime Bridge 链路仍使用本 Skill。
 
 ## 前置条件
@@ -98,12 +99,58 @@ AIBridgeCLI runtime exec --dll probe.dll --transport http --url <url> --riskAcce
 
 需要时添加 `--entryType Namespace.Type --methodName Method`。`runtime exec --code` 不受支持；不要为了绕过限制自动启动 Unity Editor。
 
+### 准备 Runtime Exec DLL
+
+优先复用已存在的 `.aibridge/code/*.dll` 或项目内 probe/debug DLL；没有可用 DLL 时才临时编译。重复或高频 Runtime 操作应沉淀为固定 DLL，只变更入口参数或固定入口逻辑，避免每次重新查引用。
+
+编译器选择：
+
+1. Unity 自带 Roslyn：`<UnityEditor>\Editor\Data\DotNetSdkRoslyn\csc.dll`
+2. 本机 .NET SDK Roslyn：`C:\Program Files\dotnet\sdk\<version>\Roslyn\bincore\csc.dll`
+
+引用优先级：
+
+1. 当前目标构建产物：`Library\Bee\artifacts\<Target>\ManagedStripped\*.dll`
+2. Editor 编译产物：`Library\ScriptAssemblies\*.dll`
+
+不要默认只引用 `Assembly-CSharp.dll`。先看项目实际程序集拆分；例如 FPS 示例常见类型分别在 `fps.Game.dll`、`fps.Gameplay.dll`、`fps.AI.dll`。
+
+PowerShell 编译模板：
+
+```powershell
+$unityEditor = "C:\Program Files\Unity\Hub\Editor\<version>\Editor"
+$unityCsc = Join-Path $unityEditor "Data\DotNetSdkRoslyn\csc.dll"
+$sdkVersion = (& dotnet --list-sdks | Select-Object -Last 1).Split()[0]
+$dotnetCsc = Join-Path $env:ProgramFiles "dotnet\sdk\$sdkVersion\Roslyn\bincore\csc.dll"
+$csc = if (Test-Path -LiteralPath $unityCsc) { $unityCsc } else { $dotnetCsc }
+
+$m = "Library\Bee\artifacts\Android\ManagedStripped"
+$refs = @(
+  "mscorlib.dll",
+  "System.dll",
+  "System.Core.dll",
+  "UnityEngine.dll",
+  "UnityEngine.CoreModule.dll",
+  "UnityEngine.AIModule.dll",
+  "UnityEngine.PhysicsModule.dll",
+  "fps.Game.dll",
+  "fps.Gameplay.dll",
+  "fps.AI.dll"
+) | ForEach-Object { "-r:" + (Join-Path $m $_) }
+
+& dotnet $csc -nologo -target:library -nostdlib -out:".aibridge\code\Probe.dll" $refs ".aibridge\code\Probe.cs"
+```
+
+执行后用返回值、`runtime logs --logType Error`、必要时 `runtime status`/`runtime screenshot` 验证。只清理本次临时生成的 `.cs`/`.dll`；不要删除已存在或准备复用的 `.aibridge/code` 资产。
+
 ## 故障判断
 
 - `connection refused`：先判定 Player 或 HTTP endpoint 未运行，不要判定 CLI 功能损坏。
 - `target_not_found`：检查 `--runtime-dir`、target 是否过期以及 Player 是否仍在运行。
 - `401` 或鉴权失败：确认 `--token`，不要移除 Runtime 端鉴权。
 - UI 找不到或无法点击：检查当前场景、Canvas、EventSystem、遮挡层和 raycast 结果。
+- 编译失败：优先判定为本地 DLL 准备问题，检查编译器、目标平台引用、项目程序集拆分；不要直接归因 Runtime Bridge。
 - DLL 执行失败：分别确认代码执行开关、`riskAccepted`、HybridCLR/运行环境兼容性、入口类型和方法。
+- `RuntimeExecuteCommand_Execute` 超时或报 `metadata file not found`：不要据此判定 Player Runtime 不可用；改用 `AIBridgeCLI runtime status` 和 `runtime exec --dll` 验证直接链路。
 
 使用 `AIBridgeCLI runtime --help` 查询当前 CLI 支持的子命令；以实际 CLI 输出为准。

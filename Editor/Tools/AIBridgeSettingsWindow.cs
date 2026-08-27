@@ -38,7 +38,7 @@ namespace AIBridge.Editor
         private void OnEnable()
         {
             _agentCodex = EditorPrefs.GetBool(PrefKeyAgentCodex, true);
-            _agentClaude = EditorPrefs.GetBool(PrefKeyAgentClaude, true);
+            _agentClaude = EditorPrefs.GetBool(PrefKeyAgentClaude, false);
             _agentKiro = EditorPrefs.GetBool(PrefKeyAgentKiro, false);
             UpdateTitle();
         }

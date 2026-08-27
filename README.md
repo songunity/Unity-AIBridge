@@ -277,12 +277,12 @@ AIBridgeCLI.exe runtime exec --dll probe.dll --transport http --url http://127.0
 **复制逻辑：**
 - 系统会先扫描项目根目录中已存在的 AI 编辑器目录（`.agents`、`.cursor`、`.factory`、`.claude`、`.codex` 等）
 - 如果找到任何已存在的目录，会分别复制到 `skills/aibridge/` 和 `skills/aibridge-runtime/`
-- 如果没有找到任何 AI 编辑器目录，会自动创建 `.agents` 和 `.claude` 目录并复制两个 Skill
+- 如果没有找到任何 AI 编辑器目录，会自动创建 `.agents` 目录并复制两个 Skill
 
 **示例：**
 - 如果项目中已有 `.factory` 目录，两个 Skill 会被复制到 `.factory/skills/aibridge/` 和 `.factory/skills/aibridge-runtime/`
 - 如果项目中同时有 `.factory` 和 `.cursor` 目录，两个目录都会被更新
-- 如果项目中没有任何 AI 编辑器目录，会创建 `.agents/skills/` 和 `.claude/skills/` 下的两个 Skill
+- 如果项目中没有任何 AI 编辑器目录，会创建 `.agents/skills/` 下的两个 Skill
 
 ### 更新 Skill 文档
 

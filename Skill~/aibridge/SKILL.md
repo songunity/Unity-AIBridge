@@ -71,6 +71,17 @@ CLI 可执行文件位于 Unity 项目根目录下的 `.aibridge/cli/` 中。定
 
 这些命令仍由 Unity Editor 接收，只是要求 Editor 处于 Play Mode。不要将其与独立 Player 的 `AIBridgeCLI runtime ...` 命令混用。
 
+### Play Mode UI 调整与 Prefab 同步
+
+用户要求在 Play Mode 中反复调整 UI 布局时：
+
+1. 先用 `EditorCommand_GetState` 记录初始 Play Mode 状态。
+2. 用户要求“先改运行中的”时，只修改当前运行实例并截图预览，不要立即重启 Play Mode。
+3. 用户要求“同步实例和 Prefab”或确认预览后，使用同一组参数更新当前运行实例和 Prefab；只有用户已授权资源修改时才能写入 Prefab。
+4. 明确区分“运行实例预览”“Prefab 已保存”“Prefab 重新加载验证”。直接修改运行实例后的截图不能证明 Prefab 能正确重新加载。
+5. UI 迭代期间可以延后重启；最终确认后应重新进入 Play Mode、重新打开目标界面并再次截图。若用户要求暂不重启，必须明确说明尚未完成 Prefab 重新加载验证。
+6. 结束时恢复第 1 步记录的 Play Mode 状态，并确认没有遗留 AIBridge CLI 进程或会话。
+
 ### 工作流 2：调试场景对象
 
 1. 获取场景层级：`SceneCommand_GetHierarchy`

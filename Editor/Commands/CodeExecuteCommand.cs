@@ -8,6 +8,29 @@ using UnityEngine;
 
 public static class CodeExecuteCommand
 {
+    private static CSharpCodeRunner runner;
+
+    static CodeExecuteCommand()
+    {
+        UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += () => runner = null;
+    }
+
+    /// <summary>
+    /// 查询当前域内的编译缓存统计，不触发探针编译或执行。
+    /// </summary>
+    [AIBridge("查询 Editor C# 编译缓存统计")]
+    public static IEnumerator CacheStatus()
+    {
+        yield return CommandResult.Success(new
+        {
+            capacity = CSharpCodeRunner.CacheCapacity,
+            entries = runner?.CachedEntryCount ?? 0,
+            hits = runner?.CacheHits ?? 0,
+            compilations = runner?.CompilationCount ?? 0,
+            referenceBuilds = runner?.ReferenceBuildCount ?? 0
+        });
+    }
+
     [AIBridge("在 Unity Editor（包括 Play Mode）执行 C# 代码片段或脚本文件。如果脚本内容过多更建议写入文件来运行，脚本文件放到.aibridge/code中",
         example:@"
 Windows CMD 必须使用单引号包裹代码：
@@ -31,7 +54,6 @@ public static class CodeExecutor
 ")]
     public static IEnumerator Execute([Description("要执行的代码")]string code = null, [Description("要执行的文件，需要完整路径")]string file = null)
     {
-        CSharpCodeRunner codeRunner = new CSharpCodeRunner();
         if (!string.IsNullOrEmpty(file))
         {
             if (File.Exists(file))
@@ -40,16 +62,19 @@ public static class CodeExecutor
                 if (string.IsNullOrWhiteSpace(code))
                 {
                     yield return CommandResult.Failure("File is empty.");
+                    yield break;
                 }
             }
             else
             {
                 yield return CommandResult.Failure("File is not exist.");
+                yield break;
             }
         }
         if (string.IsNullOrWhiteSpace(code))
         {
             yield return CommandResult.Failure("Code is null or empty.");
+            yield break;
         }
 
         // Capture logs during execution
@@ -67,21 +92,25 @@ public static class CodeExecutor
 
         Application.logMessageReceived += logHandler;
 
-        var result = codeRunner.CompileAndExecute(code);
-        var elapsed = 0f;
+        EvaluationResult result;
         const float maxExecutionTime = 120f;
         try
         {
+            // 编译和引用构建也放在 finally 的保护范围内，异常时必须解除日志监听。
+            var codeRunner = runner ??= new CSharpCodeRunner();
+            result = codeRunner.CompileAndExecute(code);
+            // 编辑模式的帧间隔不代表协程实际等待时长，使用真实经过时间。
+            var waitTimer = System.Diagnostics.Stopwatch.StartNew();
             while (result != null && result.IsPending)
             {
-                elapsed += UnityEngine.Time.unscaledDeltaTime;
-                if (elapsed > maxExecutionTime)
+                if (waitTimer.Elapsed.TotalSeconds > maxExecutionTime)
                 {
                     result = null;
                     break;
                 }
                 result = codeRunner.ContinuePendingTask(result);
-                yield return null;
+                if (result.IsPending)
+                    yield return null;
             }
         }
         finally

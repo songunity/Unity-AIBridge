@@ -4,17 +4,28 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 /// <summary>
 /// Provides functionality to execute C# code at runtime within Unity.
 /// </summary>
 public sealed class CSharpCodeRunner
 {
-    private readonly List<MetadataReference> references;
+    private readonly List<MetadataReference> references = new List<MetadataReference>();
+    public const int CacheCapacity = 64;
+    private readonly Dictionary<string, MethodInfo> compiledMethods = new Dictionary<string, MethodInfo>();
+    private readonly Queue<string> cacheOrder = new Queue<string>();
+    private string referenceFingerprint;
+    private static readonly CSharpCompilationOptions EditorCompileOptions = new CSharpCompilationOptions(
+        OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Debug, allowUnsafe: true);
+
+    public int CachedEntryCount => compiledMethods.Count;
+    public int CacheHits { get; private set; }
+    public int CompilationCount { get; private set; }
+    public int ReferenceBuildCount { get; private set; }
     private const string AsyncMethodName = "ExecuteAsync";
 
     /// <summary>
@@ -22,10 +33,18 @@ public sealed class CSharpCodeRunner
     /// </summary>
     public CSharpCodeRunner()
     {
-        this.references = new List<MetadataReference>();
+        RefreshReferences();
+    }
 
+    /// <summary>
+    /// 按程序集身份、路径、MVID 和文件版本刷新引用；只在引用变化时重建元数据并清空编译缓存。
+    /// 在 Editor 主线程调用，动态探针不参与引用集合，避免每次执行都使缓存失效。
+    /// </summary>
+    private void RefreshReferences()
+    {
         var allAssemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(x => !x.IsDynamic && !string.IsNullOrEmpty(x.Location))
+            .Where(x => !x.IsDynamic && !string.IsNullOrEmpty(x.Location)
+                && !x.GetName().Name.StartsWith("DynamicAssembly_", StringComparison.Ordinal))
             .ToList();
 
         var assemblyNames = new HashSet<string>(allAssemblies.Select(a => a.GetName().Name));
@@ -39,8 +58,26 @@ public sealed class CSharpCodeRunner
                 return !assemblyNames.Contains(baseName);
             }
             return true;
-        });
+        }).OrderBy(x => x.FullName, StringComparer.Ordinal)
+            .ThenBy(x => x.Location, StringComparer.Ordinal).ToArray();
 
+        var identity = new StringBuilder();
+        foreach (var assembly in filtered)
+        {
+            var file = new FileInfo(assembly.Location);
+            identity.Append(assembly.FullName).Append('\0').Append(assembly.Location).Append('\0')
+                .Append(assembly.ManifestModule.ModuleVersionId).Append('\0')
+                .Append(file.Exists ? file.Length : -1).Append('\0')
+                .Append(file.Exists ? file.LastWriteTimeUtc.Ticks : 0).Append('\n');
+        }
+        var fingerprint = identity.ToString();
+        if (referenceFingerprint == fingerprint)
+            return;
+
+        references.Clear();
+        compiledMethods.Clear();
+        cacheOrder.Clear();
+        ReferenceBuildCount++;
         foreach (var assembly in filtered)
         {
             try
@@ -51,6 +88,7 @@ public sealed class CSharpCodeRunner
             {
             }
         }
+        referenceFingerprint = fingerprint;
     }
 
     /// <summary>
@@ -60,35 +98,37 @@ public sealed class CSharpCodeRunner
     /// <returns>The wrapped code.</returns>
     private string WrapCodeInClass(string code)
     {
-        var matches = Regex.Matches(code, $"(using.*?;)");
-        StringBuilder sb = new StringBuilder();
-        foreach (Match match in matches)
+        var root = CSharpSyntaxTree.ParseText(code).GetCompilationUnitRoot();
+        var usings = new StringBuilder();
+        foreach (var directive in root.Usings)
+            usings.AppendLine(directive.ToString());
+
+        // 只移除语法树中的 using 指令；保留 using 声明、字符串、注释及原有换行。
+        var body = new StringBuilder(code);
+        foreach (var directive in root.Usings.Reverse())
         {
-            if (match.Success)
-            {
-                sb.AppendLine(match.Groups[1].Value);
-            }
+            for (var i = directive.Span.Start; i < directive.Span.End; i++)
+                if (body[i] != '\r' && body[i] != '\n') body[i] = ' ';
         }
 
-        code = Regex.Replace(code, "using.*?;", "");
-        var methodName = code.Contains("await ") ? AsyncMethodName : "Execute";
-        var returnType = methodName == AsyncMethodName ? "async Task<object>" : "object";
+        // 在异步方法上下文解析，支持 await 换行、await using 和 await foreach。
+        // 嵌套函数中的 await 不要求外层入口也为 async。
+        var method = (MethodDeclarationSyntax)SyntaxFactory.ParseMemberDeclaration(
+            "public async Task<object> ExecuteAsync() {\n" + body + "\n}");
+        var hasAwait = method.Body.DescendantTokens(node =>
+                !(node is AnonymousFunctionExpressionSyntax) && !(node is LocalFunctionStatementSyntax))
+            .Any(token => token.IsKind(SyntaxKind.AwaitKeyword));
+        var methodName = hasAwait ? AsyncMethodName : "Execute";
+        var returnType = hasAwait ? "async Task<object>" : "object";
         return $@"
-{sb}
+{usings}
 using System;
 using System.Threading.Tasks;
 public static class CodeExecutor
 {{
     public static {returnType} {methodName}()
     {{
-        try{{
-        {code}
-        }}
-        catch (Exception e)
-        {{
-            UnityEngine.Debug.LogError(e.ToString());
-            return e.ToString();
-        }}
+        {body}
         return null;
     }}
 }}
@@ -170,63 +210,48 @@ public static class CodeExecutor
             };
         }
 
-        // Wrap the code in a class with a static method that returns the result
+        RefreshReferences();
         var wrappedCode = this.WrapCodeInClass(code);
+        // 引用变化时整体失效，编译选项固定，包装后的代码即可作为缓存键。
+        var key = wrappedCode;
 
-        // Compile the code
-        var result = this.CompileCode(wrappedCode);
+        if (!compiledMethods.TryGetValue(key, out var method))
+        {
+            CompilationCount++;
+            var result = this.CompileCode(wrappedCode);
+            if (!result.Success)
+                return result;
 
-        if (!result.Success)
-        {
-            return result;
-        }
-
-        // Execute the compiled code
-        try
-        {
-            return ExecuteCompiledAssembly(result.CompiledAssembly);
-        }
-        catch (Exception ex)
-        {
-            return new EvaluationResult
+            var type = result.CompiledAssembly.GetType("CodeExecutor");
+            method = type?.GetMethod("Execute") ?? type?.GetMethod(AsyncMethodName);
+            if (method == null)
             {
-                Success = false,
-                ErrorMessage = $"Runtime error: {ex.Message}"
-            };
+                return new EvaluationResult
+                {
+                    Success = false,
+                    ErrorMessage = "Failed to find the Execute method"
+                };
+            }
+            // 只限制缓存持有量；Mono 中已经加载的程序集不能通过清空字典卸载。
+            if (compiledMethods.Count >= CacheCapacity)
+                compiledMethods.Remove(cacheOrder.Dequeue());
+            compiledMethods.Add(key, method);
+            cacheOrder.Enqueue(key);
         }
+        else
+        {
+            CacheHits++;
+        }
+
+        // 每次重新执行入口并生成结果和 Task，不复用上一次读取到的状态。
+        return ExecuteCompiledMethod(method);
     }
 
-    private EvaluationResult ExecuteCompiledAssembly(Assembly assembly)
+    /// <summary>
+    /// 执行已编译入口；异步任务及返回值仅属于当前请求。
+    /// </summary>
+    private EvaluationResult ExecuteCompiledMethod(MethodInfo method)
     {
-        if (assembly == null)
-        {
-            return new EvaluationResult
-            {
-                Success = false,
-                ErrorMessage = "Failed to compile the code"
-            };
-        }
-
-        var type = assembly.GetType("CodeExecutor");
-        if (type == null)
-        {
-            return new EvaluationResult
-            {
-                Success = false,
-                ErrorMessage = "Failed to find the CodeExecutor type"
-            };
-        }
-
-        var method = type.GetMethod("Execute") ?? type.GetMethod(AsyncMethodName);
-        if (method == null)
-        {
-            return new EvaluationResult
-            {
-                Success = false,
-                ErrorMessage = "Failed to find the Execute method"
-            };
-        }
-
         try
         {
             var returnValue = method.Invoke(null, null);
@@ -259,6 +284,14 @@ public static class CodeExecutor
                 ErrorMessage = $"Runtime error: {ex.InnerException?.Message ?? ex.Message}"
             };
         }
+        catch (Exception ex)
+        {
+            return new EvaluationResult
+            {
+                Success = false,
+                ErrorMessage = $"Runtime error: {ex.Message}"
+            };
+        }
     }
 
     public EvaluationResult ContinuePendingTask(EvaluationResult pendingResult)
@@ -274,12 +307,7 @@ public static class CodeExecutor
 
         if (!pendingResult.PendingTask.IsCompleted)
         {
-            return new EvaluationResult
-            {
-                Success = false,
-                IsPending = true,
-                PendingTask = pendingResult.PendingTask
-            };
+            return pendingResult;
         }
 
         try
@@ -318,17 +346,12 @@ public static class CodeExecutor
     /// <returns>The result of the compilation.</returns>
     private EvaluationResult CompileCode(string code)
     {
-        var options = new CSharpCompilationOptions(
-            OutputKind.DynamicallyLinkedLibrary,
-            optimizationLevel: OptimizationLevel.Debug,
-            allowUnsafe: true);
-
         var syntaxTree = CSharpSyntaxTree.ParseText(code);
         var compilation = CSharpCompilation.Create(
             "DynamicAssembly_" + Guid.NewGuid().ToString("N"),
             new[] { syntaxTree },
             this.references,
-            options);
+            EditorCompileOptions);
 
         using (var ms = new MemoryStream())
         {

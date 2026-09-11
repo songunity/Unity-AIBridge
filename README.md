@@ -305,3 +305,13 @@ MIT License
 ## 贡献
 
 欢迎贡献！请随时提交 Pull Request。
+
+### Editor C# 编译缓存
+
+`CodeExecuteCommand_Execute` 在当前程序集域内复用相同代码的编译入口，每次仍重新执行代码，返回值和异步任务不复用；日志按请求执行期间收集，并发请求的日志来源尚未隔离。缓存以包装后的代码为键，使用固定编译选项；引用程序集身份、路径、MVID 或文件版本变化时，以及程序集重载后失效。
+
+缓存最多保留 64 个入口。达到上限后，按 FIFO 淘汰最早加入的入口并缓存新代码；清空字典不会卸载 Mono 已加载的动态程序集。此缓存不作用于远程 Player 的 `CompileToBytes` 路径。
+
+通过 `AIBridgeCLI CodeExecuteCommand_CacheStatus --raw` 查询当前缓存条目、命中次数、编译次数与引用重建次数，不影响原有 `ReturnValue / Output` 格式。
+
+异步等待使用真实经过时间计时，保留 120 秒上限；超时表示停止等待，不代表用户任务已被取消。

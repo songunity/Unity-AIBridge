@@ -327,50 +327,24 @@ namespace AIBridge.Editor
             var sourceRt = GetGameViewRenderTexture();
             if (sourceRt == null) return null;
 
-            int width = sourceRt.width;
-            int height = sourceRt.height;
+            scale = Mathf.Clamp(scale, 0.25f, 1f);
+            int width = Mathf.Max(1, (int)(sourceRt.width * scale));
+            int height = Mathf.Max(1, (int)(sourceRt.height * scale));
 
-            // Apply flip
-            if (_cachedRenderTexture == null || _cachedRenderTexture.width != width || _cachedRenderTexture.height != height)
+            if (_cachedRenderTexture == null || _cachedRenderTexture.width != width
+                || _cachedRenderTexture.height != height || _cachedRenderTexture.graphicsFormat != sourceRt.graphicsFormat)
             {
                 if (_cachedRenderTexture != null)
                     RenderTexture.ReleaseTemporary(_cachedRenderTexture);
-                _cachedRenderTexture = null;
+                _cachedRenderTexture = RenderTexture.GetTemporary(width, height, 0, sourceRt.graphicsFormat);
             }
 
-            RenderTexture flipped;
+            // 一次 GPU 拷贝同时完成缩放和翻转，目标纹理跨帧复用。
             if (SystemInfo.graphicsUVStartsAtTop)
-            {
-                flipped = RenderTexture.GetTemporary(width, height, 0, sourceRt.graphicsFormat);
-                Graphics.Blit(sourceRt, flipped, new Vector2(1, -1), new Vector2(0, 1));
-            }
+                Graphics.Blit(sourceRt, _cachedRenderTexture, new Vector2(1, -1), new Vector2(0, 1));
             else
-            {
-                flipped = RenderTexture.GetTemporary(width, height, 0, sourceRt.graphicsFormat);
-                Graphics.Blit(sourceRt, flipped);
-            }
-
-            if (scale >= 1f)
-            {
-                // Return flipped directly (caller uses it for async readback, released next frame)
-                if (_cachedRenderTexture != null && _cachedRenderTexture != flipped)
-                    RenderTexture.ReleaseTemporary(_cachedRenderTexture);
-                _cachedRenderTexture = flipped;
-                return flipped;
-            }
-
-            scale = Mathf.Clamp(scale, 0.25f, 1f);
-            int scaledWidth = Mathf.Max(1, (int)(width * scale));
-            int scaledHeight = Mathf.Max(1, (int)(height * scale));
-
-            var scaledRt = RenderTexture.GetTemporary(scaledWidth, scaledHeight);
-            Graphics.Blit(flipped, scaledRt);
-            RenderTexture.ReleaseTemporary(flipped);
-
-            if (_cachedRenderTexture != null && _cachedRenderTexture != scaledRt)
-                RenderTexture.ReleaseTemporary(_cachedRenderTexture);
-            _cachedRenderTexture = scaledRt;
-            return scaledRt;
+                Graphics.Blit(sourceRt, _cachedRenderTexture);
+            return _cachedRenderTexture;
         }
 
         /// <summary>

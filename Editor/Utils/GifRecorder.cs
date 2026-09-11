@@ -27,8 +27,12 @@ namespace AIBridge.Editor
         private static double _lastCaptureTime;
         private static double _frameInterval;
         private static int _capturedFrames;
+        private static long _durationCentiseconds;
         private static bool _stopRequested;
         private static bool _captureStarted;
+        private static bool _finishing;
+        private static string _finishError;
+        private const int MaxQueuedFrames = 4;
         private static double _captureStartTime;
 
         private static FileStream _outputStream;
@@ -87,8 +91,11 @@ namespace AIBridge.Editor
             _frameInterval = 1.0 / _fps;
             _lastCaptureTime = 0;
             _capturedFrames = 0;
+            _durationCentiseconds = 0;
             _stopRequested = false;
             _captureStarted = false;
+            _finishing = false;
+            _finishError = null;
             _waitingForReadback = false;
             _captureStartTime = EditorApplication.timeSinceStartup + _startDelay;
             _recordingStartTime = DateTime.Now;
@@ -118,6 +125,14 @@ namespace AIBridge.Editor
         {
             if (!IsRecording) return;
 
+            // 收尾期间继续让出主线程，等 GPU 回读及编码线程真正结束再释放资源。
+            if (_finishing)
+            {
+                if (!_waitingForReadback && (_encodeThread == null || !_encodeThread.IsAlive))
+                    CompleteRecording();
+                return;
+            }
+
             // Check for encoding errors from background thread
             if (_encodeError != null)
             {
@@ -131,7 +146,8 @@ namespace AIBridge.Editor
                 return;
             }
 
-            if (_waitingForReadback) return;
+            // 编码落后时暂停采集，避免积压大量 RGBA 数组；下一帧保留实际经过时间。
+            if (_waitingForReadback || _encodeQueue.Count >= MaxQueuedFrames) return;
 
             double currentTime = EditorApplication.timeSinceStartup;
 
@@ -163,7 +179,7 @@ namespace AIBridge.Editor
         {
             _waitingForReadback = false;
 
-            if (!IsRecording) return;
+            if (!IsRecording || _finishing) return;
 
             if (request.hasError)
             {
@@ -175,16 +191,6 @@ namespace AIBridge.Editor
             int width = request.width;
             int height = request.height;
 
-            // Flip vertically
-            int rowSize = width * 4;
-            var pixels = new byte[data.Length];
-            for (int y = 0; y < height; y++)
-            {
-                int srcOffset = y * rowSize;
-                int dstOffset = (height - 1 - y) * rowSize;
-                Unity.Collections.NativeArray<byte>.Copy(data, srcOffset, pixels, dstOffset, rowSize);
-            }
-
             if (_frameWidth == 0)
             {
                 _frameWidth = width;
@@ -194,16 +200,12 @@ namespace AIBridge.Editor
 
             if (width != _frameWidth || height != _frameHeight) return;
 
+            // 回读数据只在回调内有效；主线程仅复制一次，逐行翻转交给编码线程。
+            var pixels = data.ToArray();
             _encodeQueue.Enqueue(new FrameData { Pixels = pixels, FrameDelay = _pendingFrameDelay });
             _capturedFrames++;
+            _durationCentiseconds += _pendingFrameDelay;
             _onProgress?.Invoke(_capturedFrames, _targetFrameCount);
-
-            if (_capturedFrames % 5 == 0)
-            {
-                EditorUtility.DisplayProgressBar("Recording GIF",
-                    $"Frame {_capturedFrames}/{_targetFrameCount}",
-                    (float)_capturedFrames / _targetFrameCount);
-            }
 
             if (_capturedFrames >= _targetFrameCount)
             {
@@ -229,11 +231,21 @@ namespace AIBridge.Editor
                 _encoder = new GifEncoder(_outputStream, _frameWidth, _frameHeight, _fps, _colorCount);
 
                 bool initialized = false;
+                int rowSize = _frameWidth * 4;
+                var rowBuffer = new byte[rowSize];
 
                 while (!_encodingDone || !_encodeQueue.IsEmpty)
                 {
                     if (_encodeQueue.TryDequeue(out var frame))
                     {
+                        for (int y = 0; y < _frameHeight / 2; y++)
+                        {
+                            int top = y * rowSize;
+                            int bottom = (_frameHeight - 1 - y) * rowSize;
+                            Buffer.BlockCopy(frame.Pixels, top, rowBuffer, 0, rowSize);
+                            Buffer.BlockCopy(frame.Pixels, bottom, frame.Pixels, top, rowSize);
+                            Buffer.BlockCopy(rowBuffer, 0, frame.Pixels, bottom, rowSize);
+                        }
                         if (!initialized)
                         {
                             _encoder.Initialize(frame.Pixels);
@@ -265,19 +277,19 @@ namespace AIBridge.Editor
 
         private static void FinishRecording(string error)
         {
+            if (_finishing) return;
+            _finishing = true;
+            _finishError = error;
+            _encodingDone = true;
+        }
+
+        private static void CompleteRecording()
+        {
             EditorApplication.update -= OnUpdate;
             IsRecording = false;
-            _waitingForReadback = false;
-            EditorUtility.ClearProgressBar();
             ScreenshotHelper.ReleaseCachedResources();
-
-            // Signal encode thread to finish and wait
-            _encodingDone = true;
-            if (_encodeThread != null && _encodeThread.IsAlive)
-            {
-                _encodeThread.Join(5000);
-            }
             _encodeThread = null;
+            var error = _finishError;
 
             // Check for encoding error
             if (_encodeError != null && string.IsNullOrEmpty(error))
@@ -290,15 +302,17 @@ namespace AIBridge.Editor
             if (!success)
             {
                 try { if (File.Exists(_outputPath)) File.Delete(_outputPath); } catch { }
-                _onComplete?.Invoke(new GifRecordResult { Success = false, Error = error ?? "No frames captured." });
+                var onComplete = _onComplete;
                 Cleanup();
+                onComplete?.Invoke(new GifRecordResult { Success = false, Error = error ?? "No frames captured." });
                 return;
             }
 
+            GifRecordResult result;
             try
             {
                 var fileInfo = new FileInfo(_outputPath);
-                _onComplete?.Invoke(new GifRecordResult
+                result = new GifRecordResult
                 {
                     Success = true,
                     GifPath = _outputPath,
@@ -306,17 +320,19 @@ namespace AIBridge.Editor
                     FrameCount = _capturedFrames,
                     Width = _frameWidth,
                     Height = _frameHeight,
-                    Duration = (float)_capturedFrames / _fps,
+                    Duration = _durationCentiseconds / 100f,
                     FileSize = fileInfo.Length,
                     Timestamp = _recordingStartTime.ToString("yyyy-MM-ddTHH:mm:ss")
-                });
+                };
             }
             catch (Exception ex)
             {
-                _onComplete?.Invoke(new GifRecordResult { Success = false, Error = $"Failed to get file info: {ex.Message}" });
+                result = new GifRecordResult { Success = false, Error = $"Failed to get file info: {ex.Message}" };
             }
 
+            var callback = _onComplete;
             Cleanup();
+            callback?.Invoke(result);
         }
 
         private static void Cleanup()

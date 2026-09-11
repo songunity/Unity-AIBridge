@@ -1,129 +1,62 @@
 ---
 name: aibridge
-description: 通过 AI Bridge CLI 自动化已打开的 Unity Editor，管理 GameObject、场景、资源、预制体和组件，执行 Editor C# 代码、控制 Play Mode、模拟 Play Mode UI 输入并捕获 Game 视图。当任务需要操作 Unity Editor 或其 Play Mode 时使用；连接独立 Player Runtime Bridge 时改用 aibridge-runtime。
+description: 通过 AI Bridge CLI 操作已打开的 Unity Editor、场景和资源，执行 C#、控制 Play Mode、检查和点击 UI、截图。独立 Player 使用 aibridge-runtime。
 ---
 
-# AI Bridge Skill
+# AI Bridge
 
-## 概述
+## 连接与命令选择
 
-通过 AI Bridge CLI 控制已打开的 Unity Editor。保持 Editor、Editor Play Mode 与独立 Player Runtime Bridge 的连接链路分离。
+- 定位 Unity 项目根（含 Assets 和 ProjectSettings），使用 `.aibridge/cli/AIBridgeCLI.exe`；macOS/Linux 无 `.exe`。Editor 与独立 Player 的连接链路分开。
+- 每次使用 `--raw`。先记录当前 Editor 状态，默认附加现有会话，定位已有对象；仅在任务需要时进入或退出 Play Mode，不机械创建 Canvas、Button 或重启游戏。
+- 首次使用不熟悉的命令，通过 `Help --command <命令>` 查参数；同版本同会话复用已查帮助。`Compile --raw --timeout 300000` 直接调用即可，其结果已包含编译错误。
+- 相关只读查询合并到 Batch 或同一 C# 探针中。有依赖的操作按顺序执行，等待真正的业务就绪条件。
+- 遵循项目指令中的资源修改、账号、测试数据及现场保留约定；业务验证交给项目测试/GM 流程，不用客户端假数据替代真实服务端交互。
 
-## 前置条件
+## 参数与结果
 
-- Unity 项目已安装 AI Bridge 包
-- CLI 位置：`<UnityProjectRoot>/.aibridge/cli/AIBridgeCLI`（Windows 为 `AIBridgeCLI.exe`）
-- 如果工作目录不在 Unity 项目根目录（如 monorepo），需要先定位 Unity 项目路径再拼接 CLI 路径
-- 始终添加 `--raw` 标志以获取 JSON 输出
-- `<CLI路径> --help` 查看全局帮助
+PowerShell 的带空格路径使用调用运算符：`& "<路径>/AIBridgeCLI.exe" ...`。短代码可用单引号；复杂 JSON 优先 `--stdin`，避免 Shell 引号和转义差异。长代码保存到 `.aibridge/code/`，通过 `--file <完整路径>` 执行。
 
-常用全局参数：
+代码只包含 using 与方法体逻辑。查询直接 `return` 基本类型、普通对象、数组或字典，不先 Debug.Log 再查控制台；Unity 对象应返回所需字段，不直接返回整个对象。
 
-- `--timeout <ms>` - 超时时间，单位毫秒，默认 `5000`
-- `--no-wait` - 不等待结果，适合只触发命令的场景
-- `--raw` - 输出原始 JSON
-- `--quiet` - 安静模式，减少额外输出
-- `--json <json>` - 透传并合并 JSON 参数，同名字段会覆盖
-- `--stdin` - 从标准输入读取 JSON 参数
-- `--help` - 显示帮助
+协议 2 的代码执行结果使用 `data.returnValue`、`data.logs`，没有旧的 `ReturnValue/Output` 文本和业务标记前缀。日志包含 `level/message/stackTrace`。外层 `success` 表示命令执行是否成功，业务返回值仍需按任务检查。
 
-当命令执行时间可能超过默认 5 秒时，必须显式增加 `--timeout`，例如：
+- 错误检查读取 `errorCode/error` 和日志级别，不在普通返回字符串中搜索 `Exception:`。
+- `logScope=executionWindow` 表示捕获执行期间日志，并发来源尚未隔离；精确日志验证采用顺序操作。
+- CLI 与 Editor 包必须同时升级；协议不匹配明确报错，不回退旧格式。
 
-- 编译：`AIBridgeCLI Compile --raw --timeout 300000`
-- 跑测试：`AIBridgeCLI CodeExecuteCommand_Execute --code '...' --raw --timeout 300000`
-- 截图/GIF 等较慢操作：按实际情况设置更大的超时
+## 批量执行与长任务
 
-### 路径定位策略
+`Batch` 接收 `commands` 数组，各项含 `type`、`params`。默认 `stopOnError=true`，任一失败使批次失败，余项标记 `skipped`。独立查询可显式设为 false 继续执行，但外层仍报告失败。检查每项结果，不把批次已结束当作业务全部通过。
 
-CLI 可执行文件位于 Unity 项目根目录下的 `.aibridge/cli/` 中。定位方式：
+Batch 顺序执行，不提供回滚或自动业务等待。打开页面的命令结束不等于异步加载完成；点击前检查目标条件。独立提交的命令可能交错执行，不等于 Unity 多线程操作。
 
-1. **工作目录就是 Unity 项目根** — 直接用 `./.aibridge/cli/AIBridgeCLI`
-2. **Monorepo 结构（工作目录在 Unity 项目上层）** — 找到包含 `Assets` 目录的子文件夹即为 Unity 项目根，拼接路径如 `<子目录>/.aibridge/cli/AIBridgeCLI`
+- `--timeout` 是 CLI 等待结果的期限（默认 5000 毫秒）。代码命令的 `executionTimeoutMs` 是异步结果等待期限（默认 120000 毫秒），两者独立。
+- `--no-wait` 返回命令 ID 和 submitted，仅说明已提交。随后使用 `command status --id <id> --raw` 或 `command result --id <id> --wait --timeout <ms> --raw`。
+- CLI `WAIT_TIMEOUT` 不取消命令；先查询原 ID，禁止直接重发写操作。
+- 代码异步等待超时也不取消底层 Task，不支持强制中止同步代码。此时业务最终结果需要另行观察，不能靠重放确认。
+- 状态包括 submitted、queued、running、completed、failed、unknown。域重载或失去会话后的 unknown 不代表未执行；保留结果可重复读取，终态结果保留 10 分钟。
 
-平台差异：
-- macOS/Linux：`AIBridgeCLI`（无后缀）
-- Windows：`AIBridgeCLI.exe`
+## UI 检查与验证
 
-### Windows PowerShell 注意事项
+- 验证无法点击时优先 `UIAutomationCommand_Find/Raycast/Click`，核对实际 raycast 命中、事件目标、目标是否被遮挡及业务结果。直接调用函数或发送事件只能证明对应逻辑，不能证明用户能点到。
+- `NoEventSystem` 先检查 Play Mode、场景加载和现有 EventSystem 是否启用，不直接添加组件改变现场。
+- 实时同步测试保持页面打开，不主动重开页面或重新请求数据；刷新后的正确结果不能证明实时同步成功。
+- 创建隔离测试 UI 只用于用户任务需要的本地显示/原型验证，不用它代替现有项目业务 UI。
+- Play Mode 调整先记录原状态。用户要求先改运行实例时，先预览并截图；已授权修改资源时，再用同组参数同步 Prefab。
+- 区分运行实例预览、Prefab 已保存和重新加载验证。最终资源验证需要重新加载并打开目标界面；用户要求暂不重启时，明确尚未验证重新加载，不擅自打断现场。
 
-在 Windows PowerShell 中调用时：
+## 资源与编译
 
-- 路径 **不包含空格**，直接写：
-  `E:\path\to\AIBridgeCLI.exe Compile --raw`
-- 路径 **包含空格**，必须写成：
-  `& "E:\path with spaces\AIBridgeCLI.exe" Compile --raw`
+资源搜索使用 `AssetDatabaseCommand_Find`，具体过滤参数查 Help；加载资源数据通过 C# `UnityEditor.AssetDatabase.LoadAssetAtPath`。不要使用已失效的 AssetDatabaseCommand_Search/Load。
 
-不要写成：
+代码变化确需编译验证时调用 Compile；编译和程序集重载会影响会话及缓存，按项目测试流程统一安排，避免每个小查询都重新编译。
 
-`"E:\path\to\AIBridgeCLI.exe" Compile --raw`
+## 编译缓存与耗时
 
-## 常见工作流
+同一探针保持代码内容稳定，不拼入无意义时间戳。缓存仅复用编译入口，每次重新执行，返回值和 Task 不复用；程序集引用变化或域重载后失效。
 
-### 工作流 1：测试 UI 交互
-
-1. 创建 UI 元素（Canvas、Button、EventSystem）
-2. 进入播放模式：`EditorCommand_Play`
-3. 模拟点击：`InputSimulationCommand_Click --path "Canvas/Button1"`
-4. 使用代码执行验证结果
-5. 退出播放模式：`EditorCommand_Stop`
-
-**注意：** UI 点击需要场景中有 EventSystem。
-
-这些命令仍由 Unity Editor 接收，只是要求 Editor 处于 Play Mode。不要将其与独立 Player 的 `AIBridgeCLI runtime ...` 命令混用。
-
-### Play Mode UI 调整与 Prefab 同步
-
-用户要求在 Play Mode 中反复调整 UI 布局时：
-
-1. 先用 `EditorCommand_GetState` 记录初始 Play Mode 状态。
-2. 用户要求“先改运行中的”时，只修改当前运行实例并截图预览，不要立即重启 Play Mode。
-3. 用户要求“同步实例和 Prefab”或确认预览后，使用同一组参数更新当前运行实例和 Prefab；只有用户已授权资源修改时才能写入 Prefab。
-4. 明确区分“运行实例预览”“Prefab 已保存”“Prefab 重新加载验证”。直接修改运行实例后的截图不能证明 Prefab 能正确重新加载。
-5. UI 迭代期间可以延后重启；最终确认后应重新进入 Play Mode、重新打开目标界面并再次截图。若用户要求暂不重启，必须明确说明尚未完成 Prefab 重新加载验证。
-6. 结束时恢复第 1 步记录的 Play Mode 状态，并确认没有遗留 AIBridge CLI 进程或会话。
-
-### 工作流 2：调试场景对象
-
-1. 获取场景层级：`SceneCommand_GetHierarchy`
-2. 查找特定对象：`GameObjectCommand_Find --name "Player"`
-3. 获取组件信息：`InspectorCommand_GetComponents --path "Player"`
-4. 执行代码检查/修改：`CodeExecuteCommand_Execute --code '...'`
-
-### 工作流 3：快速代码原型
-
-1. 编写 C# 代码片段（仅 using 语句 + 逻辑）
-2. 执行：`CodeExecuteCommand_Execute --code 'using UnityEngine; Debug.Log("Test");'`
-3. 在 Unity 控制台查看输出
-4. 快速迭代，无需创建脚本文件
-
-**对于较长代码：** 保存到 `.aibridge/code/` 并使用 `--file` 参数。
-
-### 工作流 4：资源管理
-
-1. 搜索资源：`AssetDatabaseCommand_Search --mode prefab --keyword "Player"`
-2. 加载资源信息：`AssetDatabaseCommand_Load --assetPath "Assets/Prefabs/Player.prefab"`
-3. 根据需要实例化或修改
-
-### 工作流 5：编译验证代码是否有报错
-
-1. 编译 Unity：`Compile`
-2. 查看返回值是否有报错
-
-## 如何查询命令详情
-
-### 查看命令详细用法
-
-```bash
-AIBridgeCLI Help --command "GameObjectCommand_Find" --raw
-```
-
-返回包含：
-
-- 命令描述
-- 参数列表（名称、类型、是否必需、描述、默认值）
-- 使用示例
-
-首次使用某个命令前先查询详细用法；`Compile` 直接调用即可。
+`CodeExecuteCommand_CacheStatus` 按需查询，不在每条命令前后固定调用。区分提交次数、真实编译次数和命中数。结果中的排队、执行、CLI 等待及代码准备/异步等待耗时用于定位开销，不把局部加速当作整个业务流程加速。
 
 <!-- AUTO-GENERATED-COMMANDS-START -->
 ## 命令分类
@@ -137,11 +70,12 @@ AIBridgeCLI Help --command "GameObjectCommand_Find" --raw
 
 ### Batch
 
-- **Batch** - 批量执行多个命令，按顺序执行并返回每个命令的结果。用于需要执行多个相关操作的场景
+- **Batch** - 顺序执行命令，默认遇错停止；任一失败则批次失败，每项返回执行状态。
 
 ### CodeExecute
 
-- **CodeExecuteCommand_Execute** - 在 Unity Editor（包括 Play Mode）执行 C# 代码片段或脚本文件。如果脚本内容过多更建议写入文件来运行，脚本文件放到.aibridge/code中
+- **CodeExecuteCommand_CacheStatus** - 查询 Editor C# 编译缓存统计
+- **CodeExecuteCommand_Execute** - 在 Unity Editor 执行 C# 方法体或文件，返回结构化 returnValue 和 logs。长代码使用 --file 完整路径。
 
 ### Editor
 
@@ -227,12 +161,3 @@ AIBridgeCLI Help --command "GameObjectCommand_Find" --raw
 - **TransformCommand_SetScale** - 设置 GameObject 的缩放
 
 <!-- AUTO-GENERATED-COMMANDS-END -->
-
-## 边界情况和故障排除
-
-- **"NoEventSystem"** - 为 UI 交互添加 EventSystem
-- **长时间操作** - 使用 `--timeout` 参数（例如 GIF 需要 15 秒以上）
-- **路径未找到** - 使用 `SceneCommand_GetHierarchy` 验证路径
-- **代码执行错误** - 检查 using 语句和语法
-
----

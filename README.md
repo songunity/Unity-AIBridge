@@ -2,6 +2,8 @@
 
 [English](./README_EN.md) | 中文
 
+仓库测试：`./Tools~/Test.ps1`；包含隔离 Unity 的完整验证使用 `-IncludeEditor`，详见 [本地测试入口](./RELEASING.md#本地测试入口)。
+
 AI 编码助手与 Unity Editor 之间的文件通信框架。
 
 ## 核心亮点：动态执行 C# 代码
@@ -315,3 +317,16 @@ MIT License
 通过 `AIBridgeCLI CodeExecuteCommand_CacheStatus --raw` 查询当前缓存条目、命中次数、编译次数与引用重建次数，不影响原有 `ReturnValue / Output` 格式。
 
 异步等待使用真实经过时间计时，保留 120 秒上限；超时表示停止等待，不代表用户任务已被取消。
+
+## Editor 协议 2：调用迁移
+
+本次是接口变更，Editor 包与 CLI 必须成套升级；Runtime Bridge 协议不变。
+
+- 代码执行直接返回 `data.returnValue` 与 `data.logs`，删除 `ReturnValue/Output` 文本。探针直接返回数据对象，不再拼接 `HARNESS_RESULT:` 或预先序列化 JSON。
+- 日志读取 `level/message/stackTrace`，不要在业务字符串中搜索异常词。日志范围是执行期间，尚未隔离并发来源。
+- Batch 默认遇错停止，任一子项失败使外层失败并返回非零退出码；`stopOnError=false` 仅允许继续余项，不改变失败结论。未执行项为 skipped。
+- `--no-wait` 提交后用 `command status --id <id>`、`command result --id <id> [--wait --timeout <ms>]` 查询。等待超时不取消、不删除、不重放命令；保留结果可重复读取 10 分钟。
+- `executionTimeoutMs` 默认 120000，仅控制代码异步结果等待。超时不取消底层 Task，无法确认的最终业务结果不可通过重新执行写操作来确认。
+- 新字段包含 `protocolVersion=2`、`errorCode`、`status` 和 `timings`。命令完成与业务成功分别验证；unknown 不代表未执行。
+
+当前 mildSLG 需在下载新版本时同步迁移 Harness 驱动、内嵌探针与用例、GM 玩家 ID 读取以及蓝湖模板执行器日志判断；旧运行报告无需迁移。新版本发布前不替换该项目包和脚本。

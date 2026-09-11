@@ -11,6 +11,7 @@ namespace AIBridge.Editor
         private const string MetadataFileName = "editor-instance.json";
         private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(2);
 
+        internal static readonly string SessionId = Guid.NewGuid().ToString("N");
         private static string _metadataPath;
         private static DateTime _lastWriteUtc = DateTime.MinValue;
         private static string _lastLoggedError;
@@ -60,6 +61,8 @@ namespace AIBridge.Editor
                 var metadata = new EditorInstanceMetadata
                 {
                     schemaVersion = 1,
+                    protocolVersion = 2,
+                    sessionId = SessionId,
                     processId = process.Id,
                     projectRoot = projectRoot,
                     projectName = GetProjectName(projectRoot),
@@ -71,8 +74,8 @@ namespace AIBridge.Editor
                 var tempPath = _metadataPath + ".tmp";
 
                 File.WriteAllText(tempPath, json, new UTF8Encoding(false));
-                File.Copy(tempPath, _metadataPath, true);
-                File.Delete(tempPath);
+                if (File.Exists(_metadataPath)) File.Replace(tempPath, _metadataPath, null);
+                else File.Move(tempPath, _metadataPath);
 
                 _lastWriteUtc = DateTime.UtcNow;
                 _lastLoggedError = null;

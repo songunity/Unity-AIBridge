@@ -11,9 +11,9 @@ internal static class EditorInstanceChecker
     private const string MetadataFileName = "editor-instance.json";
     private static readonly TimeSpan MaxMetadataAge = TimeSpan.FromSeconds(10);
 
-    public static (bool alive, string error) Check()
+    public static (bool alive, string error) Check(string exchangeDirectory = null)
     {
-        var exchangeDir = PathHelper.GetExchangeDirectory();
+        var exchangeDir = exchangeDirectory ?? PathHelper.GetExchangeDirectory();
         var metadataPath = Path.Combine(exchangeDir, MetadataFileName);
 
         if (!File.Exists(metadataPath))
@@ -22,7 +22,7 @@ internal static class EditorInstanceChecker
         EditorInstanceMetadata metadata;
         try
         {
-            var json = File.ReadAllText(metadataPath);
+            var json = CommandSender.ReadPublishedFile(metadataPath);
             metadata = JsonSerializer.Deserialize(json, JsonContext.Default.EditorInstanceMetadata);
         }
         catch (Exception ex)
@@ -69,6 +69,8 @@ internal static class EditorInstanceChecker
 internal class EditorInstanceMetadata
 {
     public int schemaVersion { get; set; }
+    public int protocolVersion { get; set; }
+    public string sessionId { get; set; }
     public int processId { get; set; }
     public string projectRoot { get; set; }
     public string projectName { get; set; }

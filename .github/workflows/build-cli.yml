@@ -8,11 +8,13 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
     paths:
       - 'Tools~/AIBridgeCLI/AIBridgeCLI/**'
+      - 'Tools~/AIBridgeCLI/AIBridge.Test/**'
       - '.github/workflows/build-cli.yml'
   pull_request:
     branches: [main]
     paths:
       - 'Tools~/AIBridgeCLI/AIBridgeCLI/**'
+      - 'Tools~/AIBridgeCLI/AIBridge.Test/**'
   workflow_dispatch:
 
 permissions:
@@ -51,6 +53,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang zlib1g-dev
+
+      - name: Test CLI
+        run: dotnet test Tools~/AIBridgeCLI/AIBridge.Test/AIBridge.Test.csproj -c Release --nologo
+
+      - name: Validate skills
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: ./Tools~/ValidateSkills.ps1
 
       - name: Publish
         run: |

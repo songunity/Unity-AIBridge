@@ -194,13 +194,17 @@ public static class CodeExecutor
         }
     }
 
-    /// <summary>
-    /// Compiles and executes the specified C# code.
-    /// </summary>
-    /// <param name="code">The C# code to compile and execute.</param>
-    /// <returns>The result of the compilation and execution.</returns>
+    /// <summary>最近一次入口准备耗时，不包含业务方法执行。</summary>
+    public long LastPreparationMs { get; private set; }
+    /// <summary>最近一次入口是否复用了已编译方法。</summary>
+    public bool LastCacheHit { get; private set; }
+
+    /// <summary>准备编译入口并执行；每次调用产生独立结果。</summary>
     public EvaluationResult CompileAndExecute(string code)
     {
+        var preparation = System.Diagnostics.Stopwatch.StartNew();
+        LastPreparationMs = 0;
+        LastCacheHit = false;
         if (string.IsNullOrEmpty(code))
         {
             return new EvaluationResult
@@ -220,7 +224,10 @@ public static class CodeExecutor
             CompilationCount++;
             var result = this.CompileCode(wrappedCode);
             if (!result.Success)
+            {
+                LastPreparationMs = preparation.ElapsedMilliseconds;
                 return result;
+            }
 
             var type = result.CompiledAssembly.GetType("CodeExecutor");
             method = type?.GetMethod("Execute") ?? type?.GetMethod(AsyncMethodName);
@@ -241,9 +248,11 @@ public static class CodeExecutor
         else
         {
             CacheHits++;
+            LastCacheHit = true;
         }
 
         // 每次重新执行入口并生成结果和 Task，不复用上一次读取到的状态。
+        LastPreparationMs = preparation.ElapsedMilliseconds;
         return ExecuteCompiledMethod(method);
     }
 

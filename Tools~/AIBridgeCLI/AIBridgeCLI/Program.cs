@@ -18,7 +18,9 @@ public class Program
         }
         catch (Exception ex)
         {
-            OutputFormatter.PrintError(ex.Message);
+            if (args.Any(arg => string.Equals(arg, "--raw", StringComparison.OrdinalIgnoreCase)))
+                OutputFormatter.PrintResult(CommandSender.Failure(null, "CLI_ERROR", ex.Message), OutputMode.Raw);
+            else OutputFormatter.PrintError(ex.Message);
             return 1;
         }
     }
@@ -28,6 +30,21 @@ public class Program
         if (args.Length > 0 && string.Equals(args[0], "runtime", StringComparison.OrdinalIgnoreCase))
         {
             return RuntimeCliCommand.Execute(args.Skip(1).ToArray());
+        }
+
+        if (args.Length > 0 && args[0] == "command")
+        {
+            if (args.Length < 2 || (args[1] != "status" && args[1] != "result"))
+                throw new ArgumentException("Use command status|result --id <id> [--wait] [--timeout <ms>].");
+            var query = ParsedArgs.Parse(args.Skip(1).ToArray());
+            query.Options.TryGetValue("id", out var id);
+            CommandSender.ValidateId(id);
+            var client = new CommandSender(query.Timeout);
+            var response = args[1] == "status" ? client.GetStatus(id)
+                : query.Options.ContainsKey("wait") ? client.WaitForResult(id, query.Timeout)
+                : client.TryGetResult(id) ?? CommandSender.Failure(id, "RESULT_UNAVAILABLE", "No retained result; query command status.");
+            OutputFormatter.PrintResult(response, query.OutputMode);
+            return response.success ? 0 : 1;
         }
 
         var parsed = ParsedArgs.Parse(args);
@@ -55,6 +72,7 @@ public class Program
                 try
                 {
                     using var doc = JsonDocument.Parse(stdinJson);
+                    if (doc.RootElement.ValueKind != JsonValueKind.Object) throw new ArgumentException("stdin JSON must be an object.");
                     if (doc.RootElement.ValueKind == JsonValueKind.Object)
                     {
                         foreach (var prop in doc.RootElement.EnumerateObject())
@@ -70,8 +88,7 @@ public class Program
                 }
                 catch (JsonException)
                 {
-                    OutputFormatter.PrintError("Invalid JSON from stdin");
-                    return 1;
+                    throw new ArgumentException("Invalid JSON from stdin");
                 }
             }
         }
@@ -82,6 +99,7 @@ public class Program
             try
             {
                 using var doc = JsonDocument.Parse(jsonStr);
+                if (doc.RootElement.ValueKind != JsonValueKind.Object) throw new ArgumentException("--json must be an object.");
                 if (doc.RootElement.ValueKind == JsonValueKind.Object)
                 {
                     foreach (var prop in doc.RootElement.EnumerateObject())
@@ -97,33 +115,20 @@ public class Program
             }
             catch (JsonException)
             {
-                OutputFormatter.PrintError("Invalid JSON in --json argument");
-                return 1;
+                throw new ArgumentException("Invalid JSON in --json argument");
             }
         }
 
         // Build request
-        CommandRequest request;
-        try
-        {
-            request = RequestBuilder.BuildRequest(parsed);
-        }
-        catch (ArgumentException ex)
-        {
-            OutputFormatter.PrintError(ex.Message);
-            return 1;
-        }
+        var request = RequestBuilder.BuildRequest(parsed);
 
         var sender = new CommandSender(parsed.Timeout);
 
         if (parsed.NoWait)
         {
-            var commandId = sender.SendCommandNoWait(request);
-            if (parsed.OutputMode == OutputMode.Pretty)
-                OutputFormatter.PrintInfo($"Command sent with ID: {commandId}");
-            else
-                Console.WriteLine(JsonSerializer.Serialize(new { id = commandId, status = "sent" }, JsonContext.Default.Object));
-            return 0;
+            var sent = sender.Submit(request);
+            OutputFormatter.PrintResult(sent, parsed.OutputMode);
+            return sent.success ? 0 : 1;
         }
 
         var result = sender.SendCommand(request);

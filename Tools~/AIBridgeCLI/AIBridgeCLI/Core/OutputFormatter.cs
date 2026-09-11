@@ -58,7 +58,9 @@ public static class OutputFormatter
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Write("✓ ");
             Console.ResetColor();
-            Console.WriteLine($"Command executed successfully ({result.executionTime}ms)");
+            Console.WriteLine(result.status != null && result.status != "completed"
+                ? $"Command state: {result.status} (ID: {result.id})"
+                : $"Command executed successfully ({result.executionTime}ms)");
 
             if (result.data != null)
             {
@@ -75,6 +77,8 @@ public static class OutputFormatter
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"  Error: {result.error}");
             Console.ResetColor();
+            if (result.id != null) Console.WriteLine($"  ID: {result.id}; state: {result.status ?? "unknown"}");
+            if (result.data != null) PrintData(result.data, "  ");
         }
     }
 

@@ -31,106 +31,126 @@ public static class CodeExecuteCommand
         });
     }
 
-    [AIBridge("在 Unity Editor（包括 Play Mode）执行 C# 代码片段或脚本文件。如果脚本内容过多更建议写入文件来运行，脚本文件放到.aibridge/code中",
-        example:@"
-Windows CMD 必须使用单引号包裹代码：
-AIBridgeCLI CodeExecuteCommand_Execute --code 'using UnityEngine; Debug.Log(""Hello"");' --raw
-
-PowerShell 或 Bash 可以使用双引号（需要转义）：
-AIBridgeCLI CodeExecuteCommand_Execute --code ""using UnityEngine; Debug.Log(\""Hello\"");"" --raw
-
-// 上边代码是你需要提供的逻辑，不需要写方法，只需要写using和逻辑
-// 以上的代码会被编译成下边的
-using UnityEngine;
-
-public static class CodeExecutor
-{{
-    public static object Execute()
-    {{
-        Debug.Log(""Hello"");
-        return null;
-    }}
-}}
-")]
-    public static IEnumerator Execute([Description("要执行的代码")]string code = null, [Description("要执行的文件，需要完整路径")]string file = null)
+    [AIBridge("在 Unity Editor 执行 C# 方法体或文件，返回结构化 returnValue 和 logs。长代码使用 --file 完整路径。",
+        example: "AIBridgeCLI CodeExecuteCommand_Execute --code 'return 42;' --raw")]
+    public static IEnumerator Execute(
+        [Description("using 语句与方法体逻辑")] string code = null,
+        [Description("代码文件完整路径")] string file = null,
+        [Description("异步结果等待上限（毫秒），超时不取消底层任务")] int executionTimeoutMs = 120000)
     {
+        if (executionTimeoutMs <= 0)
+        {
+            yield return CommandResult.Failure("executionTimeoutMs must be positive.");
+            yield break;
+        }
         if (!string.IsNullOrEmpty(file))
         {
-            if (File.Exists(file))
+            if (!File.Exists(file))
             {
-                code = File.ReadAllText(file);
-                if (string.IsNullOrWhiteSpace(code))
-                {
-                    yield return CommandResult.Failure("File is empty.");
-                    yield break;
-                }
-            }
-            else
-            {
-                yield return CommandResult.Failure("File is not exist.");
+                yield return CommandResult.Failure("File does not exist.");
                 yield break;
             }
+            code = File.ReadAllText(file);
         }
         if (string.IsNullOrWhiteSpace(code))
         {
-            yield return CommandResult.Failure("Code is null or empty.");
+            yield return CommandResult.Failure("Code is empty.");
             yield break;
         }
 
-        // Capture logs during execution
-        var logMessages = new List<string>();
-        var logHandler = new Application.LogCallback((logString, stackTrace, type) =>
-        {
-            var prefix = type switch
-            {
-                LogType.Error or LogType.Exception => "[ERROR] ",
-                LogType.Warning => "[WARNING] ",
-                _ => "[INFO] "
-            };
-            logMessages.Add(prefix + logString);
-        });
-
+        var logs = new List<object>();
+        var logHandler = new Application.LogCallback((message, stackTrace, type) =>
+            logs.Add(new { level = type.ToString(), message, stackTrace }));
+        var codeRunner = runner ??= new CSharpCodeRunner();
+        EvaluationResult result = null;
+        var invocationTimer = System.Diagnostics.Stopwatch.StartNew();
+        var waitTimer = new System.Diagnostics.Stopwatch();
+        long preparationMs = 0;
+        bool cacheHit = false;
+        bool timedOut = false;
         Application.logMessageReceived += logHandler;
-
-        EvaluationResult result;
-        const float maxExecutionTime = 120f;
         try
         {
-            // 编译和引用构建也放在 finally 的保护范围内，异常时必须解除日志监听。
-            var codeRunner = runner ??= new CSharpCodeRunner();
-            result = codeRunner.CompileAndExecute(code);
-            // 编辑模式的帧间隔不代表协程实际等待时长，使用真实经过时间。
-            var waitTimer = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                result = codeRunner.CompileAndExecute(code);
+                preparationMs = codeRunner.LastPreparationMs;
+                cacheHit = codeRunner.LastCacheHit;
+            }
+            catch (Exception ex)
+            {
+                result = new EvaluationResult { Success = false, ErrorMessage = ex.ToString() };
+            }
+            waitTimer.Start();
             while (result != null && result.IsPending)
             {
-                if (waitTimer.Elapsed.TotalSeconds > maxExecutionTime)
+                if (waitTimer.ElapsedMilliseconds >= executionTimeoutMs)
                 {
-                    result = null;
+                    timedOut = true;
                     break;
                 }
-                result = codeRunner.ContinuePendingTask(result);
-                if (result.IsPending)
-                    yield return null;
+                try { result = codeRunner.ContinuePendingTask(result); }
+                catch (Exception ex) { result = new EvaluationResult { Success = false, ErrorMessage = ex.ToString() }; }
+                if (result != null && result.IsPending) yield return null;
             }
         }
         finally
         {
+            waitTimer.Stop();
+            invocationTimer.Stop();
             Application.logMessageReceived -= logHandler;
         }
-        var output = string.Join("\n", logMessages);
 
-        if (result == null)
+        var response = new CommandResult();
+        Newtonsoft.Json.Linq.JToken value = Newtonsoft.Json.Linq.JValue.CreateNull();
+        if (timedOut)
         {
-            yield return CommandResult.Failure($"Execution timed out after {maxExecutionTime}s\nOutput:\n{output}");
+            response.errorCode = "EXECUTION_WAIT_TIMEOUT";
+            response.error = "Async result wait expired. The underlying task was not cancelled; its eventual business outcome is unknown. Do not replay the operation.";
         }
-        else if (!result.Success)
+        else if (result == null || !result.Success)
         {
-            yield return CommandResult.Failure($"Execution Failed:\n{result.ErrorMessage}\nOutput:\n{output}");
+            response.errorCode = "EXECUTION_FAILED";
+            response.error = result?.ErrorMessage ?? "Execution returned no result.";
         }
         else
         {
-            var returnValue = result.ReturnValue == null ? "null" : result.ReturnValue.ToString();
-            yield return CommandResult.Success($"ReturnValue:\n{returnValue}\nOutput:\n{output}");
+            try
+            {
+                // 先转换为 JSON token，序列化失败在此命令内报告，避免结果文件无法发布。
+                var serializer = Newtonsoft.Json.JsonSerializer.Create(new Newtonsoft.Json.JsonSerializerSettings
+                {
+                    ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Error,
+                    Converters = new List<Newtonsoft.Json.JsonConverter> { new UnsupportedReturnConverter() }
+                });
+                if (result.ReturnValue != null) value = Newtonsoft.Json.Linq.JToken.FromObject(result.ReturnValue, serializer);
+                response.success = true;
+            }
+            catch (Exception ex)
+            {
+                response.errorCode = "UNSUPPORTED_RETURN_VALUE";
+                response.error = "Return only selected data fields, not Unity objects or cyclic/unsupported objects. " + ex.Message;
+            }
         }
+        response.data = new
+        {
+            returnValue = value,
+            logs,
+            logScope = "executionWindow",
+            timings = new { preparationMs, invocationMs = invocationTimer.ElapsedMilliseconds - preparationMs - waitTimer.ElapsedMilliseconds, asyncWaitMs = waitTimer.ElapsedMilliseconds, cacheHit }
+        };
+        yield return response;
+    }
+
+    /// <summary>禁止 JSON 序列化遍历 Unity 对象与可执行/反射对象，包括嵌套字段。</summary>
+    private sealed class UnsupportedReturnConverter : Newtonsoft.Json.JsonConverter
+    {
+        public override bool CanConvert(Type type) => typeof(UnityEngine.Object).IsAssignableFrom(type)
+            || typeof(Delegate).IsAssignableFrom(type) || typeof(Type).IsAssignableFrom(type);
+        public override bool CanRead => false;
+        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer)
+            => throw new Newtonsoft.Json.JsonSerializationException("Unsupported return type: " + value.GetType().FullName);
+        public override object ReadJson(Newtonsoft.Json.JsonReader reader, Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer)
+            => throw new NotSupportedException();
     }
 }

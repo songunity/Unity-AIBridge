@@ -11,6 +11,8 @@ public static class HelpProvider
         sb.AppendLine();
         sb.AppendLine("Usage:");
         sb.AppendLine("  AIBridgeCLI <CommandName> [options]");
+        sb.AppendLine("  AIBridgeCLI command status --id <id> --raw");
+        sb.AppendLine("  AIBridgeCLI command result --id <id> [--wait --timeout <ms>] --raw");
         sb.AppendLine("  AIBridgeCLI runtime <subcommand> [options]");
         sb.AppendLine();
         sb.AppendLine("Global Options:");

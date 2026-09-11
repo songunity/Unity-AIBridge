@@ -81,6 +81,7 @@ public static class CompileUnityCommand
                 {
                     return new CommandResult()
                     {
+                        protocolVersion = 2,
                         id = stateResult.id,
                         success = false,
                         error = "Compile start was not confirmed, and Unity is idle now.",
@@ -110,6 +111,7 @@ public static class CompileUnityCommand
 
         return new CommandResult()
         {
+            protocolVersion = 2,
             id = startResult.id,
             success = false,
             error = lastCommunicationError == null

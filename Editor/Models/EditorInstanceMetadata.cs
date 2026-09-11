@@ -6,6 +6,8 @@ namespace AIBridge.Editor
     internal class EditorInstanceMetadata
     {
         public int schemaVersion;
+        public int protocolVersion;
+        public string sessionId;
         public int processId;
         public string projectRoot;
         public string projectName;

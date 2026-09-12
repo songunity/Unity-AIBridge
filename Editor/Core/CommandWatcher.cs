@@ -1,29 +1,43 @@
 using System;
 using System.IO;
+using System.Text;
+using System.Collections.Generic;
+using System.Diagnostics;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using UnityEditor;
 
 namespace AIBridge.Editor
 {
-    /// <summary>
-    /// Watches the commands directory and processes incoming commands
-    /// </summary>
+    /// <summary>通过原子文件交接接收命令；持久化失败只重试交接，不重放业务。</summary>
     public class CommandWatcher
     {
-        /// <summary>
-        /// Timeout for stale command/result files (10 minutes)
-        /// </summary>
         private static readonly TimeSpan StaleFileTimeout = TimeSpan.FromMinutes(10);
-
+        private const int StatusRetryMilliseconds = 2000;
         private readonly string _commandsDir;
         private readonly string _resultsDir;
         private readonly string _codeDir;
         private readonly string _screenshotsDir;
-        private readonly CommandQueue _queue;
         private readonly string _statusDir;
-        private readonly System.Collections.Generic.Dictionary<string, System.Diagnostics.Stopwatch> _queueTimers = new System.Collections.Generic.Dictionary<string, System.Diagnostics.Stopwatch>();
-        private readonly System.Collections.Generic.Dictionary<string, long> _queueTimes = new System.Collections.Generic.Dictionary<string, long>();
+        private readonly CommandQueue _queue = new CommandQueue();
+        private readonly Dictionary<string, Stopwatch> _queueTimers = new Dictionary<string, Stopwatch>();
+        private readonly Dictionary<string, long> _queueTimes = new Dictionary<string, long>();
+        private readonly Dictionary<string, Stopwatch> _statusFailures = new Dictionary<string, Stopwatch>();
+        private readonly Dictionary<string, string> _pendingStatuses = new Dictionary<string, string>();
+        private readonly Dictionary<string, PendingResult> _pendingResults = new Dictionary<string, PendingResult>();
+        private readonly HashSet<string> _published = new HashSet<string>();
+        private DateTime _nextCleanup;
+
+        private enum StatusWrite { Written, Waiting, Failed }
+
+        /// <summary>只保存第一次完成的结果；后续发布重试不再调用命令入口。</summary>
+        private sealed class PendingResult
+        {
+            public CommandResult Result;
+            public string Json;
+            public readonly Stopwatch Age = Stopwatch.StartNew();
+            public long NextAttemptMs;
+            public bool Warned;
+        }
 
         public CommandWatcher(string baseDir)
         {
@@ -31,297 +45,262 @@ namespace AIBridge.Editor
             _resultsDir = Path.Combine(baseDir, "results");
             _codeDir = Path.Combine(baseDir, "code");
             _screenshotsDir = Path.Combine(baseDir, "screenshots");
-            _queue = new CommandQueue();
             _statusDir = Path.Combine(baseDir, "status");
-
             EnsureDirectoriesExist();
         }
 
-        /// <summary>
-        /// Scan for new command files and enqueue them
-        /// </summary>
+        /// <summary>重试待发布结果，再扫描请求；临时 IO 失败不冒充 JSON 解析错误。</summary>
         public void ScanForCommands()
         {
-            if (!Directory.Exists(_commandsDir))
+            foreach (var id in new List<string>(_pendingResults.Keys)) TryPublishResult(id);
+            foreach (var id in new List<string>(_pendingStatuses.Keys))
             {
-                return;
+                var state = _pendingStatuses[id];
+                if (TryWriteStatus(id, state, out _) != StatusWrite.Waiting) _pendingStatuses.Remove(id);
             }
-
             string[] files;
-            try
-            {
-                files = Directory.GetFiles(_commandsDir, "*.json");
-            }
-            catch (Exception ex)
-            {
-                AIBridgeLogger.LogError($"Failed to scan commands directory: {ex.Message}");
-                return;
-            }
-
+            try { files = Directory.GetFiles(_commandsDir, "*.json"); }
+            catch (IOException ex) { AIBridgeLogger.LogDebug("Command scan delayed: " + ex.Message); return; }
+            catch (UnauthorizedAccessException ex) { AIBridgeLogger.LogDebug("Command scan denied: " + ex.Message); return; }
             foreach (var file in files)
             {
                 try
                 {
-                    // Check if file is stale (older than timeout)
-                    var fileInfo = new FileInfo(file);
-                    var fileAge = DateTime.UtcNow - fileInfo.LastWriteTimeUtc;
-                    if (fileAge > StaleFileTimeout)
+                    if (DateTime.UtcNow - File.GetLastWriteTimeUtc(file) > StaleFileTimeout)
                     {
-                        AIBridgeLogger.LogWarning($"Cleaning up stale command file: {Path.GetFileName(file)} (age: {fileAge.TotalMinutes:F1} minutes)");
-                        File.Delete(file);
+                        TryDeleteInput(file);
                         continue;
                     }
-
-                    var json = File.ReadAllText(file, System.Text.Encoding.UTF8);
-
-                    // Use Newtonsoft.Json for proper Dictionary support
-                    var jObject = JObject.Parse(json);
-                    var request = new CommandRequest
+                    var obj = JObject.Parse(ReadPublishedText(file));
+                    var id = (string)obj["id"];
+                    if (string.IsNullOrEmpty(id) || !System.Text.RegularExpressions.Regex.IsMatch(id, "^[a-zA-Z0-9_-]+$"))
+                        throw new JsonException("Invalid command ID");
+                    // 内存和磁盘都参与去重；不能因输入文件删除失败再次入队。
+                    if (_queue.IsProcessed(id) || _pendingResults.ContainsKey(id) || _published.Contains(id)
+                        || File.Exists(Path.Combine(_resultsDir, id + ".json")) || File.Exists(Path.Combine(_statusDir, id + ".json")))
                     {
-                        id = jObject["id"]?.ToString(),
-                        type = jObject["type"]?.ToString(),
-                        @params = new System.Collections.Generic.Dictionary<string, object>()
-                    };
-
-                    // Parse params
-                    var paramsObj = jObject["params"] as JObject;
-                    if (paramsObj != null)
-                    {
-                        foreach (var prop in paramsObj.Properties())
-                        {
-                            request.@params[prop.Name] = ConvertJTokenToObject(prop.Value);
-                        }
+                        TryDeleteInput(file);
+                        continue;
                     }
-
-                    if (request != null && !string.IsNullOrEmpty(request.id)
-                        && System.Text.RegularExpressions.Regex.IsMatch(request.id, "^[a-zA-Z0-9_-]+$"))
+                    var request = new CommandRequest { id = id, type = (string)obj["type"], @params = new Dictionary<string, object>() };
+                    if (obj["params"] is JObject parameters)
+                        foreach (var property in parameters.Properties()) request.@params[property.Name] = ConvertJTokenToObject(property.Value);
+                    if ((int?)obj["protocolVersion"] != 2)
                     {
-                        // 磁盘状态同时作为当前保留窗口内的去重依据，域重载后也不重放。
-                        if (File.Exists(Path.Combine(_resultsDir, request.id + ".json")) || File.Exists(Path.Combine(_statusDir, request.id + ".json")))
-                        {
-                            File.Delete(file);
-                            continue;
-                        }
-                        if ((int?)jObject["protocolVersion"] != 2)
-                        {
-                            var mismatch = CommandResult.FailureWithId(request.id, "Update CLI and Editor package together (protocol 2 required).");
-                            mismatch.errorCode = "PROTOCOL_MISMATCH";
-                            WriteResult(mismatch);
-                            File.Delete(file);
-                            continue;
-                        }
-                        if (_queue.Enqueue(request))
-                        {
-                            _queueTimers[request.id] = System.Diagnostics.Stopwatch.StartNew();
-                            WriteStatus(request.id, "queued");
-                            AIBridgeLogger.LogDebug($"Enqueued command: {request.id} ({request.type})");
-                            // Delete the command file after reading
-                            File.Delete(file);
-                        }
+                        var mismatch = CommandResult.FailureWithId(id, "Update CLI and Editor package together (protocol 2 required).");
+                        mismatch.errorCode = "PROTOCOL_MISMATCH";
+                        WriteResult(mismatch);
+                        TryDeleteInput(file);
+                        continue;
+                    }
+                    var status = TryWriteStatus(id, "queued", out var error);
+                    if (status == StatusWrite.Waiting) continue;
+                    if (status == StatusWrite.Failed)
+                    {
+                        WriteResult(StatusFailure(id, error));
+                        TryDeleteInput(file);
+                        continue;
+                    }
+                    if (_queue.Enqueue(request))
+                    {
+                        _queueTimers[id] = Stopwatch.StartNew();
+                        TryDeleteInput(file);
                     }
                 }
+                catch (IOException ex) { AIBridgeLogger.LogDebug("Command file temporarily unavailable: " + ex.Message); }
+                catch (UnauthorizedAccessException ex) { AIBridgeLogger.LogDebug("Command file access denied: " + ex.Message); }
                 catch (Exception ex)
                 {
-                    AIBridgeLogger.LogError($"Failed to parse command file {file}: {ex.Message}");
-                    // Move failed file to prevent repeated errors
-                    try
-                    {
-                        File.Move(file, file + ".error");
-                    }
-                    catch
-                    {
-                        // Ignore
-                    }
+                    AIBridgeLogger.LogError($"Invalid command file {Path.GetFileName(file)}: {ex.Message}");
+                    try { File.Move(file, file + ".error"); }
+                    catch (IOException) { }
+                    catch (UnauthorizedAccessException) { }
                 }
             }
-
-            // Periodically trim processed IDs
             _queue.TrimProcessedIds();
-
-            // Cleanup stale result files and error files
             CleanupStaleFiles();
-
-            // Cleanup old screenshots (1 day retention)
             ScreenshotCacheManager.CleanupOldScreenshots();
         }
 
-        /// <summary>
-        /// Clean up stale result files and error command files
-        /// </summary>
-        private void CleanupStaleFiles()
-        {
-            // Cleanup stale result files
-            if (Directory.Exists(_resultsDir))
-            {
-                try
-                {
-                    var resultFiles = Directory.GetFiles(_resultsDir, "*.json");
-                    foreach (var file in resultFiles)
-                    {
-                        var fileInfo = new FileInfo(file);
-                        var fileAge = DateTime.UtcNow - fileInfo.LastWriteTimeUtc;
-                        if (fileAge > StaleFileTimeout)
-                        {
-                            File.Delete(file);
-                            AIBridgeLogger.LogDebug($"Cleaned up stale result file: {Path.GetFileName(file)}");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    AIBridgeLogger.LogError($"Failed to cleanup stale result files: {ex.Message}");
-                }
-            }
-
-            foreach (var file in Directory.GetFiles(_statusDir, "*.json"))
-            {
-                if (DateTime.UtcNow - File.GetLastWriteTimeUtc(file) <= StaleFileTimeout) continue;
-                var state = JObject.Parse(File.ReadAllText(file));
-                var active = (string)state["sessionId"] == EditorInstanceTracker.SessionId
-                    && ((string)state["status"] == "queued" || (string)state["status"] == "running");
-                if (!active) File.Delete(file);
-            }
-
-            // Cleanup stale error files in commands directory
-            if (Directory.Exists(_commandsDir))
-            {
-                try
-                {
-                    var errorFiles = Directory.GetFiles(_commandsDir, "*.error");
-                    foreach (var file in errorFiles)
-                    {
-                        var fileInfo = new FileInfo(file);
-                        var fileAge = DateTime.UtcNow - fileInfo.LastWriteTimeUtc;
-                        if (fileAge > StaleFileTimeout)
-                        {
-                            File.Delete(file);
-                            AIBridgeLogger.LogDebug($"Cleaned up stale error file: {Path.GetFileName(file)}");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    AIBridgeLogger.LogError($"Failed to cleanup stale error files: {ex.Message}");
-                }
-            }
-        }
-
-        /// <summary>
-        /// Process one pending command
-        /// </summary>
-        /// <returns>True if a command was processed</returns>
+        /// <summary>状态写入期间仍持有队首，只有确定可执行或已明确拒绝时才出队。</summary>
         public bool ProcessOneCommand()
         {
-            if (!_queue.TryDequeue(out var request))
-            {
-                return false;
-            }
-
+            if (!_queue.TryPeek(out var request)) return false;
+            var status = TryWriteStatus(request.id, "running", out var error);
+            if (status == StatusWrite.Waiting) return false;
+            _queue.TryDequeue(out _);
             if (_queueTimers.TryGetValue(request.id, out var timer))
             {
                 _queueTimes[request.id] = timer.ElapsedMilliseconds;
                 _queueTimers.Remove(request.id);
             }
-            WriteStatus(request.id, "running");
-            if (!CommandRegistry.TryGetCommand(request.type, out var entry))
+            if (status == StatusWrite.Failed)
             {
-                WriteResult(CommandResult.FailureWithId(request.id, $"Unknown command: {request.type}"));
+                WriteResult(StatusFailure(request.id, error));
                 return true;
             }
-
+            if (!CommandRegistry.TryGetCommand(request.type, out var entry))
+            {
+                WriteResult(CommandResult.FailureWithId(request.id, "Unknown command: " + request.type));
+                return true;
+            }
             if (!CommandParamBinder.TryBind(entry, request, out var args, out var bindError))
             {
                 WriteResult(CommandResult.FailureWithId(request.id, bindError));
                 return true;
             }
-
             try
             {
                 var coroutine = (System.Collections.IEnumerator)entry.Method.Invoke(null, args);
                 EditorCoroutineRunner.Start(coroutine, WriteResult, request.id);
             }
-            catch (Exception ex)
-            {
-                WriteResult(CommandResult.FromException(request.id, ex.InnerException ?? ex));
-            }
-            AIBridgeLogger.LogDebug($"Command {request.id} ({request.type}) started async processing");
-
+            catch (Exception ex) { WriteResult(CommandResult.FromException(request.id, ex.InnerException ?? ex)); }
             return true;
         }
 
-        /// <summary>
-        /// Write command result to file
-        /// </summary>
+        private static CommandResult StatusFailure(string id, string error)
+        {
+            var result = CommandResult.FailureWithId(id, "Status file remained unavailable. Command was not executed. " + error);
+            result.errorCode = "STATUS_WRITE_FAILED";
+            return result;
+        }
+
+        /// <summary>完成回调只接收一次结果；状态更新失败不能把已成功业务改写成失败。</summary>
         private void WriteResult(CommandResult result)
         {
-            EnsureDirectoriesExist();
-
+            if (_published.Contains(result.id) || _pendingResults.ContainsKey(result.id)) return;
             result.status = result.errorCode == "EXECUTION_WAIT_TIMEOUT" ? "unknown" : result.success ? "completed" : "failed";
             _queueTimes.TryGetValue(result.id, out var queuedMs);
             _queueTimes.Remove(result.id);
             result.timings = new { queuedMs, executionMs = result.executionTime };
-            var filePath = Path.Combine(_resultsDir, $"{result.id}.json");
-
-            try
-            {
-                // Use Newtonsoft.Json for proper object serialization (supports anonymous types)
-                var json = JsonConvert.SerializeObject(result, Formatting.Indented, new JsonSerializerSettings
-                {
-                    NullValueHandling = NullValueHandling.Ignore,
-                    ReferenceLoopHandling = ReferenceLoopHandling.Ignore
-                });
-                var tmpPath = filePath + ".tmp";
-                File.WriteAllText(tmpPath, json, System.Text.Encoding.UTF8);
-                File.Move(tmpPath, filePath);
-                WriteStatus(result.id, result.status);
-            }
+            string json;
+            try { json = JsonConvert.SerializeObject(result, Formatting.Indented, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore, ReferenceLoopHandling = ReferenceLoopHandling.Ignore }); }
             catch (Exception ex)
             {
-                WriteStatus(result.id, "unknown");
-                AIBridgeLogger.LogError($"Failed to write result for {result.id}: {ex.Message}");
+                var failure = CommandResult.FailureWithId(result.id, "Execution finished but result serialization failed; do not replay. " + ex.Message);
+                failure.errorCode = "RESULT_SERIALIZATION_FAILED";
+                failure.status = "unknown";
+                result = failure;
+                json = JsonConvert.SerializeObject(result);
+            }
+            _pendingResults[result.id] = new PendingResult { Result = result, Json = json };
+            TryPublishResult(result.id);
+        }
+
+        /// <summary>结果发布重试独立于执行；短时 IO 失败保留原结果至既有十分钟保留期限。</summary>
+        private void TryPublishResult(string id)
+        {
+            var pending = _pendingResults[id];
+            if (pending.Age.ElapsedMilliseconds < pending.NextAttemptMs) return;
+            var path = Path.Combine(_resultsDir, id + ".json");
+            try
+            {
+                // 已有文件只有内容相同才算本次发布成功，绝不覆盖其他终态。
+                if (File.Exists(path))
+                {
+                    if (ReadPublishedText(path) != pending.Json) throw new IOException("A different result already exists for this ID.");
+                }
+                else
+                {
+                    var temporary = path + ".tmp";
+                    File.WriteAllText(temporary, pending.Json, new UTF8Encoding(false));
+                    File.Move(temporary, path);
+                }
+                _pendingResults.Remove(id);
+                _published.Add(id);
+                if (TryWriteStatus(id, pending.Result.status, out _) == StatusWrite.Waiting)
+                    _pendingStatuses[id] = pending.Result.status;
+            }
+            catch (IOException ex) { DeferResult(id, pending, ex.Message); }
+            catch (UnauthorizedAccessException ex) { DeferResult(id, pending, ex.Message); }
+        }
+
+        private void DeferResult(string id, PendingResult pending, string error)
+        {
+            if (!pending.Warned)
+            {
+                AIBridgeLogger.LogWarning($"Result publication delayed: {id}; execution will not be repeated. {error}");
+                pending.Warned = true;
+            }
+            pending.NextAttemptMs = pending.Age.ElapsedMilliseconds + 1000;
+            if (pending.Age.Elapsed < StaleFileTimeout) return;
+            _pendingResults.Remove(id);
+            _published.Add(id);
+            if (TryWriteStatus(id, "unknown", out _) == StatusWrite.Waiting) _pendingStatuses[id] = "unknown";
+            AIBridgeLogger.LogWarning("Result retention expired without publication: " + id);
+        }
+
+        /// <summary>Windows 文件不允许删除共享时只能等待占用解除，不删除旧文件或原地截断。</summary>
+        private StatusWrite TryWriteStatus(string id, string status, out string error)
+        {
+            var key = id + "|" + status;
+            var path = Path.Combine(_statusDir, id + ".json");
+            error = null;
+            try
+            {
+                var temporary = path + ".tmp";
+                File.WriteAllText(temporary, JsonConvert.SerializeObject(new { id, protocolVersion = 2, status, sessionId = EditorInstanceTracker.SessionId, updatedAtUtc = DateTime.UtcNow.ToString("O") }), new UTF8Encoding(false));
+                if (File.Exists(path)) File.Replace(temporary, path, null);
+                else File.Move(temporary, path);
+                _statusFailures.Remove(key);
+                return StatusWrite.Written;
+            }
+            catch (IOException ex) { error = ex.Message; }
+            catch (UnauthorizedAccessException ex) { error = ex.Message; }
+            if (!_statusFailures.TryGetValue(key, out var timer))
+            {
+                _statusFailures[key] = timer = Stopwatch.StartNew();
+                AIBridgeLogger.LogWarning($"Status publication delayed: {id}, {status}. {error}");
+            }
+            if (timer.ElapsedMilliseconds < StatusRetryMilliseconds) return StatusWrite.Waiting;
+            _statusFailures.Remove(key);
+            return StatusWrite.Failed;
+        }
+
+        private static string ReadPublishedText(string path)
+        {
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(stream, Encoding.UTF8)) return reader.ReadToEnd();
+        }
+
+        private static void TryDeleteInput(string file)
+        {
+            try { File.Delete(file); }
+            catch (IOException ex) { AIBridgeLogger.LogDebug("Input cleanup delayed: " + ex.Message); }
+            catch (UnauthorizedAccessException ex) { AIBridgeLogger.LogDebug("Input cleanup denied: " + ex.Message); }
+        }
+
+        /// <summary>清理异常不打断命令泵；读取状态时允许发布方替换文件。</summary>
+        private void CleanupStaleFiles()
+        {
+            if (DateTime.UtcNow < _nextCleanup) return;
+            _nextCleanup = DateTime.UtcNow.AddMinutes(1);
+            foreach (var directory in new[] { _resultsDir, _statusDir, _commandsDir })
+            {
+                try
+                {
+                    foreach (var file in Directory.GetFiles(directory, directory == _commandsDir ? "*.error" : "*.json"))
+                    {
+                        if (DateTime.UtcNow - File.GetLastWriteTimeUtc(file) <= StaleFileTimeout) continue;
+                        var id = Path.GetFileNameWithoutExtension(file);
+                        if (_queueTimers.ContainsKey(id) || _queueTimes.ContainsKey(id) || _pendingResults.ContainsKey(id) || _pendingStatuses.ContainsKey(id)) continue;
+                        try { File.Delete(file); _published.Remove(id); }
+                        catch (IOException ex) { AIBridgeLogger.LogDebug("Stale file cleanup delayed: " + ex.Message); }
+                        catch (UnauthorizedAccessException ex) { AIBridgeLogger.LogDebug("Stale file cleanup denied: " + ex.Message); }
+                    }
+                }
+                catch (IOException ex) { AIBridgeLogger.LogDebug("Cleanup scan delayed: " + ex.Message); }
+                catch (UnauthorizedAccessException ex) { AIBridgeLogger.LogDebug("Cleanup scan denied: " + ex.Message); }
             }
         }
 
-        /// <summary>状态在主线程原子发布；会话标识用于识别重载后无法确认的操作。</summary>
-        private void WriteStatus(string id, string status)
-        {
-            var path = Path.Combine(_statusDir, id + ".json");
-            var temporary = path + ".tmp";
-            File.WriteAllText(temporary, JsonConvert.SerializeObject(new { id, protocolVersion = 2, status, sessionId = EditorInstanceTracker.SessionId, updatedAtUtc = DateTime.UtcNow.ToString("O") }));
-            if (File.Exists(path)) File.Replace(temporary, path, null);
-            else File.Move(temporary, path);
-        }
-
-        /// <summary>确保命令、状态及结果目录存在。</summary>
         private void EnsureDirectoriesExist()
         {
-            try
-            {
-                Directory.CreateDirectory(_statusDir);
-                if (!Directory.Exists(_commandsDir))
-                {
-                    Directory.CreateDirectory(_commandsDir);
-                }
-
-                if (!Directory.Exists(_resultsDir))
-                {
-                    Directory.CreateDirectory(_resultsDir);
-                }
-
-                if (!Directory.Exists(_codeDir))
-                {
-                    Directory.CreateDirectory(_codeDir);
-                }
-
-                if (!Directory.Exists(_screenshotsDir))
-                {
-                    Directory.CreateDirectory(_screenshotsDir);
-                }
-            }
-            catch (Exception ex)
-            {
-                AIBridgeLogger.LogError($"Failed to create directories: {ex.Message}");
-            }
+            Directory.CreateDirectory(_commandsDir);
+            Directory.CreateDirectory(_resultsDir);
+            Directory.CreateDirectory(_codeDir);
+            Directory.CreateDirectory(_screenshotsDir);
+            Directory.CreateDirectory(_statusDir);
         }
 
         /// <summary>

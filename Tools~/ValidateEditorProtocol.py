@@ -106,6 +106,9 @@ def main():
         batches.append(round((time.perf_counter() - started) * 1000, 2))
     performance = {"singleMs": singles, "batchMs": batches, "singleMedianMs": statistics.median(singles), "batchMedianMs": statistics.median(batches)}
 
+    locked = call("CodeExecuteCommand_Execute", {"file": str(ROOT / "Tools~/ValidateEditorLocks.cs")}, options=("--timeout", "45000",))
+    assert locked["data"]["returnValue"]["passed"] is True
+
     # 域重载时仍在等待的请求不能被标为失败、成功或自动重放。
     pending = call("CodeExecuteCommand_Execute", {"code": "await System.Threading.Tasks.Task.Delay(60000); return 99;"}, options=("--no-wait",))
     deadline = time.monotonic() + 10

@@ -21,4 +21,10 @@
     <ProjectReference Include="..\AIBridgeCLI\AIBridgeCLI.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="../../../Editor/Core/CommandWatcher.cs" Link="EditorSource/CommandWatcher.cs" />
+    <Compile Include="../../../Editor/Core/CommandQueue.cs" Link="EditorSource/CommandQueue.cs" />
+    <Compile Include="../../../Editor/Models/CommandRequest.cs" Link="EditorSource/CommandRequest.cs" />
+    <Compile Include="../../../Editor/Models/CommandResult.cs" Link="EditorSource/CommandResult.cs" />
+  </ItemGroup>
 </Project>

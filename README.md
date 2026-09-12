@@ -328,5 +328,6 @@ MIT License
 - `--no-wait` 提交后用 `command status --id <id>`、`command result --id <id> [--wait --timeout <ms>]` 查询。等待超时不取消、不删除、不重放命令；保留结果可重复读取 10 分钟。
 - `executionTimeoutMs` 默认 120000，仅控制代码异步结果等待。超时不取消底层 Task，无法确认的最终业务结果不可通过重新执行写操作来确认。
 - 新字段包含 `protocolVersion=2`、`errorCode`、`status` 和 `timings`。命令完成与业务成功分别验证；unknown 不代表未执行。
+- 状态文件被占用时保留命令，在后续 Editor 更新中重试；执行前持续失败超过 2 秒，返回 `STATUS_WRITE_FAILED`，明确该命令未执行。执行后的结果发布失败只重试发布，最多保留 10 分钟，不重放命令；CLI 等待超时仍应查询原 ID。文件读取方应允许 `FileShare.Delete`，不要先删除旧状态文件绕过原子替换。
 
 当前 mildSLG 需在下载新版本时同步迁移 Harness 驱动、内嵌探针与用例、GM 玩家 ID 读取以及蓝湖模板执行器日志判断；旧运行报告无需迁移。新版本发布前不替换该项目包和脚本。

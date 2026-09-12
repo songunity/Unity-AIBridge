@@ -123,13 +123,17 @@ try {
         $summary.editorPid = $ownedUnity.Id
         $timer = [Diagnostics.Stopwatch]::StartNew()
         $ready = $false
+        $firstHeartbeatUtc = $null
         while ($timer.Elapsed.TotalSeconds -lt $StartupTimeoutSeconds) {
             if ($ownedUnity.HasExited) { throw "隔离 Unity 提前退出（$($ownedUnity.ExitCode)），见 $editorLog" }
             $metadataPath = Join-Path $projectRoot '.aibridge/editor-instance.json'
             if (Test-Path -LiteralPath $metadataPath) {
                 try {
                     $metadata = Get-Content -LiteralPath $metadataPath -Raw | ConvertFrom-Json
-                    if ($metadata.processId -eq $ownedUnity.Id -and $metadata.protocolVersion -eq 2) { $ready = $true; break }
+                    if ($metadata.processId -eq $ownedUnity.Id -and $metadata.protocolVersion -eq 2) {
+                        if ($firstHeartbeatUtc -and $metadata.lastUpdatedUtc -ne $firstHeartbeatUtc) { $ready = $true; break }
+                        $firstHeartbeatUtc = $metadata.lastUpdatedUtc
+                    }
                 } catch { } # 启动期间只接受完整元数据，未就绪继续有界等待。
             }
             Start-Sleep -Seconds 1

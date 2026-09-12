@@ -48,6 +48,8 @@ namespace AIBridge.Editor
 
         private static void WriteMetadata()
         {
+            // 失败也遵守心跳间隔，避免文件占用时每帧反复写盘。
+            _lastWriteUtc = DateTime.UtcNow;
             try
             {
                 var metadataDirectory = Path.GetDirectoryName(_metadataPath);

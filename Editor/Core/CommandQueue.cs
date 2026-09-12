@@ -49,6 +49,16 @@ namespace AIBridge.Editor
             }
         }
 
+        /// <summary>仅查看队首；状态持久化成功或明确拒绝后才取出，避免文件锁造成丢单。</summary>
+        public bool TryPeek(out CommandRequest request)
+        {
+            lock (_lock)
+            {
+                request = _queue.Count > 0 ? _queue.Peek() : null;
+                return request != null;
+            }
+        }
+
         /// <summary>
         /// Try to dequeue a command
         /// </summary>

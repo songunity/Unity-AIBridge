@@ -1,5 +1,6 @@
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using UnityEditor;
 using UnityEngine;
 
@@ -96,11 +97,18 @@ namespace AIBridge.Editor
         }
 
         /// <summary>
-        /// Find the AIBridge package root directory
+        /// Find the resolved root directory of the AIBridge package
         /// </summary>
         private static string FindPackageRoot()
         {
-            // Try local package first: Packages/AIBridge
+            // Let Unity resolve embedded, local file, and PackageCache installations.
+            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(AIBridge).Assembly);
+            if (packageInfo != null && Directory.Exists(packageInfo.resolvedPath))
+            {
+                return packageInfo.resolvedPath;
+            }
+
+            // Preserve compatibility with projects that place the package at Packages/AIBridge.
             var localPath = Path.Combine(ProjectRoot, "Packages", "AIBridge");
             if (Directory.Exists(localPath))
             {
@@ -120,6 +128,26 @@ namespace AIBridge.Editor
 
             AIBridgeLogger.LogWarning("AIBridge package root not found, using fallback path");
             return localPath; // Fallback
+        }
+
+        /// <summary>
+        /// Compare file contents so a newer target timestamp cannot preserve an outdated CLI.
+        /// </summary>
+        private static bool FilesHaveSameContent(string sourcePath, string targetPath)
+        {
+            if (new FileInfo(sourcePath).Length != new FileInfo(targetPath).Length)
+            {
+                return false;
+            }
+
+            using (var sha256 = SHA256.Create())
+            using (var sourceStream = File.OpenRead(sourcePath))
+            using (var targetStream = File.OpenRead(targetPath))
+            {
+                var sourceHash = sha256.ComputeHash(sourceStream);
+                var targetHash = sha256.ComputeHash(targetStream);
+                return sourceHash.SequenceEqual(targetHash);
+            }
         }
 
         /// <summary>
@@ -227,8 +255,8 @@ namespace AIBridge.Editor
                     var fileName = Path.GetFileName(sourceFile);
                     var targetFile = Path.Combine(targetPath, fileName);
                     
-                    // Only copy if target doesn't exist or source is newer
-                    if (!File.Exists(targetFile) || File.GetLastWriteTime(sourceFile) > File.GetLastWriteTime(targetFile))
+                    // Copy whenever contents differ so the CLI stays aligned with the Editor package.
+                    if (!File.Exists(targetFile) || !FilesHaveSameContent(sourceFile, targetFile))
                     {
                         File.Copy(sourceFile, targetFile, true);
                         AIBridgeLogger.LogDebug($"Copied CLI file: {fileName}");

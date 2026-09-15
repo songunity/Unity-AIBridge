@@ -20,7 +20,11 @@ namespace AIBridge.Editor
 
         static AIBridgeRuntimeBuildProcessor()
         {
-            EditorApplication.delayCall += SyncRuntimeBootstrapDefinesForActiveTarget;
+            // Jenkins 等批处理构建不使用 Runtime Bridge，禁止在构建启动阶段修改项目宏。
+            if (!Application.isBatchMode)
+            {
+                EditorApplication.delayCall += SyncRuntimeBootstrapDefinesForActiveTarget;
+            }
         }
 
         public int callbackOrder
@@ -31,6 +35,14 @@ namespace AIBridge.Editor
         public void OnPreprocessBuild(BuildReport report)
         {
             _runtimeSettingsCarrierInjected = false;
+            if (Application.isBatchMode)
+            {
+                Debug.Log(AIBridgeEditorText.T(
+                    "[AIBridge] Batch Mode build detected; Runtime Bridge build integration is disabled.",
+                    "[AIBridge] 检测到 Batch Mode 构建，已禁用 Runtime Bridge 构建集成。"));
+                return;
+            }
+
             var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
             var buildTargetGroup = report != null
                 ? BuildPipeline.GetBuildTargetGroup(report.summary.platform)
@@ -49,6 +61,11 @@ namespace AIBridge.Editor
 
         public void OnProcessScene(Scene scene, BuildReport report)
         {
+            if (Application.isBatchMode)
+            {
+                return;
+            }
+
 #if AIBRIDGE_RUNTIME_ENABLED
             if (_runtimeSettingsCarrierInjected)
             {
@@ -108,10 +125,14 @@ namespace AIBridge.Editor
                 defines,
                 RuntimeEnabledDefine,
                 settings.EnableRuntimeBridge);
-            changed |= SetDefine(
-                defines,
-                AIBridgeHybridClrUtility.HybridClrAvailableDefine,
-                AIBridgeHybridClrUtility.IsHybridClrInstalled());
+            // HybridCLR 能力宏只供 Runtime Bridge 使用，Bridge 关闭时不应增删宏或触发无效的脚本重编译。
+            if (settings.EnableRuntimeBridge)
+            {
+                changed |= SetDefine(
+                    defines,
+                    AIBridgeHybridClrUtility.HybridClrAvailableDefine,
+                    AIBridgeHybridClrUtility.IsHybridClrInstalled());
+            }
 
             if (!changed)
             {

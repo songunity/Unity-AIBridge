@@ -262,6 +262,12 @@ MIT License
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+## Optional diagnostic skills
+
+Use `Window/AIBridge/Install Diagnostic Skills` to install the Profiler, Frame Debugger, Memory Profiler and YooAsset skills with their scripts and shared Python runner. No optional Unity packages are installed automatically. Run an installed skill with `python scripts/run.py <script> --cli <absolute CLI path> --options-file <JSON options>`; source fragments depend on the runner and must not be passed directly to `--file`.
+
+Results distinguish completed, partial, blocked, failed and unknown outcomes and link full artifacts. Memory analysis targets package 1.1.0; Frame Debugger does not expose per-event GPU timings. See each skill for capture settings, dependencies and limits.
+
 ## Editor scheduling, caching and offline help
 
 Identical C# source reuses its compiled entry point, but executes again and returns fresh values/tasks. Cache hits skip source wrapping/parsing. Assembly loads trigger reference checks immediately; changes to DLL files at the same path are rechecked at most one second later. Domain reload clears the cache. Compilation errors include the diagnostic ID, original probe line/column and source excerpt.

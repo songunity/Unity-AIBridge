@@ -14,6 +14,7 @@ namespace AIBridge.Editor
     {
         private const string SkillFileName = "SKILL.md";
         private static readonly string[] SkillNames = { "aibridge", "aibridge-runtime" };
+        private static readonly string[] DiagnosticSkillNames = { "unity-profiler", "frame-debugger", "memory-profiler", "yooasset-debugger" };
         private static readonly string[] SkillRelativeFiles = { SkillFileName, "agents/openai.yaml" };
         private static readonly string[] AIDirectories = { ".agents", ".claude", ".cursor", ".factory", ".codex", ".kiro" };
         private static readonly string[] DefaultCreateDirs = { ".agents" };
@@ -210,15 +211,27 @@ namespace AIBridge.Editor
             }
         }
 
-        private static void CopySkillsToAgent(string root, string agentName)
+        [MenuItem("Window/AIBridge/Install Diagnostic Skills")]
+        public static void CopyDiagnosticSkillsToAgent()
         {
-            foreach (var skillName in SkillNames)
+            var root = GetInstallRoot();
+            var targets = AIDirectories.Where(name => Directory.Exists(Path.Combine(root, name))).ToArray();
+            if (targets.Length == 0) targets = DefaultCreateDirs;
+            foreach (var target in targets) CopySkillsToAgent(root, target, DiagnosticSkillNames);
+        }
+
+        private static void CopySkillsToAgent(string root, string agentName, string[] skillNames = null)
+        {
+            foreach (var skillName in skillNames ?? SkillNames)
             {
                 var sourceDir = SkillSourceDir(skillName);
                 var targetDir = AgentSkillDir(root, agentName, skillName);
                 Directory.CreateDirectory(targetDir);
 
-                foreach (var relativePath in SkillRelativeFiles)
+                var relativeFiles = DiagnosticSkillNames.Contains(skillName)
+                    ? Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories).Select(path => path.Substring(sourceDir.Length + 1))
+                    : SkillRelativeFiles;
+                foreach (var relativePath in relativeFiles)
                 {
                     var sourceFile = Path.Combine(sourceDir, relativePath);
                     if (!File.Exists(sourceFile)) continue;
@@ -226,6 +239,16 @@ namespace AIBridge.Editor
                     var targetFile = Path.Combine(targetDir, relativePath);
                     Directory.CreateDirectory(Path.GetDirectoryName(targetFile));
                     File.Copy(sourceFile, targetFile, true);
+                }
+
+                if (DiagnosticSkillNames.Contains(skillName))
+                {
+                    foreach (var file in new[] { "run.py", "_common.cs" })
+                    {
+                        var targetFile = Path.Combine(targetDir, "scripts", file);
+                        Directory.CreateDirectory(Path.GetDirectoryName(targetFile));
+                        File.Copy(Path.Combine(AIBridge.PackageRoot, "Skill~", "diagnostics-common", file), targetFile, true);
+                    }
                 }
 
                 Debug.Log($"[AIBridge] Skill copied to {targetDir}");

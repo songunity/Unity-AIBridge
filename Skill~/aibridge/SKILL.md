@@ -7,6 +7,8 @@ description: 通过 AI Bridge CLI 操作已打开的 Unity Editor、场景和资
 
 ## 连接与命令选择
 
+性能诊断按需使用独立的 `unity-profiler`、`frame-debugger`、`memory-profiler`、`yooasset-debugger` Skill；通过 `Window/AIBridge/Install Diagnostic Skills` 安装。诊断 Skill 的脚本和公共运行器需要一起分发；它们不会自动安装 Memory Profiler 或 YooAsset 依赖。
+
 - 定位 Unity 项目根（含 Assets 和 ProjectSettings），记录 CLI 绝对路径 `.aibridge/cli/AIBridgeCLI.exe`；不要依赖后续工具调用继承工作目录。macOS/Linux 无 `.exe`。Editor 与独立 Player 的连接链路分开。
 - 每次使用 `--raw`。先记录当前 Editor 状态，默认附加现有会话，定位已有对象；仅在任务需要时进入或退出 Play Mode，不机械创建 Canvas、Button 或重启游戏。
 - 首次使用不熟悉的命令，通过 `Help --command <命令> --raw` 查参数；优先读取当前 Editor 会话生成的本地目录，同版本同会话复用已查帮助。`Compile --raw --timeout 300000` 直接调用即可，其结果已包含编译错误。

@@ -1,7 +1,7 @@
 {
   "name": "com.sh.aibridge",
   "displayName": "AI Bridge",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "unity": "2021.3",
   "description": "File-based communication framework between AI Code assistants and Unity Editor. Provides stable, extensible command execution without MCP dependencies.",
   "author": {
@@ -31,6 +31,11 @@
     "Skill~/aibridge/agents/openai.yaml",
     "Skill~/aibridge-runtime/SKILL.md",
     "Skill~/aibridge-runtime/agents/openai.yaml",
+    "Skill~/unity-profiler",
+    "Skill~/frame-debugger",
+    "Skill~/memory-profiler",
+    "Skill~/yooasset-debugger",
+    "Skill~/diagnostics-common",
     "Tools~/CLI/win-x64/AIBridgeCLI.exe",
     "Tools~/CLI/linux-x64/AIBridgeCLI",
     "Tools~/CLI/osx-x64/AIBridgeCLI",

@@ -20,6 +20,7 @@ def call(command, parameters=None, expected=True, options=()):
         args.append(options[0])
         options = options[1:]
     args += ["--raw", "--timeout", "15000", *options]
+    transport_timeout = max([15000] + [int(options[i + 1]) for i, value in enumerate(options[:-1]) if value == "--timeout"])
     if parameters is not None:
         args.append("--stdin")
     started = time.perf_counter()
@@ -27,7 +28,7 @@ def call(command, parameters=None, expected=True, options=()):
     records.append(entry)
     try:
         process = subprocess.run(args, input=json.dumps(parameters) if parameters is not None else None,
-                                 capture_output=True, text=True, encoding="utf-8", timeout=55)
+                                 capture_output=True, text=True, encoding="utf-8", timeout=max(55, transport_timeout / 1000 + 15))
         entry.update({"exitCode": process.returncode, "stdout": process.stdout, "stderr": process.stderr})
         result = json.loads(process.stdout)
         entry["result"] = result
@@ -63,6 +64,8 @@ def main():
     call("EditorCommand_GetState")
     from ValidateRuntimeDiscovery import validate
     runtime_discovery = validate(call, PROJECT)
+    from ValidateDiagnosticSkills import validate as validate_diagnostics
+    diagnostics = validate_diagnostics(call, ROOT, PROJECT)
     help_result = call("Help", {"command": "CodeExecuteCommand_Execute"}, options=("--offline",))
     assert help_result["data"]["helpCatalog"]["sessionId"] == metadata["sessionId"]
     # 实际注册表与 Skill 目录一致；不只检查源码字符串。
@@ -159,7 +162,12 @@ return true;''')
     deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
         if metadata.exists():
-            current = json.loads(metadata.read_text())
+            try:
+                current = json.loads(metadata.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                # 域重载和 Windows 原子替换期间允许临时读失败，但不延长原截止时间。
+                time.sleep(0.25)
+                continue
             if current["sessionId"] != old_session:
                 break
         time.sleep(0.25)
@@ -173,7 +181,7 @@ return true;''')
     assert invalid.returncode != 0 and json.loads(invalid.stdout)["errorCode"] == "CLI_ERROR"
     runtime = subprocess.run([str(CLI), "runtime", "list_targets", "--raw"], capture_output=True, text=True, encoding="utf-8")
     assert runtime.returncode == 0 and "protocolVersion" not in json.loads(runtime.stdout)
-    summary = {"passed": True, "checks": len(records), "rawErrors": True, "runtimeFormatUnchanged": True, "performance": performance, "runtimeDiscovery": runtime_discovery}
+    summary = {"passed": True, "checks": len(records), "rawErrors": True, "runtimeFormatUnchanged": True, "performance": performance, "runtimeDiscovery": runtime_discovery, "diagnostics": diagnostics}
     records.append(summary)
     REPORT.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False))

@@ -83,4 +83,16 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
+foreach ($name in @('unity-profiler', 'frame-debugger', 'memory-profiler', 'yooasset-debugger')) {
+    $directory = Join-Path $RepoRoot "Skill~/$name"
+    if (-not (Test-Path (Join-Path $directory 'SKILL.md'))) { throw "Missing diagnostic skill: $name" }
+    if (-not (Get-ChildItem (Join-Path $directory 'scripts') -Filter '*.cs')) { throw "Missing diagnostic scripts: $name" }
+    if ($installer -notmatch [regex]::Escape('"' + $name + '"')) { throw "Installer missing diagnostic skill: $name" }
+    if ($package.files -notcontains "Skill~/$name") { throw "Package missing diagnostic skill: $name" }
+}
+foreach ($file in @('run.py', '_common.cs')) {
+    if (-not (Test-Path (Join-Path $RepoRoot "Skill~/diagnostics-common/$file"))) { throw "Missing diagnostic support: $file" }
+}
+if ($package.files -notcontains 'Skill~/diagnostics-common') { throw 'Package missing shared diagnostic support' }
+
 Write-Output 'Skill validation passed.'

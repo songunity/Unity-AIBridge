@@ -2,6 +2,7 @@
 param(
     [switch]$IncludeEditor,
     [string]$UnityPath,
+    [string]$MemoryProfilerPackagePath,
     [ValidateRange(30, 900)][int]$StartupTimeoutSeconds = 300
 )
 
@@ -109,6 +110,10 @@ try {
         }
         Copy-Item -LiteralPath (Join-Path $repoRoot 'package.json') -Destination $packageCopy -Force
         $dependencies = [ordered]@{ 'com.sh.aibridge' = 'file:AIBridge'; 'com.unity.ugui' = '1.0.0'; 'com.unity.test-framework' = '1.1.33' }
+        if ($MemoryProfilerPackagePath) {
+            $memoryPackage = (Resolve-Path -LiteralPath $MemoryProfilerPackagePath -ErrorAction Stop).Path.Replace('\', '/')
+            $dependencies['com.unity.memoryprofiler'] = 'file:' + $memoryPackage
+        }
         # 与 Unity 2022.3 空工程一致的内置模块，不读取业务项目 manifest。
         foreach ($module in @('ai','androidjni','animation','assetbundle','audio','cloth','director','imageconversion','imgui','jsonserialize','particlesystem','physics','physics2d','screencapture','terrain','terrainphysics','tilemap','ui','uielements','umbra','unityanalytics','unitywebrequest','unitywebrequestassetbundle','unitywebrequestaudio','unitywebrequesttexture','unitywebrequestwww','vehicles','video','vr','wind','xr')) {
             $dependencies['com.unity.modules.' + $module] = '1.0.0'

@@ -318,6 +318,14 @@ MIT License
 
 异步等待使用真实经过时间计时，保留 120 秒上限；超时表示停止等待，不代表用户任务已被取消。
 
+### 可选诊断 Skill
+
+通过 `Window/AIBridge/Install Diagnostic Skills` 安装 `unity-profiler`、`frame-debugger`、`memory-profiler`、`yooasset-debugger`。它们与基础桥接 Skill 分开加载；安装器同时复制脚本、公共参数入口和结果处理代码，不会自动安装 Memory Profiler 或 YooAsset 包。
+
+在安装后的技能目录执行 `python scripts/run.py <脚本名> --cli <目标项目CLI绝对路径> --options-file <参数JSON>`。诊断入口提交一次后按原 ID 等待，不重放超时采集；返回明确状态、摘要、采样上下文和完整数据文件。详细用法见各技能的 `SKILL.md`。仓库内开发时可用 `python Skill~/diagnostics-common/run.py <脚本名> --scripts Skill~/<技能名>/scripts --cli <CLI路径>`。
+
+Memory 分析以官方 1.1.0 源码适配，快照依赖、采集选项、引用查询深度及兼容限制均在技能中明确说明。Frame Debugger 不提供逐事件 GPU 时间；Profiler 的已录制调用栈与 Flow 不代表所有线程因果关系完整。
+
 ### 调度、帮助与耗时
 
 Editor 用文件通知唤醒命令检查，空闲时每 100ms 补扫，收到命令后的一秒内每 10ms 检查；实际频率仍受 Editor 更新频率和主线程负载限制。CLI 等待结果使用文件通知，并以 500ms 轮询补偿丢失的通知；通知不可用时回退到 50ms 轮询。同步命令当次推进，Batch 在 8ms 时间预算内连续执行；单条同步代码不可抢占，异步子项仍完成后才执行下一项。

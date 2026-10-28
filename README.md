@@ -320,7 +320,7 @@ MIT License
 
 ### 可选诊断 Skill
 
-通过 `Window/AIBridge/Install Diagnostic Skills` 安装 `unity-profiler`、`frame-debugger`、`memory-profiler`、`yooasset-debugger`。它们与基础桥接 Skill 分开加载；安装器同时复制脚本、公共参数入口和结果处理代码，不会自动安装 Memory Profiler 或 YooAsset 包。
+通过 `Window/AIBridge/Install Profiler Skills` 安装 `unity-profiler`、`frame-debugger`、`memory-profiler`、`yooasset-debugger`。它们与基础桥接 Skill 分开加载；安装器同时复制脚本、公共参数入口和结果处理代码，不会自动安装 Memory Profiler 或 YooAsset 包。
 
 在安装后的技能目录执行 `python scripts/run.py <脚本名> --cli <目标项目CLI绝对路径> --options-file <参数JSON>`。诊断入口提交一次后按原 ID 等待，不重放超时采集；返回明确状态、摘要、采样上下文和完整数据文件。详细用法见各技能的 `SKILL.md`。仓库内开发时可用 `python Skill~/diagnostics-common/run.py <脚本名> --scripts Skill~/<技能名>/scripts --cli <CLI路径>`。
 

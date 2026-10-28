@@ -211,7 +211,7 @@ namespace AIBridge.Editor
             }
         }
 
-        [MenuItem("Window/AIBridge/Install Diagnostic Skills")]
+        [MenuItem("Window/AIBridge/Install Profiler Skills")]
         public static void CopyDiagnosticSkillsToAgent()
         {
             var root = GetInstallRoot();

@@ -264,7 +264,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Optional diagnostic skills
 
-Use `Window/AIBridge/Install Diagnostic Skills` to install the Profiler, Frame Debugger, Memory Profiler and YooAsset skills with their scripts and shared Python runner. No optional Unity packages are installed automatically. Run an installed skill with `python scripts/run.py <script> --cli <absolute CLI path> --options-file <JSON options>`; source fragments depend on the runner and must not be passed directly to `--file`.
+Use `Window/AIBridge/Install Profiler Skills` to install the Profiler, Frame Debugger, Memory Profiler and YooAsset skills with their scripts and shared Python runner. No optional Unity packages are installed automatically. Run an installed skill with `python scripts/run.py <script> --cli <absolute CLI path> --options-file <JSON options>`; source fragments depend on the runner and must not be passed directly to `--file`.
 
 Results distinguish completed, partial, blocked, failed and unknown outcomes and link full artifacts. Memory analysis targets package 1.1.0; Frame Debugger does not expose per-event GPU timings. See each skill for capture settings, dependencies and limits.
 

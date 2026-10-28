@@ -6,9 +6,10 @@ namespace AIBridge.Editor;
 
 internal static class AIBridgeLogger
 {
-    public static void LogDebug(string text) { }
-    public static void LogWarning(string text) { }
-    public static void LogError(string text) { }
+    public static readonly List<string> Entries = new();
+    public static void LogDebug(string text) => Entries.Add(text);
+    public static void LogWarning(string text) => Entries.Add(text);
+    public static void LogError(string text) => Entries.Add(text);
 }
 internal static class ScreenshotCacheManager { public static void CleanupOldScreenshots() { } }
 internal static class EditorInstanceTracker { public static readonly string SessionId = "test-domain"; }

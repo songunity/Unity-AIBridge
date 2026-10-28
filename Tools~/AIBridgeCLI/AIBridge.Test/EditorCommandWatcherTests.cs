@@ -9,6 +9,7 @@ public sealed class EditorCommandWatcherTests : IDisposable
     private readonly CommandWatcher watcher;
     public EditorCommandWatcherTests()
     {
+        AIBridgeLogger.Entries.Clear();
         CommandRegistry.Executions = 0;
         CommandRegistry.DuringExecution = null;
         CommandRegistry.DuplicateCallback = false;
@@ -47,6 +48,7 @@ public sealed class EditorCommandWatcherTests : IDisposable
         Assert.Equal("STATUS_WRITE_FAILED", (string)Result("blocked")["errorCode"]);
         Assert.Equal(0, CommandRegistry.Executions);
         Submit("next"); watcher.ScanForCommands(); watcher.ProcessOneCommand();
+        Assert.True(File.Exists(FileAt("results", "next")), string.Join(Environment.NewLine, AIBridgeLogger.Entries));
         Assert.True((bool)Result("next")["success"]);
         Assert.Equal(1, CommandRegistry.Executions);
     }

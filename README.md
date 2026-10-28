@@ -310,13 +310,23 @@ MIT License
 
 ### Editor C# 编译缓存
 
-`CodeExecuteCommand_Execute` 在当前程序集域内复用相同代码的编译入口，每次仍重新执行代码，返回值和异步任务不复用；日志按请求执行期间收集，并发请求的日志来源尚未隔离。缓存以包装后的代码为键，使用固定编译选项；引用程序集身份、路径、MVID 或文件版本变化时，以及程序集重载后失效。
+`CodeExecuteCommand_Execute` 在当前程序集域内复用相同代码的编译入口，每次仍重新执行代码，返回值和异步任务不复用；日志按请求执行期间收集，并发请求的日志来源尚未隔离。缓存以原始代码为键，命中时不再包装和解析代码。程序集加载时立即检查引用变化；同路径 DLL 的文件变化最多一秒后复核，程序集重载后缓存清空。
 
 缓存最多保留 64 个入口。达到上限后，按 FIFO 淘汰最早加入的入口并缓存新代码；清空字典不会卸载 Mono 已加载的动态程序集。此缓存不作用于远程 Player 的 `CompileToBytes` 路径。
 
-通过 `AIBridgeCLI CodeExecuteCommand_CacheStatus --raw` 查询当前缓存条目、命中次数、编译次数与引用重建次数，不影响原有 `ReturnValue / Output` 格式。
+通过 `AIBridgeCLI CodeExecuteCommand_CacheStatus --raw` 查询当前缓存条目、命中次数、编译次数与引用重建次数。代码结果使用协议 2 的 `data.returnValue` 和 `data.logs`。
 
 异步等待使用真实经过时间计时，保留 120 秒上限；超时表示停止等待，不代表用户任务已被取消。
+
+### 调度、帮助与耗时
+
+Editor 用文件通知唤醒命令检查，空闲时每 100ms 补扫，收到命令后的一秒内每 10ms 检查；实际频率仍受 Editor 更新频率和主线程负载限制。CLI 等待结果使用文件通知，并以 500ms 轮询补偿丢失的通知；通知不可用时回退到 50ms 轮询。同步命令当次推进，Batch 在 8ms 时间预算内连续执行；单条同步代码不可抢占，异步子项仍完成后才执行下一项。
+
+`Help --command <名称> --raw` 优先读取匹配 Editor 会话的 `.aibridge/command-catalog.json`。`--offline` 禁止提交 Editor 命令；Editor 关闭后可读取上次目录，`data.helpCatalog` 标注来源会话、生成时间和是否存在会话元数据。没有目录或会话不匹配时明确失败，升级后需由匹配 Editor 重新生成；扫描命令注册表时也会更新目录。
+
+耗时字段可区分请求发现、排队、协程调度和主动执行：`discoveryMs`、`queuedMs`、`dispatchMs`、`activeMs`；`executionMs` 包含 yield/异步等待。`cliWaitMs` 为提交加等待总时间，`cliSubmitMs` 为提交部分，`resultDeliveryMs` 包含结果序列化、发布重试及 CLI 观察。代码结果额外提供 `initializationMs`、`referenceMs`、`compileMs`，Compile 提供全程 `compileTotalMs`。父 Batch 的主动耗时不累计异步子协程所有帧的执行时间；这些字段不能直接当作 CPU Profiler 数据。
+
+编译诊断返回错误编号、原始探针行列和相关代码行。项目/CLI 路径错误或心跳过期时，先检查现场；不要重复提交相同帮助或写操作。
 
 ## Editor 协议 2：调用迁移
 

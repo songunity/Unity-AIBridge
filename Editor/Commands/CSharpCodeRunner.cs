@@ -19,6 +19,18 @@ public sealed class CSharpCodeRunner
     private readonly Dictionary<string, MethodInfo> compiledMethods = new Dictionary<string, MethodInfo>();
     private readonly Queue<string> cacheOrder = new Queue<string>();
     private string referenceFingerprint;
+    private static int assemblyGeneration;
+    private int referenceGeneration = -1;
+    private readonly System.Diagnostics.Stopwatch referenceCheck = System.Diagnostics.Stopwatch.StartNew();
+    static CSharpCodeRunner()
+    {
+        AppDomain.CurrentDomain.AssemblyLoad += (_, args) =>
+        {
+            var assembly = args.LoadedAssembly;
+            if (!assembly.IsDynamic && !assembly.GetName().Name.StartsWith("DynamicAssembly_", StringComparison.Ordinal))
+                System.Threading.Interlocked.Increment(ref assemblyGeneration);
+        };
+    }
     private static readonly CSharpCompilationOptions EditorCompileOptions = new CSharpCompilationOptions(
         OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Debug, allowUnsafe: true);
 
@@ -42,6 +54,11 @@ public sealed class CSharpCodeRunner
     /// </summary>
     private void RefreshReferences()
     {
+        var generation = System.Threading.Volatile.Read(ref assemblyGeneration);
+        // 程序集加载立即失效；同路径 DLL 的文件变化最多一秒后复核。
+        if (referenceGeneration == generation && referenceCheck.ElapsedMilliseconds < 1000) return;
+        referenceGeneration = generation;
+        referenceCheck.Restart();
         var allAssemblies = AppDomain.CurrentDomain.GetAssemblies()
             .Where(x => !x.IsDynamic && !string.IsNullOrEmpty(x.Location)
                 && !x.GetName().Name.StartsWith("DynamicAssembly_", StringComparison.Ordinal))
@@ -101,7 +118,7 @@ public sealed class CSharpCodeRunner
         var root = CSharpSyntaxTree.ParseText(code).GetCompilationUnitRoot();
         var usings = new StringBuilder();
         foreach (var directive in root.Usings)
-            usings.AppendLine(directive.ToString());
+            usings.AppendLine("#line " + (directive.GetLocation().GetLineSpan().StartLinePosition.Line + 1) + " \"probe.csx\"" + "\n" + directive.ToString());
 
         // 只移除语法树中的 using 指令；保留 using 声明、字符串、注释及原有换行。
         var body = new StringBuilder(code);
@@ -128,7 +145,9 @@ public static class CodeExecutor
 {{
     public static {returnType} {methodName}()
     {{
-        {body}
+#line 1 ""probe.csx""
+{body}
+#line default
         return null;
     }}
 }}
@@ -151,10 +170,10 @@ public static class CodeExecutor
         }
 
         var wrappedCode = this.WrapCodeInClass(code);
-        return this.CompileCodeToBytes(wrappedCode);
+        return this.CompileCodeToBytes(wrappedCode, code);
     }
 
-    private EvaluationResult CompileCodeToBytes(string code)
+    private EvaluationResult CompileCodeToBytes(string code, string originalCode)
     {
         var options = new CSharpCompilationOptions(
             OutputKind.DynamicallyLinkedLibrary,
@@ -176,7 +195,7 @@ public static class CodeExecutor
             {
                 var errors = emitResult.Diagnostics
                     .Where(d => d.Severity == DiagnosticSeverity.Error)
-                    .Select(d => d.GetMessage())
+                    .Select(d => FormatDiagnostic(d, originalCode))
                     .ToArray();
 
                 return new EvaluationResult
@@ -196,6 +215,8 @@ public static class CodeExecutor
 
     /// <summary>最近一次入口准备耗时，不包含业务方法执行。</summary>
     public long LastPreparationMs { get; private set; }
+    public long LastReferenceMs { get; private set; }
+    public long LastCompileMs { get; private set; }
     /// <summary>最近一次入口是否复用了已编译方法。</summary>
     public bool LastCacheHit { get; private set; }
 
@@ -204,6 +225,8 @@ public static class CodeExecutor
     {
         var preparation = System.Diagnostics.Stopwatch.StartNew();
         LastPreparationMs = 0;
+        LastReferenceMs = 0;
+        LastCompileMs = 0;
         LastCacheHit = false;
         if (string.IsNullOrEmpty(code))
         {
@@ -215,14 +238,15 @@ public static class CodeExecutor
         }
 
         RefreshReferences();
-        var wrappedCode = this.WrapCodeInClass(code);
-        // 引用变化时整体失效，编译选项固定，包装后的代码即可作为缓存键。
-        var key = wrappedCode;
+        LastReferenceMs = preparation.ElapsedMilliseconds;
+        // 原始代码作为键，命中时不再解析和包装语法树。
+        var key = code;
 
         if (!compiledMethods.TryGetValue(key, out var method))
         {
             CompilationCount++;
-            var result = this.CompileCode(wrappedCode);
+            var result = this.CompileCode(WrapCodeInClass(code), code);
+            LastCompileMs = preparation.ElapsedMilliseconds - LastReferenceMs;
             if (!result.Success)
             {
                 LastPreparationMs = preparation.ElapsedMilliseconds;
@@ -353,7 +377,17 @@ public static class CodeExecutor
     /// </summary>
     /// <param name="code">The C# code to compile.</param>
     /// <returns>The result of the compilation.</returns>
-    private EvaluationResult CompileCode(string code)
+    private static string FormatDiagnostic(Diagnostic diagnostic, string source)
+    {
+        var span = diagnostic.Location.GetMappedLineSpan();
+        var line = span.StartLinePosition.Line;
+        var lines = source.Replace("\r\n", "\n").Split('\n');
+        var excerpt = line >= 0 && line < lines.Length ? lines[line].Trim() : "";
+        if (excerpt.Length > 240) excerpt = excerpt.Substring(0, 240);
+        return $"{diagnostic.Id} {span.Path}({line + 1},{span.StartLinePosition.Character + 1}): {diagnostic.GetMessage()}\n  {excerpt}";
+    }
+
+    private EvaluationResult CompileCode(string code, string originalCode)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(code);
         var compilation = CSharpCompilation.Create(
@@ -370,7 +404,7 @@ public static class CodeExecutor
             {
                 var errors = emitResult.Diagnostics
                     .Where(d => d.Severity == DiagnosticSeverity.Error)
-                    .Select(d => d.GetMessage())
+                    .Select(d => FormatDiagnostic(d, originalCode))
                     .ToArray();
 
                 return new EvaluationResult

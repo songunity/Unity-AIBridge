@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 
 namespace AIBridgeCLI.Commands;
 
@@ -9,15 +10,15 @@ public static class CompileUnityCommand
 
     public static CommandResult Compile(int timeout = 120000)
     {
-        var transportTimeout = Math.Min(DefaultTransportTimeout, Math.Max(DefaultPollInterval, timeout));
+        if (timeout <= 0) throw new ArgumentOutOfRangeException(nameof(timeout));
+        var total = Stopwatch.StartNew();
+        var transportTimeout = Math.Min(DefaultTransportTimeout, timeout);
         var sender = new CommandSender(timeout: transportTimeout);
         var startResult = sender.SendCommand(new CommandRequest()
         {
             id = PathHelper.GenerateCommandId(),
             type = "CompileCommand_Start",
         });
-
-        var startTime = DateTime.Now;
         var startedByInvocation = false;
         var attachedToExistingCompilation = false;
         var observedCompilationActivity = false;
@@ -37,11 +38,13 @@ public static class CompileUnityCommand
         }
         else
         {
-            return startResult;
+            return WithTotal(startResult, total);
         }
 
-        while ((DateTime.Now - startTime).TotalMilliseconds < timeout)
+        while (total.ElapsedMilliseconds < timeout)
         {
+            var remaining = timeout - (int)total.ElapsedMilliseconds;
+            sender = new CommandSender(timeout: Math.Min(DefaultTransportTimeout, Math.Max(1, remaining)));
             CommandResult stateResult;
             try
             {
@@ -54,14 +57,14 @@ public static class CompileUnityCommand
             catch (Exception e)
             {
                 lastCommunicationError = e.Message;
-                Thread.Sleep(DefaultPollInterval);
+                Thread.Sleep(Math.Min(DefaultPollInterval, Math.Max(0, timeout - (int)total.ElapsedMilliseconds)));
                 continue;
             }
 
             if (!stateResult.success)
             {
                 lastCommunicationError = stateResult.error;
-                Thread.Sleep(DefaultPollInterval);
+                Thread.Sleep(Math.Min(DefaultPollInterval, Math.Max(0, timeout - (int)total.ElapsedMilliseconds)));
                 continue;
             }
 
@@ -71,7 +74,7 @@ public static class CompileUnityCommand
             if (state == "compiling" || isCompiling)
             {
                 observedCompilationActivity = true;
-                Thread.Sleep(DefaultPollInterval);
+                Thread.Sleep(Math.Min(DefaultPollInterval, Math.Max(0, timeout - (int)total.ElapsedMilliseconds)));
                 continue;
             }
 
@@ -79,7 +82,7 @@ public static class CompileUnityCommand
             {
                 if (startCommunicationTimedOut)
                 {
-                    return new CommandResult()
+                    return WithTotal(new CommandResult()
                     {
                         protocolVersion = 2,
                         id = stateResult.id,
@@ -92,10 +95,10 @@ public static class CompileUnityCommand
                             statusConfirmed: true,
                             startCommunicationTimedOut,
                             lastCommunicationError)
-                    };
+                    }, total);
                 }
 
-                Thread.Sleep(DefaultPollInterval);
+                Thread.Sleep(Math.Min(DefaultPollInterval, Math.Max(0, timeout - (int)total.ElapsedMilliseconds)));
                 continue;
             }
 
@@ -106,10 +109,10 @@ public static class CompileUnityCommand
                 statusConfirmed: true,
                 startCommunicationTimedOut,
                 lastCommunicationError);
-            return stateResult;
+            return WithTotal(stateResult, total);
         }
 
-        return new CommandResult()
+        return WithTotal(new CommandResult()
         {
             protocolVersion = 2,
             id = startResult.id,
@@ -124,7 +127,17 @@ public static class CompileUnityCommand
                 statusConfirmed: false,
                 startCommunicationTimedOut,
                 lastCommunicationError)
-        };
+        }, total);
+    }
+
+    private static CommandResult WithTotal(CommandResult result, Stopwatch timer)
+    {
+        var timings = result.timings is JsonElement element && element.ValueKind == JsonValueKind.Object
+            ? element.EnumerateObject().ToDictionary(p => p.Name, p => (object)p.Value.Clone())
+            : result.timings as Dictionary<string, object> ?? new Dictionary<string, object>();
+        timings["compileTotalMs"] = timer.ElapsedMilliseconds;
+        result.timings = timings;
+        return result;
     }
 
     private static bool IsTransportTimeout(string error)

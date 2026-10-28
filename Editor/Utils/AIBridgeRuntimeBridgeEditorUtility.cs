@@ -47,6 +47,7 @@ namespace AIBridge.Editor
         public string DeviceName;
         public string LastSeenUtc;
         public string LastHealthCheckUtc;
+        public string HealthError;
         public string RemoteEndPoint;
         public string SourceInterface;
         public string SourceInterfaceAddress;
@@ -61,6 +62,9 @@ namespace AIBridge.Editor
 
     internal static partial class AIBridgeRuntimeBridgeEditorUtility
     {
+        private static readonly object DiscoveryCacheLock = new object();
+        private static string _lastDiscoveryJson;
+        public static string DiscoveryCacheError { get; private set; }
         public const string RuntimeDirectoryName = "runtime";
         public const string TargetsDirectoryName = "targets";
         public const string HeartbeatFileName = "heartbeat.json";
@@ -269,6 +273,7 @@ namespace AIBridge.Editor
                     DeviceName = GetString(item, "deviceName"),
                     LastSeenUtc = lastSeen.HasValue ? lastSeen.Value.ToString("o") : null,
                     LastHealthCheckUtc = GetString(item, "lastHealthCheckUtc"),
+                    HealthError = GetString(item, "healthError"),
                     RemoteEndPoint = GetString(item, "remoteEndPoint"),
                     SourceInterface = GetString(item, "sourceInterface"),
                     SourceInterfaceAddress = GetString(item, "sourceInterfaceAddress"),
@@ -347,6 +352,7 @@ namespace AIBridge.Editor
                 return false;
             }
 
+            lock (DiscoveryCacheLock)
             try
             {
                 var cache = ReadDiscoveryCache();
@@ -383,7 +389,7 @@ namespace AIBridge.Editor
                     Directory.CreateDirectory(directory);
                 }
 
-                File.WriteAllText(path, SerializeJson(cache, pretty: true));
+                SaveDiscoveryCache(cache);
                 return true;
             }
             catch (Exception exception)
@@ -492,21 +498,45 @@ namespace AIBridge.Editor
             }
         }
 
-        private static Dictionary<string, object> ReadDiscoveryCache()
+        private static void SaveDiscoveryCache(Dictionary<string, object> cache)
         {
+            // 调用者持有锁，原子发布避免 UI 读到半份 JSON。
+            if (DiscoveryCacheError != null) throw new IOException(DiscoveryCacheError);
             var path = GetDiscoveryCachePath();
-            if (!File.Exists(path))
-            {
-                return null;
-            }
-
+            var json = SerializeJson(cache, pretty: true);
+            var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
-                return DeserializeJson(File.ReadAllText(path));
+                File.WriteAllText(temporary, json);
+                if (File.Exists(path)) File.Replace(temporary, path, null);
+                else File.Move(temporary, path);
+                _lastDiscoveryJson = json;
             }
-            catch
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        }
+
+        private static Dictionary<string, object> ReadDiscoveryCache()
+        {
+            lock (DiscoveryCacheLock)
             {
-                return null;
+                var path = GetDiscoveryCachePath();
+                if (!File.Exists(path)) { DiscoveryCacheError = null; _lastDiscoveryJson = null; return null; }
+                try
+                {
+                    string json;
+                    using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    using (var reader = new StreamReader(stream)) json = reader.ReadToEnd();
+                    var cache = DeserializeJson(json);
+                    if (cache == null) throw new IOException("Invalid discovery cache JSON");
+                    _lastDiscoveryJson = json;
+                    DiscoveryCacheError = null;
+                    return cache;
+                }
+                catch (Exception ex)
+                {
+                    DiscoveryCacheError = "Cannot read device cache: " + ex.Message;
+                    return _lastDiscoveryJson == null ? null : DeserializeJson(_lastDiscoveryJson);
+                }
             }
         }
 

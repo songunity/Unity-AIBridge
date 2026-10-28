@@ -18,6 +18,10 @@ namespace AIBridge.Editor
         /// Polling interval in seconds
         /// </summary>
         private const float POLL_INTERVAL = 0.1f;
+        private const float ACTIVE_POLL_INTERVAL = 0.01f;
+        private static double _activeUntil;
+        private static FileSystemWatcher _commandNotifications;
+        private static int _scanRequested = 1;
 
         /// <summary>
         /// Maximum commands to process per frame
@@ -82,6 +86,24 @@ namespace AIBridge.Editor
             // Initialize components
             _watcher = new CommandWatcher(BridgeDirectory);
             EditorInstanceTracker.Initialize(BridgeDirectory);
+            HelpCommand.ExportCatalog(BridgeDirectory);
+            try
+            {
+                _commandNotifications = new FileSystemWatcher(Path.Combine(BridgeDirectory, "commands"), "*.json");
+                _commandNotifications.Created += (_, __) => System.Threading.Interlocked.Exchange(ref _scanRequested, 1);
+                _commandNotifications.Renamed += (_, __) => System.Threading.Interlocked.Exchange(ref _scanRequested, 1);
+                _commandNotifications.Changed += (_, __) => System.Threading.Interlocked.Exchange(ref _scanRequested, 1);
+                _commandNotifications.Error += (_, __) => System.Threading.Interlocked.Exchange(ref _scanRequested, 1);
+                _commandNotifications.EnableRaisingEvents = true;
+            }
+            catch (System.Exception ex)
+            {
+                _commandNotifications?.Dispose();
+                _commandNotifications = null;
+                AIBridgeLogger.LogWarning("Command notifications unavailable; periodic scan remains active: " + ex.Message);
+            }
+            AssemblyReloadEvents.beforeAssemblyReload += DisposeNotifications;
+            EditorApplication.quitting += DisposeNotifications;
 
             // Subscribe to editor update
             EditorApplication.update -= OnEditorUpdate;
@@ -164,7 +186,9 @@ namespace AIBridge.Editor
 
             // Check polling interval
             var currentTime = EditorApplication.timeSinceStartup;
-            if (currentTime - _lastPollTime < POLL_INTERVAL)
+            if (System.Threading.Interlocked.Exchange(ref _scanRequested, 0) == 0
+                && currentTime - _lastPollTime < (currentTime < _activeUntil ? ACTIVE_POLL_INTERVAL : POLL_INTERVAL)
+                && !_watcher.HasPendingWork)
             {
                 return;
             }
@@ -175,10 +199,18 @@ namespace AIBridge.Editor
 
             // Process commands (limited per frame to prevent blocking)
             var processed = 0;
-            while (processed < MAX_COMMANDS_PER_FRAME && _watcher.ProcessOneCommand())
+            var budget = System.Diagnostics.Stopwatch.StartNew();
+            while (budget.ElapsedMilliseconds < 8 && processed < MAX_COMMANDS_PER_FRAME && _watcher.ProcessOneCommand())
             {
                 processed++;
             }
+            if (processed > 0) _activeUntil = EditorApplication.timeSinceStartup + 1;
+        }
+
+        private static void DisposeNotifications()
+        {
+            _commandNotifications?.Dispose();
+            _commandNotifications = null;
         }
 
         /// <summary>

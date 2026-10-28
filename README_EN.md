@@ -262,6 +262,16 @@ MIT License
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+## Editor scheduling, caching and offline help
+
+Identical C# source reuses its compiled entry point, but executes again and returns fresh values/tasks. Cache hits skip source wrapping/parsing. Assembly loads trigger reference checks immediately; changes to DLL files at the same path are rechecked at most one second later. Domain reload clears the cache. Compilation errors include the diagnostic ID, original probe line/column and source excerpt.
+
+File notifications wake the Editor command pump, with a 100ms fallback scan and a 10ms polling interval for one second after work arrives. Actual latency still depends on Editor updates and main-thread load. CLI result waits use notifications plus a 500ms fallback, or 50ms polling when notifications are unavailable. Synchronous commands advance immediately; Batch shares an 8ms budget before yielding and still waits for each asynchronous item. A single synchronous operation cannot be preempted.
+
+`Help --command <name> --raw` first reads the catalog matching the Editor session. `--offline` never submits a command and can read the retained catalog after the Editor closes. `data.helpCatalog` identifies the source session, generation time and presence of session metadata. Missing or mismatched catalogs fail explicitly; start the matching Editor after an upgrade to regenerate help. Registry scans also refresh the catalog.
+
+Timing fields separate discovery, queueing, dispatch and active coroutine work (`discoveryMs`, `queuedMs`, `dispatchMs`, `activeMs`). `executionMs` includes asynchronous/yield waits. `cliWaitMs` includes submission and waiting; `cliSubmitMs` isolates submission, and `resultDeliveryMs` includes serialization, publication retries and client observation. Code results include `initializationMs`, `referenceMs` and `compileMs`; Compile reports its full `compileTotalMs`. These are wall-clock measurements, not CPU profiler samples; a parent Batch does not accumulate all frames of an asynchronous child.
+
 ## Editor 协议 2：调用迁移
 
 本次是接口变更，Editor 包与 CLI 必须成套升级；Runtime Bridge 协议不变。

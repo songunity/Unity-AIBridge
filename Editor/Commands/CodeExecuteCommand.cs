@@ -61,11 +61,13 @@ public static class CodeExecuteCommand
         var logs = new List<object>();
         var logHandler = new Application.LogCallback((message, stackTrace, type) =>
             logs.Add(new { level = type.ToString(), message, stackTrace }));
+        var initialization = System.Diagnostics.Stopwatch.StartNew();
         var codeRunner = runner ??= new CSharpCodeRunner();
+        initialization.Stop();
         EvaluationResult result = null;
         var invocationTimer = System.Diagnostics.Stopwatch.StartNew();
         var waitTimer = new System.Diagnostics.Stopwatch();
-        long preparationMs = 0;
+        long preparationMs = 0, referenceMs = 0, compileMs = 0;
         bool cacheHit = false;
         bool timedOut = false;
         Application.logMessageReceived += logHandler;
@@ -75,6 +77,8 @@ public static class CodeExecuteCommand
             {
                 result = codeRunner.CompileAndExecute(code);
                 preparationMs = codeRunner.LastPreparationMs;
+                referenceMs = codeRunner.LastReferenceMs;
+                compileMs = codeRunner.LastCompileMs;
                 cacheHit = codeRunner.LastCacheHit;
             }
             catch (Exception ex)
@@ -137,7 +141,7 @@ public static class CodeExecuteCommand
             returnValue = value,
             logs,
             logScope = "executionWindow",
-            timings = new { preparationMs, invocationMs = invocationTimer.ElapsedMilliseconds - preparationMs - waitTimer.ElapsedMilliseconds, asyncWaitMs = waitTimer.ElapsedMilliseconds, cacheHit }
+            timings = new { initializationMs = initialization.ElapsedMilliseconds, preparationMs, referenceMs, compileMs, invocationMs = invocationTimer.ElapsedMilliseconds - preparationMs - waitTimer.ElapsedMilliseconds, asyncWaitMs = waitTimer.ElapsedMilliseconds, cacheHit }
         };
         yield return response;
     }

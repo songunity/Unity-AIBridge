@@ -18,6 +18,8 @@ namespace AIBridge.Editor
             public string RequestId;
             public Stopwatch Timer;
             public IEnumerator CurrentEnumerator;
+            private long _dispatchMs = -1;
+            private readonly Stopwatch _active = new Stopwatch();
 
             private double _waitStartTime;
             private float _waitDuration;
@@ -26,6 +28,7 @@ namespace AIBridge.Editor
             {
                 try
                 {
+                    if (_dispatchMs < 0) _dispatchMs = Timer.ElapsedMilliseconds;
                     var currentCoroutine = CurrentEnumerator ?? Coroutine;
 
                     while (true)
@@ -40,7 +43,11 @@ namespace AIBridge.Editor
                             _waitDuration = 0;
                         }
 
-                        if (!currentCoroutine.MoveNext())
+                        bool moved;
+                        _active.Start();
+                        try { moved = currentCoroutine.MoveNext(); }
+                        finally { _active.Stop(); }
+                        if (!moved)
                         {
                             if (CurrentEnumerator != null)
                             {
@@ -50,6 +57,8 @@ namespace AIBridge.Editor
 
                             var result = CommandResult.SuccessWithId(RequestId);
                             result.executionTime = Timer.ElapsedMilliseconds;
+                            result.dispatchDelayMs = Math.Max(0, _dispatchMs);
+                            result.activeMs = _active.ElapsedMilliseconds;
                             OnComplete?.Invoke(result);
                             return true;
                         }
@@ -92,6 +101,8 @@ namespace AIBridge.Editor
                         {
                             commandResult.id = RequestId;
                             commandResult.executionTime = Timer.ElapsedMilliseconds;
+                            commandResult.dispatchDelayMs = Math.Max(0, _dispatchMs);
+                            commandResult.activeMs = _active.ElapsedMilliseconds;
                             OnComplete?.Invoke(commandResult);
                             return true;
                         }
@@ -103,6 +114,8 @@ namespace AIBridge.Editor
                 {
                     var result = CommandResult.FromException(RequestId, ex);
                     result.executionTime = Timer.ElapsedMilliseconds;
+                    result.dispatchDelayMs = Math.Max(0, _dispatchMs);
+                    result.activeMs = _active.ElapsedMilliseconds;
                     OnComplete?.Invoke(result);
                     return true;
                 }
@@ -132,13 +145,15 @@ namespace AIBridge.Editor
 
         public static void Start(IEnumerator coroutine, Action<CommandResult> onComplete, string requestId)
         {
-            _running.Add(new CoroutineHandle
+            var handle = new CoroutineHandle
             {
                 Coroutine = coroutine,
                 OnComplete = onComplete,
                 RequestId = requestId,
                 Timer = Stopwatch.StartNew()
-            });
+            };
+            // 同步结果当次完成；真正 yield 的命令仍由 Editor update 推进。
+            if (!handle.Step()) _running.Add(handle);
         }
 
         private static void Tick()

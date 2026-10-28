@@ -119,6 +119,18 @@ public class Program
             }
         }
 
+        if (parsed.CommandName == "Help")
+        {
+            parsed.Options.TryGetValue("command", out var command);
+            var local = HelpProvider.ReadCatalog(PathHelper.GetExchangeDirectory(), command, parsed.Options.ContainsKey("offline"));
+            if (local != null || parsed.Options.ContainsKey("offline"))
+            {
+                local ??= CommandSender.Failure(null, "HELP_UNAVAILABLE", "No matching Editor session catalog. Start the matching Editor once to publish help; do not retry offline Help until the catalog changes.");
+                OutputFormatter.PrintResult(local, parsed.OutputMode);
+                return local.success ? 0 : 1;
+            }
+        }
+
         // Build request
         var request = RequestBuilder.BuildRequest(parsed);
 

@@ -90,6 +90,12 @@ namespace AIBridge.Editor
             var autoScan = EditorPrefs.GetBool(PrefKeyAutoScan, false);
             if (!autoScan && IsEditablePackage)
                 RegenerateAutoRegister(found);
+            // 扫描可能发生在初始化过程中；下次 Editor update 再发布已更新的参数目录。
+            EditorApplication.delayCall += () =>
+            {
+                if (!string.IsNullOrEmpty(AIBridge.BridgeDirectory))
+                    HelpCommand.ExportCatalog(AIBridge.BridgeDirectory);
+            };
         }
 
         private static HashSet<string> GetExtraScanAssemblies()
@@ -236,6 +242,9 @@ namespace AIBridge.Editor
             RegisterCommand(inspectorCommandType.GetMethod("AddComponent", flags));
             RegisterCommand(inspectorCommandType.GetMethod("GetComponents", flags));
             RegisterCommand(inspectorCommandType.GetMethod("GetProperties", flags));
+            RegisterCommand(inspectorCommandType.GetMethod("GetProperty", flags));
+            RegisterCommand(inspectorCommandType.GetMethod("FindProperty", flags));
+            RegisterCommand(inspectorCommandType.GetMethod("SetProperties", flags));
             RegisterCommand(inspectorCommandType.GetMethod("RemoveComponent", flags));
             RegisterCommand(inspectorCommandType.GetMethod("SetProperty", flags));
             var menuItemCommandType = loadedAssemblies["com.sh.aibridge.Editor"].GetType("AIBridge.Editor.MenuItemCommand");
@@ -243,6 +252,7 @@ namespace AIBridge.Editor
             var prefabCommandType = loadedAssemblies["com.sh.aibridge.Editor"].GetType("AIBridge.Editor.PrefabCommand");
             RegisterCommand(prefabCommandType.GetMethod("Apply", flags));
             RegisterCommand(prefabCommandType.GetMethod("GetInfo", flags));
+            RegisterCommand(prefabCommandType.GetMethod("GetHierarchy", flags));
             RegisterCommand(prefabCommandType.GetMethod("Instantiate", flags));
             RegisterCommand(prefabCommandType.GetMethod("Save", flags));
             RegisterCommand(prefabCommandType.GetMethod("Unpack", flags));
@@ -267,6 +277,14 @@ namespace AIBridge.Editor
             RegisterCommand(transformCommandType.GetMethod("SetScale", flags));
             var codeExecuteCommandType = loadedAssemblies["com.sh.aibridge.Editor"].GetType("CodeExecuteCommand");
             RegisterCommand(codeExecuteCommandType.GetMethod("Execute", flags));
+            RegisterCommand(codeExecuteCommandType.GetMethod("CacheStatus", flags));
+            var gameViewCommandType = loadedAssemblies["com.sh.aibridge.Editor"].GetType("AIBridge.Editor.GameViewCommand");
+            RegisterCommand(gameViewCommandType.GetMethod("GetResolution", flags));
+            RegisterCommand(gameViewCommandType.GetMethod("SetResolution", flags));
+            RegisterCommand(gameViewCommandType.GetMethod("ListResolutions", flags));
+            var testCommandType = loadedAssemblies["com.sh.aibridge.Editor"].GetType("AIBridge.Editor.TestCommand");
+            RegisterCommand(testCommandType.GetMethod("Run", flags));
+            RegisterCommand(testCommandType.GetMethod("Status", flags));
             var runtimeExecuteCommandType = loadedAssemblies["com.sh.aibridge.Editor"].GetType("RuntimeExecuteCommand");
             if (runtimeExecuteCommandType != null)
                 RegisterCommand(runtimeExecuteCommandType.GetMethod("Execute", flags));

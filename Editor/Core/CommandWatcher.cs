@@ -25,7 +25,9 @@ namespace AIBridge.Editor
         private readonly Dictionary<string, string> _pendingStatuses = new Dictionary<string, string>();
         private readonly Dictionary<string, PendingResult> _pendingResults = new Dictionary<string, PendingResult>();
         private readonly HashSet<string> _published = new HashSet<string>();
+        private readonly Dictionary<string, long> _discoveryTimes = new Dictionary<string, long>();
         private DateTime _nextCleanup;
+        public bool HasPendingWork => _queue.Count > 0 || _pendingResults.Count > 0 || _pendingStatuses.Count > 0;
 
         private enum StatusWrite { Written, Waiting, Failed }
 
@@ -104,6 +106,7 @@ namespace AIBridge.Editor
                     if (_queue.Enqueue(request))
                     {
                         _queueTimers[id] = Stopwatch.StartNew();
+                        _discoveryTimes[id] = Math.Max(0, (long)(DateTime.UtcNow - File.GetLastWriteTimeUtc(file)).TotalMilliseconds);
                         TryDeleteInput(file);
                     }
                 }
@@ -172,7 +175,10 @@ namespace AIBridge.Editor
             result.status = result.errorCode == "EXECUTION_WAIT_TIMEOUT" ? "unknown" : result.success ? "completed" : "failed";
             _queueTimes.TryGetValue(result.id, out var queuedMs);
             _queueTimes.Remove(result.id);
-            result.timings = new { queuedMs, executionMs = result.executionTime };
+            _discoveryTimes.TryGetValue(result.id, out var discoveryMs);
+            _discoveryTimes.Remove(result.id);
+            result.timings = new { discoveryMs, queuedMs, dispatchMs = result.dispatchDelayMs, activeMs = result.activeMs,
+                executionMs = result.executionTime, resultReadyUtc = DateTime.UtcNow.ToString("O") };
             string json;
             try { json = JsonConvert.SerializeObject(result, Formatting.Indented, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore, ReferenceLoopHandling = ReferenceLoopHandling.Ignore }); }
             catch (Exception ex)

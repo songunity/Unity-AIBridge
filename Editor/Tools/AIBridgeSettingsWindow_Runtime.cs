@@ -20,7 +20,8 @@ namespace AIBridge.Editor
         private readonly List<AIBridgeRuntimeDiscoveredTargetInfo> _discoveredTargets = new List<AIBridgeRuntimeDiscoveredTargetInfo>();
         private readonly List<RuntimeTargetView> _targets = new List<RuntimeTargetView>();
         private readonly HashSet<string> _expandedTargetIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private readonly HashSet<string> _refreshingHealthUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private Task<AIBridgeRuntimeLanDiscoveryResult> _pendingRefresh;
+        private double _nextHealthRefreshTime;
         private Vector2 _scrollPosition;
         private string _runtimeDirectory;
         private string _localHttpUrl;
@@ -30,7 +31,7 @@ namespace AIBridge.Editor
         private string _lanScanStatus;
         private double _lanScanStatusTime;
         private int _lanScanGeneration;
-        private double _lastRefreshTime;
+        private double _lastRefreshTime = -1;
         private double _nextTargetCacheRefreshTime;
         private double _nextUiRepaintTime;
 
@@ -59,6 +60,18 @@ namespace AIBridge.Editor
         private void OnInspectorUpdate()
         {
             var now = EditorApplication.timeSinceStartup;
+            if (_pendingRefresh != null && _pendingRefresh.IsCompleted)
+            {
+                var task = _pendingRefresh;
+                _pendingRefresh = null;
+                CompleteLanScan(_lanScanGeneration, task.Status == TaskStatus.RanToCompletion ? task.Result
+                    : new AIBridgeRuntimeLanDiscoveryResult { Error = task.Exception?.GetBaseException().Message ?? "Refresh canceled" });
+            }
+            if (now >= _nextHealthRefreshTime && !_lanScanRunning)
+            {
+                _nextHealthRefreshTime = now + 30;
+                if (_discoveredTargets.Count > 0) BeginLanScan(false);
+            }
             if (now >= _nextTargetCacheRefreshTime)
             {
                 LoadRuntimeTargetsFromCache();
@@ -76,6 +89,8 @@ namespace AIBridge.Editor
         {
             titleContent = new GUIContent(AIBridgeEditorText.Get(AIBridgeEditorTextKey.AIBridgeRuntimeTitle));
             DrawHeader();
+            if (!string.IsNullOrEmpty(AIBridgeRuntimeBridgeEditorUtility.DiscoveryCacheError))
+                EditorGUILayout.HelpBox(AIBridgeRuntimeBridgeEditorUtility.DiscoveryCacheError, MessageType.Warning);
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
             DrawRuntimeBridgeSettings();
             EditorGUILayout.EndScrollView();
@@ -296,15 +311,14 @@ namespace AIBridge.Editor
         private void DrawRuntimeTargetsToolbar()
         {
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+            using (new EditorGUI.DisabledScope(_lanScanRunning))
             if (GUILayout.Button(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Refresh), EditorStyles.toolbarButton, GUILayout.Width(72)))
             {
                 RefreshRuntimeTargets();
             }
 
             var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
-            var canScanLan = settings.EnableRuntimeBridge
-                && !IsLoopbackBindAddress(settings.HttpBindAddress)
-                && settings.EnableLanDiscovery;
+            var canScanLan = !_lanScanRunning;
             using (new EditorGUI.DisabledScope(!canScanLan))
             {
                 _scanLanOnRefresh = EditorGUILayout.ToggleLeft(
@@ -451,7 +465,10 @@ namespace AIBridge.Editor
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Kind), discovery.TargetKind);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Auth), discovery.RequiresToken ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.TokenRequired) : AIBridgeEditorText.Get(AIBridgeEditorTextKey.NoToken));
                 DrawInfoLine(AIBridgeEditorText.T("Online Time", "在线时长"), FormatUptime(discovery.UptimeSeconds));
-                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Health), discovery.Reachable ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.Online) : AIBridgeEditorText.Get(AIBridgeEditorTextKey.Unreachable));
+                DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Health), GetTargetStatus(target));
+                DrawInfoLine(AIBridgeEditorText.T("Last check", "最后检查"), FormatUtcLocalMinute(discovery.LastHealthCheckUtc));
+                if (!string.IsNullOrEmpty(discovery.HealthError))
+                    EditorGUILayout.HelpBox(discovery.HealthError, MessageType.Warning);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.Remote), discovery.RemoteEndPoint);
                 DrawInfoLine(AIBridgeEditorText.Get(AIBridgeEditorTextKey.SourceNic), JoinNonEmpty(discovery.SourceInterface, discovery.SourceInterfaceAddress));
             }
@@ -504,8 +521,18 @@ namespace AIBridge.Editor
                     || (target.Discovery != null && !string.IsNullOrWhiteSpace(GetDiscoveryUrl(target.Discovery))));
         }
 
-        private static string GetTargetStatus(RuntimeTargetView target)
+        private string GetTargetStatus(RuntimeTargetView target)
         {
+            if (_lanScanRunning) return AIBridgeEditorText.T("CHECKING", "检查中");
+            var discovery = target?.Discovery;
+            if (discovery != null && !(target.Player != null && !target.Player.Stale))
+            {
+                if (discovery.HealthError != null && (discovery.HealthError.StartsWith("HTTP 401") || discovery.HealthError.StartsWith("HTTP 403")))
+                    return AIBridgeEditorText.T("AUTH REQUIRED", "需要认证");
+                if (!IsReachableDiscovery(discovery) && discovery.AgeSeconds.HasValue
+                    && discovery.AgeSeconds.Value <= AIBridgeRuntimeBridgeEditorUtility.DiscoveryOfflineGraceSeconds)
+                    return AIBridgeEditorText.T("TEMPORARILY LOST", "暂时失联");
+            }
             if (IsConnectedTarget(target))
             {
                 return AIBridgeEditorText.Get(AIBridgeEditorTextKey.Online);
@@ -533,7 +560,7 @@ namespace AIBridge.Editor
 
         private static bool IsReachableDiscovery(AIBridgeRuntimeDiscoveredTargetInfo target)
         {
-            return target != null && target.Reachable;
+            return target != null && target.Reachable && !target.Stale && string.IsNullOrEmpty(target.HealthError);
         }
 
         private static bool CanDeleteTargetCache(RuntimeTargetView target)
@@ -625,15 +652,15 @@ namespace AIBridge.Editor
 
         private void RefreshRuntimeTargets()
         {
-            LoadRuntimeTargetsFromCache();
-            var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
-            if (_scanLanOnRefresh
-                && settings.EnableRuntimeBridge
-                && !IsLoopbackBindAddress(settings.HttpBindAddress)
-                && settings.EnableLanDiscovery)
-            {
-                BeginLanScan();
-            }
+            if (!_lanScanRunning) BeginLanScan(_scanLanOnRefresh);
+        }
+
+        private void OnDisable()
+        {
+            // 后台任务只产生结果，关闭窗口后不发布缓存、不访问窗口。
+            ++_lanScanGeneration;
+            _pendingRefresh = null;
+            _lanScanRunning = false;
         }
 
         private void LoadRuntimeTargetsFromCache()
@@ -646,10 +673,8 @@ namespace AIBridge.Editor
             _discoveredTargets.AddRange(AIBridgeRuntimeBridgeEditorUtility.ListDiscoveredTargets());
             ClearExpiredLanScanStatus();
             RebuildRuntimeTargets();
-            BeginStaleDiscoveryHealthRefresh();
-            _lastRefreshTime = EditorApplication.timeSinceStartup;
-            _nextTargetCacheRefreshTime = _lastRefreshTime + TargetCacheRefreshIntervalSeconds;
-            _nextUiRepaintTime = _lastRefreshTime + 1d;
+            _nextTargetCacheRefreshTime = EditorApplication.timeSinceStartup + TargetCacheRefreshIntervalSeconds;
+            _nextUiRepaintTime = EditorApplication.timeSinceStartup + 1d;
             Repaint();
         }
 
@@ -904,58 +929,20 @@ namespace AIBridge.Editor
             return 1;
         }
 
-        private void BeginLanScan()
+        private void BeginLanScan(bool scanLan)
         {
-            if (_lanScanRunning)
-            {
-                return;
-            }
-
+            if (_lanScanRunning) return;
             var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
             var udpPort = Math.Max(1, settings.DiscoveryUdpPort);
             var authToken = settings.AuthToken;
-            var generation = ++_lanScanGeneration;
-            var synchronizationContext = SynchronizationContext.Current;
+            ++_lanScanGeneration;
             _lanScanRunning = true;
-            _lanScanStatus = AIBridgeEditorText.Get(AIBridgeEditorTextKey.ScanningUdp, udpPort);
+            _lanScanStatus = scanLan ? AIBridgeEditorText.T("Scanning and checking devices", "扫描并检查设备中")
+                : AIBridgeEditorText.T("Checking known devices", "检查已有设备中");
             _lanScanStatusTime = EditorApplication.timeSinceStartup;
+            _pendingRefresh = Task.Run(() => AIBridgeRuntimeBridgeEditorUtility.DiscoverLanTargets(
+                AIBridgeRuntimeBridgeEditorUtility.DefaultLanDiscoveryTimeoutMs, udpPort, authToken, scanLan, deferPublish: true));
             Repaint();
-
-            Task.Run(() =>
-            {
-                try
-                {
-                    return AIBridgeRuntimeBridgeEditorUtility.DiscoverLanTargets(
-                        AIBridgeRuntimeBridgeEditorUtility.DefaultLanDiscoveryTimeoutMs,
-                        udpPort,
-                        authToken);
-                }
-                catch (Exception exception)
-                {
-                    return new AIBridgeRuntimeLanDiscoveryResult
-                    {
-                        Success = false,
-                        Error = exception.Message
-                    };
-                }
-            }).ContinueWith(task =>
-            {
-                var result = task.Status == TaskStatus.RanToCompletion
-                    ? task.Result
-                    : new AIBridgeRuntimeLanDiscoveryResult
-                    {
-                        Success = false,
-                        Error = task.Exception == null ? "task canceled" : task.Exception.GetBaseException().Message
-                    };
-                if (synchronizationContext != null)
-                {
-                    synchronizationContext.Post(_ => CompleteLanScan(generation, result), null);
-                }
-                else
-                {
-                    EditorApplication.delayCall += () => CompleteLanScan(generation, result);
-                }
-            }, TaskScheduler.Default);
         }
 
         private void CompleteLanScan(int generation, AIBridgeRuntimeLanDiscoveryResult result)
@@ -966,6 +953,13 @@ namespace AIBridge.Editor
             }
 
             _lanScanRunning = false;
+            _lastRefreshTime = EditorApplication.timeSinceStartup;
+            _nextHealthRefreshTime = _lastRefreshTime + 30;
+            if (result != null && result.Success)
+            {
+                try { result.Publish?.Invoke(); }
+                catch (Exception ex) { result.Success = false; result.Error = ex.Message; }
+            }
             if (result == null || !result.Success)
             {
                 var error = result == null ? "unknown error" : result.Error;
@@ -1009,7 +1003,7 @@ namespace AIBridge.Editor
 
             if (_lanScanRunning)
             {
-                return _lanScanStatus;
+                return _lanScanStatus + " (" + (EditorApplication.timeSinceStartup - _lanScanStatusTime).ToString("F1") + "s)";
             }
 
             var age = Math.Max(0d, EditorApplication.timeSinceStartup - _lanScanStatusTime);
@@ -1035,63 +1029,6 @@ namespace AIBridge.Editor
                 || string.Equals(trimmed, "::1", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(trimmed, "[::1]", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(trimmed, "localhost", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private void BeginStaleDiscoveryHealthRefresh()
-        {
-            if (_lanScanRunning || _discoveredTargets.Count == 0)
-            {
-                return;
-            }
-
-            var settings = AIBridgeProjectSettings.Instance.RuntimeBridge;
-            var authToken = settings.AuthToken;
-            for (var i = 0; i < _discoveredTargets.Count; i++)
-            {
-                var target = _discoveredTargets[i];
-                if (target == null || !target.Stale || string.IsNullOrWhiteSpace(GetDiscoveryUrl(target)))
-                {
-                    continue;
-                }
-
-                var url = GetDiscoveryUrl(target);
-                if (!_refreshingHealthUrls.Add(url))
-                {
-                    continue;
-                }
-
-                var synchronizationContext = SynchronizationContext.Current;
-                Task.Run(() =>
-                {
-                    string error;
-                    return AIBridgeRuntimeBridgeEditorUtility.TryRefreshDiscoveredTargetHealth(
-                        target,
-                        timeoutMs: 500,
-                        authToken: authToken,
-                        error: out error);
-                }).ContinueWith(task =>
-                {
-                    if (synchronizationContext != null)
-                    {
-                        synchronizationContext.Post(_ => CompleteStaleDiscoveryHealthRefresh(url, task.Status == TaskStatus.RanToCompletion && task.Result), null);
-                    }
-                    else
-                    {
-                        EditorApplication.delayCall += () => CompleteStaleDiscoveryHealthRefresh(url, task.Status == TaskStatus.RanToCompletion && task.Result);
-                    }
-                }, TaskScheduler.Default);
-            }
-        }
-
-        private void CompleteStaleDiscoveryHealthRefresh(string url, bool refreshed)
-        {
-            _refreshingHealthUrls.Remove(url);
-            if (this == null || !refreshed)
-            {
-                return;
-            }
-
-            LoadRuntimeTargetsFromCache();
         }
 
         private static void SaveRuntimeSettings()
@@ -1321,6 +1258,7 @@ namespace AIBridge.Editor
 
         private string FormatRefreshAge()
         {
+            if (_lastRefreshTime < 0) return AIBridgeEditorText.T("Not checked", "尚未检查");
             var age = Math.Max(0, EditorApplication.timeSinceStartup - _lastRefreshTime);
             return age < 1 ? AIBridgeEditorText.Get(AIBridgeEditorTextKey.Now) : age.ToString("F0") + "s";
         }

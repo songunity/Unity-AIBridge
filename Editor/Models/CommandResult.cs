@@ -38,6 +38,8 @@ namespace AIBridge.Editor
         /// Execution time in milliseconds
         /// </summary>
         public long executionTime;
+        [NonSerialized] public long dispatchDelayMs;
+        [NonSerialized] public long activeMs;
 
         /// <summary>
         /// Create a successful result

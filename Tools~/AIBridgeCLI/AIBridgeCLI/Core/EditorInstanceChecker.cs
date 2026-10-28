@@ -17,7 +17,7 @@ internal static class EditorInstanceChecker
         var metadataPath = Path.Combine(exchangeDir, MetadataFileName);
 
         if (!File.Exists(metadataPath))
-            return (false, "Unity Editor is not running or AIBridge is not active (metadata file not found).");
+            return (false, $"No Editor metadata at {metadataPath}. Verify the project/CLI path and Editor process before retrying. Existing help may be read with Help --offline --raw.");
 
         EditorInstanceMetadata metadata;
         try
@@ -59,7 +59,7 @@ internal static class EditorInstanceChecker
                 DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var lastUpdated))
         {
             if (DateTime.UtcNow - lastUpdated > MaxMetadataAge)
-                return (false, "Unity Editor is not responding (heartbeat stale). Reopen or refocus the Unity Editor.");
+                return (false, $"Unity Editor process {metadata.processId} has a stale heartbeat ({(DateTime.UtcNow - lastUpdated).TotalSeconds:F0}s). Check compilation/import progress and Editor logs; wait for the heartbeat to change before retrying. This does not prove the Editor has exited.");
         }
 
         return (true, null);

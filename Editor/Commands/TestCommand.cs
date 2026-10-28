@@ -10,9 +10,9 @@ namespace AIBridge.Editor
             @"运行项目中的单元测试并返回结果。支持按测试名、分组、程序集过滤。
 
 示例：
-AIBridgeCLI TestCommand_Run --mode EditMode --raw
-AIBridgeCLI TestCommand_Run --testName ""MyNamespace.MyFixture.MyTest"" --raw
-AIBridgeCLI TestCommand_Run --assemblyName ""Tests"" --raw
+AIBridgeCLI Run --mode EditMode --raw
+AIBridgeCLI Run --testName ""MyNamespace.MyFixture.MyTest"" --raw
+AIBridgeCLI Run --assemblyName ""Tests"" --raw
 
 返回值包含：status, total, passed, failed, skipped, failedTests（含名称、消息、堆栈）",
             "Run")]
@@ -60,7 +60,7 @@ AIBridgeCLI TestCommand_Run --assemblyName ""Tests"" --raw
             @"查询最近一次测试运行的状态和结果。
 
 示例：
-AIBridgeCLI TestCommand_Status --raw
+AIBridgeCLI Status --raw
 
 返回值：status(idle/running/passed/failed/timeout), total, passed, failed, failedTests",
             "Status")]

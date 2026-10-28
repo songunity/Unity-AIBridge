@@ -1,6 +1,7 @@
 """仅在仓库 Temp/protocol-validation 隔离工程验证 Editor 协议，不连接业务项目。"""
 import argparse
 import json
+import re
 import statistics
 import subprocess
 import time
@@ -60,6 +61,16 @@ def main():
     assert Path(metadata["projectRoot"]).resolve() == PROJECT.resolve(), "禁止连接隔离工程以外的 Unity"
     assert metadata["protocolVersion"] == 2, "隔离工程必须加载协议 2 的仓库代码"
     call("EditorCommand_GetState")
+    from ValidateRuntimeDiscovery import validate
+    runtime_discovery = validate(call, PROJECT)
+    help_result = call("Help", {"command": "CodeExecuteCommand_Execute"}, options=("--offline",))
+    assert help_result["data"]["helpCatalog"]["sessionId"] == metadata["sessionId"]
+    # 实际注册表与 Skill 目录一致；不只检查源码字符串。
+    exposed = code('using System.Linq; return AIBridge.Editor.CommandRegistry.GetAll().Where(e => e.Attribute.ExposeToSkill && e.Method.DeclaringType.Name != "RuntimeCommand" && e.Method.DeclaringType.Name != "RuntimeExecuteCommand").Select(e => e.Name).ToArray();')
+    skill = (ROOT / "Skill~/aibridge/SKILL.md").read_text(encoding="utf-8-sig").split("<!-- AUTO-GENERATED-COMMANDS-START -->")[1]
+    assert set(exposed["data"]["returnValue"]) | {"Compile"} == set(re.findall(r"\*\*([A-Za-z][A-Za-z0-9_]*)\*\*", skill))
+    diagnostic = code('using System;\nusing UnityEngine;\nreturn MissingProbeValue;', False)
+    assert "CS0103" in diagnostic["error"] and "probe.csx(3," in diagnostic["error"] and "return MissingProbeValue;" in diagnostic["error"]
     typed = code('UnityEngine.Debug.LogWarning("expected warning"); return new {number=42,flag=true,text="Exception: data",empty=(string)null,items=new[]{1,2}};')
     assert typed["data"]["returnValue"] == {"number": 42, "flag": True, "text": "Exception: data", "empty": None, "items": [1, 2]}
     assert typed["data"]["logs"][0]["level"] == "Warning"
@@ -71,6 +82,28 @@ def main():
     first, second = code(body), code(body)
     assert first["data"]["returnValue"] != second["data"]["returnValue"]
     assert second["data"]["timings"]["cacheHit"]
+    assert "referenceMs" in second["data"]["timings"] and "compileMs" in second["data"]["timings"]
+    assert second["data"]["timings"]["compileMs"] == 0
+    assert "discoveryMs" in second["timings"] and "resultDeliveryMs" in second["timings"]
+    # 新程序集加载必须立即使引用集合失效，不能等待一秒文件复核窗口。
+    loaded = code('''using System.IO;
+using System.Reflection;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+var name = "BridgeReferenceProbe_" + System.Guid.NewGuid().ToString("N");
+var path = Path.Combine(AIBridge.Editor.AIBridge.BridgeDirectory, "code", name + ".dll");
+var compilation = CSharpCompilation.Create(name,
+    new[] { CSharpSyntaxTree.ParseText("public static class BridgeReferenceValue { public static int Value => 73; }") },
+    new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+using (var stream = File.Create(path)) {
+    var emitted = compilation.Emit(stream);
+    if (!emitted.Success) throw new System.Exception(string.Join(";", emitted.Diagnostics));
+}
+Assembly.LoadFrom(path);
+return true;''')
+    assert loaded["data"]["returnValue"] is True
+    assert code('return BridgeReferenceValue.Value;')["data"]["returnValue"] == 73
 
     commands = [{"type": "CodeExecuteCommand_Execute", "params": {"code": "return 1;"}},
                 {"type": "MissingCommand", "params": {}},
@@ -80,6 +113,11 @@ def main():
     continued = call("Batch", {"commands": commands, "stopOnError": False}, False)
     assert continued["data"]["successCount"] == 2 and continued["data"]["failureCount"] == 1
     assert call("Batch", {"commands": [commands[0], commands[2]]})["data"]["successCount"] == 2
+    # 同步启动优化不得让后一项越过异步项，也不得重复执行。
+    ordered = call("Batch", {"commands": [
+        {"type": "CodeExecuteCommand_Execute", "params": {"code": 'UnityEditor.SessionState.SetInt("AIBridge.Order", 1); await System.Threading.Tasks.Task.Delay(100); UnityEditor.SessionState.SetInt("AIBridge.Order", 2); return 2;'}},
+        {"type": "CodeExecuteCommand_Execute", "params": {"code": 'return UnityEditor.SessionState.GetInt("AIBridge.Order", 0);'}}]})
+    assert [item["data"]["returnValue"] for item in ordered["data"]["results"]] == [2, 2]
 
     late = call("CodeExecuteCommand_Execute", {"code": "await System.Threading.Tasks.Task.Delay(1000); return 77;"}, False, ("--timeout", "100"))
     assert late["errorCode"] == "WAIT_TIMEOUT"
@@ -129,12 +167,13 @@ def main():
         raise AssertionError("domain reload did not finish")
     assert query("status", pending["id"])["status"] == "unknown"
     assert call("CodeExecuteCommand_CacheStatus")["data"]["entries"] == 0
-    call("Compile", options=("--timeout", "45000"))
+    compiled = call("Compile", options=("--timeout", "45000"))
+    assert compiled["timings"]["compileTotalMs"] >= compiled["timings"]["cliWaitMs"]
     invalid = subprocess.run([str(CLI), "-invalid", "--raw"], capture_output=True, text=True, encoding="utf-8")
     assert invalid.returncode != 0 and json.loads(invalid.stdout)["errorCode"] == "CLI_ERROR"
     runtime = subprocess.run([str(CLI), "runtime", "list_targets", "--raw"], capture_output=True, text=True, encoding="utf-8")
     assert runtime.returncode == 0 and "protocolVersion" not in json.loads(runtime.stdout)
-    summary = {"passed": True, "checks": len(records), "rawErrors": True, "runtimeFormatUnchanged": True, "performance": performance}
+    summary = {"passed": True, "checks": len(records), "rawErrors": True, "runtimeFormatUnchanged": True, "performance": performance, "runtimeDiscovery": runtime_discovery}
     records.append(summary)
     REPORT.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False))

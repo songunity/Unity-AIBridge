@@ -31,11 +31,16 @@ public class CommandSender
         var timer = Stopwatch.StartNew();
         var sent = Submit(request);
         if (!sent.success) return sent;
+        var submitMs = timer.ElapsedMilliseconds;
         var result = WaitForResult(request.id, _timeout);
         var timings = result.timings is JsonElement element && element.ValueKind == JsonValueKind.Object
             ? element.EnumerateObject().ToDictionary(p => p.Name, p => (object)p.Value.Clone())
             : new Dictionary<string, object>();
         timings["cliWaitMs"] = timer.ElapsedMilliseconds;
+        timings["cliSubmitMs"] = submitMs;
+        if (timings.TryGetValue("resultReadyUtc", out var ready)
+            && DateTimeOffset.TryParse(ready.ToString(), out var readyAt))
+            timings["resultDeliveryMs"] = Math.Max(0, (long)(DateTimeOffset.UtcNow - readyAt).TotalMilliseconds);
         result.timings = timings;
         return result;
     }
@@ -95,12 +100,31 @@ public class CommandSender
     {
         ValidateId(id);
         var timer = Stopwatch.StartNew();
+        using var changed = new AutoResetEvent(false);
+        FileSystemWatcher watcher = null;
+        try
+        {
+            watcher = new FileSystemWatcher(_resultsDir, id + ".json");
+            FileSystemEventHandler wake = (_, _) => { try { changed.Set(); } catch (ObjectDisposedException) { } };
+            watcher.Created += wake;
+            watcher.Changed += wake;
+            watcher.Renamed += (_, _) => { try { changed.Set(); } catch (ObjectDisposedException) { } };
+            watcher.EnableRaisingEvents = true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            watcher?.Dispose();
+            watcher = null;
+        }
+        using var notifications = watcher;
         do
         {
             var result = TryGetResult(id);
             if (result != null) return result;
-            Thread.Sleep(Math.Min(_pollInterval, Math.Max(1, timeout - (int)timer.ElapsedMilliseconds)));
+            changed.WaitOne(Math.Min(watcher == null ? _pollInterval : 500, Math.Max(1, timeout - (int)timer.ElapsedMilliseconds)));
         } while (timer.ElapsedMilliseconds < timeout);
+        var finalResult = TryGetResult(id);
+        if (finalResult != null) return finalResult;
         var pending = Failure(id, "WAIT_TIMEOUT", $"Timeout waiting for result after {timeout}ms. Execution was not cancelled; query this command ID before any retry.");
         pending.status = GetStatus(id).status;
         return pending;

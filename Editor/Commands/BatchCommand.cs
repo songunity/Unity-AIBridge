@@ -19,8 +19,15 @@ namespace AIBridge.Editor
             }
             var results = new List<object>();
             int successCount = 0, failureCount = 0, skippedCount = 0;
+            var budget = System.Diagnostics.Stopwatch.StartNew();
             for (int index = 0; index < items.Count; index++)
             {
+                // 限制同步批次独占主线程的时间；单条同步命令本身不能被抢占。
+                if (budget.ElapsedMilliseconds >= 8)
+                {
+                    yield return null;
+                    budget.Restart();
+                }
                 var item = items[index] as Dictionary<string, object>;
                 var type = item != null && item.TryGetValue("type", out var name) ? name?.ToString() : null;
                 if (stopOnError && failureCount > 0)
@@ -47,7 +54,11 @@ namespace AIBridge.Editor
                 {
                     subResult = CommandResult.FromException(null, ex.InnerException ?? ex);
                 }
-                while (subResult == null) yield return null;
+                while (subResult == null)
+                {
+                    yield return null;
+                    budget.Restart();
+                }
                 var status = subResult.success ? "completed" : subResult.errorCode == "EXECUTION_WAIT_TIMEOUT" ? "unknown" : "failed";
                 results.Add(new { index, type, status, subResult.success, subResult.data, subResult.error, subResult.errorCode, executionTime = timer.ElapsedMilliseconds });
                 if (subResult.success) successCount++; else failureCount++;

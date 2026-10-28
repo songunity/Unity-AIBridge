@@ -8,6 +8,8 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace AIBridge.Editor
 {
@@ -19,6 +21,7 @@ namespace AIBridge.Editor
         public int SentPackets;
         public int ScannedInterfaces;
         public string Error;
+        internal Action Publish;
     }
 
     internal static partial class AIBridgeRuntimeBridgeEditorUtility
@@ -31,11 +34,12 @@ namespace AIBridge.Editor
         private const int HealthCheckMaxTimeoutMs = 2000;
         private const string DiscoveryProtocol = "aibridge-runtime-discovery";
 
-        public static AIBridgeRuntimeLanDiscoveryResult DiscoverLanTargets(int timeoutMs, int udpPort, string authToken)
+        public static AIBridgeRuntimeLanDiscoveryResult DiscoverLanTargets(int timeoutMs, int udpPort, string authToken, bool scanLan = true, bool deferPublish = false)
         {
             var result = new AIBridgeRuntimeLanDiscoveryResult();
             var targets = new List<AIBridgeRuntimeLanDiscoveryTarget>();
             var sockets = new List<AIBridgeRuntimeLanDiscoverySocket>();
+            var budget = Stopwatch.StartNew();
 
             try
             {
@@ -50,7 +54,7 @@ namespace AIBridge.Editor
                     ["requestId"] = requestId
                 };
                 var bytes = Encoding.UTF8.GetBytes(SerializeJson(payload, pretty: false));
-                var interfaces = BuildLanDiscoveryInterfacePlan();
+                var interfaces = scanLan ? BuildLanDiscoveryInterfacePlan() : new List<AIBridgeRuntimeLanDiscoveryInterfaceInfo>();
 
                 for (var i = 0; i < interfaces.Count; i++)
                 {
@@ -71,13 +75,24 @@ namespace AIBridge.Editor
                     result.SentPackets += SendLanDiscoveryPackets(socket, bytes, startPort, endPort);
                 }
 
-                ReceiveLanDiscoveryResponses(sockets, targets, requestId, timeoutMs);
-                ApplyLanDiscoveryHealthChecks(targets, timeoutMs, authToken);
+                if (scanLan) ReceiveLanDiscoveryResponses(sockets, targets, requestId, Math.Min(timeoutMs, 1500));
+                // 合并已有设备，UDP 未回应不代表 HTTP 地址不可用。
+                foreach (var known in ListDiscoveredTargets())
+                {
+                    if (targets.Any(t => string.Equals(NormalizeUrl(t.url), NormalizeUrl(known.ReachableUrl ?? known.Url), StringComparison.OrdinalIgnoreCase))) continue;
+                    targets.Add(new AIBridgeRuntimeLanDiscoveryTarget {
+                        targetId = known.TargetId, url = known.ReachableUrl ?? known.Url, reachableUrl = known.ReachableUrl ?? known.Url,
+                        bindUrl = known.BindUrl, platform = known.Platform, projectName = known.ProjectName,
+                        applicationVersion = known.ApplicationVersion, deviceName = known.DeviceName,
+                        lastSeenUtc = known.LastSeenUtc, requiresToken = known.RequiresToken, targetKind = known.TargetKind });
+                }
+                ApplyLanDiscoveryHealthChecks(targets, timeoutMs, authToken, budget);
                 targets = CollapseLanDiscoveryTargets(targets);
                 targets.Sort(CompareLanDiscoveryTargets);
 
                 var reachableTargets = targets.Where(target => target.reachable).ToList();
-                WriteDiscoveryCache(reachableTargets);
+                result.Publish = () => WriteDiscoveryCache(targets);
+                if (!deferPublish) result.Publish();
 
                 result.Success = true;
                 result.Count = targets.Count;
@@ -342,22 +357,23 @@ namespace AIBridge.Editor
         private static void ApplyLanDiscoveryHealthChecks(
             List<AIBridgeRuntimeLanDiscoveryTarget> targets,
             int timeoutMs,
-            string authToken)
+            string authToken, Stopwatch budget)
         {
             var healthTimeoutMs = Math.Min(HealthCheckMaxTimeoutMs, Math.Max(HealthCheckMinTimeoutMs, timeoutMs));
-            for (var i = 0; i < targets.Count; i++)
+            Parallel.ForEach(targets, new ParallelOptions { MaxDegreeOfParallelism = 4 }, target =>
             {
-                var target = targets[i];
+                var remaining = 6000 - (int)budget.ElapsedMilliseconds;
+                if (remaining <= 0) { target.reachable = false; target.healthError = "Refresh deadline exceeded"; return; }
                 target.healthUrl = BuildUrl(target.url, "/aibridge/health");
                 target.lastHealthCheckUtc = DateTime.UtcNow.ToString("o");
 
                 Dictionary<string, object> health;
                 string error;
-                if (!TryGetLanDiscoveryHealth(target.url, healthTimeoutMs, authToken, out health, out error))
+                if (!TryGetLanDiscoveryHealth(target.url, Math.Min(remaining, healthTimeoutMs), authToken, out health, out error))
                 {
                     target.reachable = false;
                     target.healthError = error;
-                    continue;
+                    return;
                 }
 
                 target.reachable = true;
@@ -373,7 +389,7 @@ namespace AIBridge.Editor
                 target.uptimeSeconds = GetDouble(health, "uptimeSeconds");
                 target.capabilities = GetValue(health, "capabilities") ?? target.capabilities;
                 target.targetKind = ResolveLanDiscoveryTargetKind(target.platform, target.isLocal, target.isVirtualInterface);
-            }
+            });
         }
 
         public static bool TryRefreshDiscoveredTargetHealth(
@@ -431,6 +447,7 @@ namespace AIBridge.Editor
             bool updateLastSeen,
             string now)
         {
+            lock (DiscoveryCacheLock)
             try
             {
                 var cache = ReadDiscoveryCache();
@@ -466,7 +483,7 @@ namespace AIBridge.Editor
                     }
 
                     cache["updatedAtUtc"] = now;
-                    File.WriteAllText(GetDiscoveryCachePath(), SerializeJson(cache, pretty: true));
+                    SaveDiscoveryCache(cache);
                     return;
                 }
             }
@@ -536,6 +553,7 @@ namespace AIBridge.Editor
                     request.Headers[HttpRequestHeader.Authorization] = "Bearer " + authToken;
                 }
 
+                using (var deadline = new Timer(_ => request.Abort(), null, Math.Max(1, timeoutMs), Timeout.Infinite))
                 using (var response = (HttpWebResponse)request.GetResponse())
                 {
                     var statusCode = (int)response.StatusCode;
@@ -599,12 +617,15 @@ namespace AIBridge.Editor
                 Directory.CreateDirectory(directory);
             }
 
-            var cache = new Dictionary<string, object>
+            lock (DiscoveryCacheLock)
             {
-                ["updatedAtUtc"] = DateTime.UtcNow.ToString("o"),
-                ["targets"] = MergeDiscoveryCacheTargets(targets)
-            };
-            File.WriteAllText(path, SerializeJson(cache, pretty: true));
+                var cache = new Dictionary<string, object>
+                {
+                    ["updatedAtUtc"] = DateTime.UtcNow.ToString("o"),
+                    ["targets"] = MergeDiscoveryCacheTargets(targets)
+                };
+                SaveDiscoveryCache(cache);
+            }
         }
 
         private static List<object> MergeDiscoveryCacheTargets(List<AIBridgeRuntimeLanDiscoveryTarget> targets)

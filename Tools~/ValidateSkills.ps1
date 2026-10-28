@@ -22,6 +22,33 @@ if (Test-Path -LiteralPath $aibridgeSkillPath -PathType Leaf) {
     if ($aibridgeSkill -match '(?m)^\s*AIBridgeCLI runtime\s') {
         $failures.Add('aibridge skill must not document the standalone Runtime CLI surface.')
     }
+    # 从源码属性检查目录，不另维护一份命令白名单。Editor 集成测试再与真实注册表交叉验证。
+    $expectedCommands = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    [void]$expectedCommands.Add('Compile')
+    foreach ($file in Get-ChildItem -LiteralPath (Join-Path $RepoRoot 'Editor/Commands') -Filter '*.cs') {
+        $source = Get-Content -LiteralPath $file.FullName -Raw
+        $class = [regex]::Match($source, 'public\s+(?:(?:static|partial)\s+)*class\s+(\w+)').Groups[1].Value
+        if ($class -in @('RuntimeCommand', 'RuntimeExecuteCommand')) { continue }
+        foreach ($method in [regex]::Matches($source, '\[AIBridge\((?<args>[\s\S]*?)\)\]\s*public\s+static\s+IEnumerator\s+(?<method>\w+)\s*\(')) {
+            $arguments = $method.Groups['args'].Value
+            if ($arguments -match 'exposeToSkill\s*:\s*false') { continue }
+            $name = [regex]::Match($arguments, '\bname\s*:\s*"([^"]+)"').Groups[1].Value
+            if (-not $name) {
+                $strings = [regex]::Matches($arguments, '@"(?:[^"]|"")*"|"(?:[^"\\]|\\.)*"')
+                if ($strings.Count -ge 3) { $name = $strings[2].Value.Trim('"') }
+            }
+            if (-not $name) { $name = $class + '_' + $method.Groups['method'].Value }
+            [void]$expectedCommands.Add($name)
+        }
+    }
+    $section = [regex]::Match($aibridgeSkill, '(?s)<!-- AUTO-GENERATED-COMMANDS-START -->(.*?)<!-- AUTO-GENERATED-COMMANDS-END -->').Groups[1].Value
+    $documented = @([regex]::Matches($section, '\*\*([A-Za-z][A-Za-z0-9_]*)\*\*') | ForEach-Object { $_.Groups[1].Value })
+    foreach ($name in $expectedCommands) {
+        if ($name -notin $documented) { $failures.Add("Skill command catalog missing: $name") }
+    }
+    foreach ($name in $documented) {
+        if (-not $expectedCommands.Contains($name)) { $failures.Add("Skill command catalog contains obsolete command: $name") }
+    }
 }
 
 if (Test-Path -LiteralPath $runtimeSkillPath -PathType Leaf) {
